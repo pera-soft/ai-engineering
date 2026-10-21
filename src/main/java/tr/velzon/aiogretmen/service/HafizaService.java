@@ -12,6 +12,7 @@ import tr.velzon.aiogretmen.ai.OgretmenAiClient.ModelTuru;
 import tr.velzon.aiogretmen.ai.OgretmenAiClient.Islem;
 import tr.velzon.aiogretmen.ai.PromptFactory;
 import tr.velzon.aiogretmen.config.AppProperties;
+import tr.velzon.aiogretmen.config.KullaniciBaglami;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -22,8 +23,12 @@ import java.util.Map;
  * Öğrenci hafızası (kullanıcı eklemesi): AI öğretmen gözlemlerini markdown ağacına yazar,
  * sonraki tüm çağrılara enjekte edilir. Güncelleme hataları ana akışı ASLA bozmaz.
  *
- *   data/hafiza/OGRENCI.md            — genel profil
- *   data/hafiza/hafta-NN/notlar.md    — hafta bazlı gözlemler
+ *   &lt;dizin&gt;/OGRENCI.md            — genel profil
+ *   &lt;dizin&gt;/hafta-NN/notlar.md    — hafta bazlı gözlemler
+ *
+ * <p>Faz 9b (ADR-0012): {@code <dizin>} KULLANICI BAŞINADIR ({@link KisiselDizin}) — yerel kullanıcı için
+ * eski kök {@code data/hafiza/}, diğerleri için {@code data/hafiza/kullanicilar/<sha256>/}. Kimlik her
+ * işlemin BAŞINDA bir kez çözülür; okuma ve yazma aynı kullanıcının dizinine gider.
  */
 @Service
 @LlmKullanan
@@ -35,30 +40,48 @@ public class HafizaService {
             (Henüz gözlem yok — ilk etkileşimlerden sonra AI öğretmen burayı dolduracak.)
             """;
 
-    private final Path hafizaDir;
+    /** Hafıza KÖKÜ (kitaplar/ ve vektor.json da burada — onlar kullanıcıya ait değildir). */
+    private final Path hafizaKok;
     private final OgretmenAiClient aiClient;
     private final PromptFactory promptFactory;
     private final JsonCevapParser parser;
+    private final KullaniciBaglami kullaniciBaglami;
 
     public HafizaService(AppProperties props, OgretmenAiClient aiClient,
-                         PromptFactory promptFactory, JsonCevapParser parser) {
-        this.hafizaDir = Path.of(props.hafizaDir());
+                         PromptFactory promptFactory, JsonCevapParser parser,
+                         KullaniciBaglami kullaniciBaglami) {
+        this.hafizaKok = Path.of(props.hafizaDir());
         this.aiClient = aiClient;
         this.promptFactory = promptFactory;
         this.parser = parser;
+        this.kullaniciBaglami = kullaniciBaglami;
+    }
+
+    /** Aktif kullanıcının hafıza dizini (oturum yoksa site profilinde fail-closed). */
+    private Path dizin() {
+        return KisiselDizin.coz(hafizaKok, kullaniciBaglami.aktifKullanici());
     }
 
     public String ogrenciProfili() {
-        return oku(hafizaDir.resolve("OGRENCI.md"), VARSAYILAN_PROFIL);
+        return ogrenciProfili(dizin());
     }
 
     public String haftaNotlari(int hafta) {
-        return oku(haftaNotlariYolu(hafta), "(Bu hafta için not yok.)");
+        return haftaNotlari(dizin(), hafta);
     }
 
     /** Prompt'lara enjekte edilecek birleşik hafıza bloğu (brief 7.1 + kullanıcı eklemesi). */
     public String hafizaBaglami(int hafta) {
-        return ogrenciProfili() + "\n\n## Hafta " + hafta + " notları\n" + haftaNotlari(hafta);
+        Path d = dizin();
+        return ogrenciProfili(d) + "\n\n## Hafta " + hafta + " notları\n" + haftaNotlari(d, hafta);
+    }
+
+    private static String ogrenciProfili(Path dizin) {
+        return oku(dizin.resolve("OGRENCI.md"), VARSAYILAN_PROFIL);
+    }
+
+    private static String haftaNotlari(Path dizin, int hafta) {
+        return oku(haftaNotlariYolu(dizin, hafta), "(Bu hafta için not yok.)");
     }
 
     /**
@@ -69,10 +92,11 @@ public class HafizaService {
         if (!aiClient.aktif()) {
             return;
         }
+        Path d = dizin(); // kimlik bir kez: okunan ve yazılan dizin AYNI kullanıcınınki
         try {
             String prompt = promptFactory.doldur("hafiza-guncelle", Map.of(
-                    "ogrenci_md", ogrenciProfili(),
-                    "hafta_notlari_md", haftaNotlari(hafta),
+                    "ogrenci_md", ogrenciProfili(d),
+                    "hafta_notlari_md", haftaNotlari(d, hafta),
                     "hafta", String.valueOf(hafta),
                     "etkilesim_turu", etkilesimTuru,
                     "etkilesim", etkilesim));
@@ -83,7 +107,7 @@ public class HafizaService {
                     prompt, 2000));
 
             parser.parse(yanit.metin(), HafizaGuncelleme.class).ifPresentOrElse(
-                    g -> yaz(hafta, g),
+                    g -> yaz(d, hafta, g),
                     () -> log.warn("Hafıza güncellemesi JSON parse edilemedi — atlandı (hafta {})", hafta));
         } catch (Exception e) {
             log.warn("Hafıza güncellemesi başarısız — akış etkilenmedi: {}", e.getMessage());
@@ -101,14 +125,14 @@ public class HafizaService {
     static final int PROFIL_KARAKTER_SINIRI = 4000;
     static final int NOT_KARAKTER_SINIRI = 6000;
 
-    private void yaz(int hafta, HafizaGuncelleme g) {
+    private static void yaz(Path dizin, int hafta, HafizaGuncelleme g) {
         try {
             if (g.ogrenciProfili() != null && !g.ogrenciProfili().isBlank()) {
-                atomikYaz(hafizaDir.resolve("OGRENCI.md"),
+                atomikYaz(dizin.resolve("OGRENCI.md"),
                         basTut(g.ogrenciProfili(), PROFIL_KARAKTER_SINIRI));
             }
             if (g.haftaNotlari() != null && !g.haftaNotlari().isBlank()) {
-                atomikYaz(haftaNotlariYolu(hafta),
+                atomikYaz(haftaNotlariYolu(dizin, hafta),
                         sonTut(g.haftaNotlari(), NOT_KARAKTER_SINIRI));
             }
         } catch (IOException e) {
@@ -136,17 +160,29 @@ public class HafizaService {
     }
 
     /**
-     * Temiz başlangıç: öğrenci profili (OGRENCI.md) + haftalık gözlemler (hafta-NN/) silinir;
-     * kitaplar/ ve vektor.json (RAG) KORUNUR. Idempotent — eksik dosya sorun değil, ana akışı bozmaz.
+     * Temiz başlangıç: VERİLEN kullanıcının öğrenci profili (OGRENCI.md) + haftalık
+     * gözlemleri (hafta-NN/) silinir. Kimlik açık parametre (explicit identity) — çağıran kimin verisini
+     * sildiğini kendisi söyler.
+     * <ul>
+     *   <li>yerel: eski kökte yalnız {@code OGRENCI.md} + {@code hafta-*}; kitaplar/, vektor.json (RAG) ve
+     *       {@code kullanicilar/} (başka kullanıcılar) KORUNUR.</li>
+     *   <li>diğerleri: kullanıcının kişisel dizini bütünüyle silinir (içinde yalnız onun hafızası var).</li>
+     * </ul>
+     * Idempotent — eksik dosya sorun değil, ana akışı bozmaz.
      */
-    public void ogrenciNotlariniSil() {
+    public void ogrenciNotlariniSil(String kullaniciId) {
         try {
-            Files.deleteIfExists(hafizaDir.resolve("OGRENCI.md"));
-            if (Files.isDirectory(hafizaDir)) {
-                try (var alt = Files.list(hafizaDir)) {
+            Path dizin = KisiselDizin.coz(hafizaKok, kullaniciId);
+            if (!KullaniciBaglami.YEREL.equals(kullaniciId)) {
+                KisiselDizin.agaciSil(dizin);
+                return;
+            }
+            Files.deleteIfExists(dizin.resolve("OGRENCI.md"));
+            if (Files.isDirectory(dizin)) {
+                try (var alt = Files.list(dizin)) {
                     for (Path d : alt.filter(Files::isDirectory)
                             .filter(p -> p.getFileName().toString().startsWith("hafta-")).toList()) {
-                        agaciSil(d);
+                        KisiselDizin.agaciSil(d);
                     }
                 }
             }
@@ -157,21 +193,8 @@ public class HafizaService {
         }
     }
 
-    /** Dizin ağacını yaprak→kök sırasıyla siler (deleteIfExists boş-olmayan dizinde patlamasın). */
-    private static void agaciSil(Path kok) throws IOException {
-        try (var yol = Files.walk(kok)) {
-            yol.sorted(java.util.Comparator.reverseOrder()).forEach(p -> {
-                try {
-                    Files.deleteIfExists(p);
-                } catch (IOException ex) {
-                    log.warn("Silinemedi {}: {}", p, ex.getMessage());
-                }
-            });
-        }
-    }
-
-    private Path haftaNotlariYolu(int hafta) {
-        return hafizaDir.resolve(String.format("hafta-%02d", hafta)).resolve("notlar.md");
+    private static Path haftaNotlariYolu(Path dizin, int hafta) {
+        return dizin.resolve(String.format("hafta-%02d", hafta)).resolve("notlar.md");
     }
 
     private static String oku(Path dosya, String varsayilan) {

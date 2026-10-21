@@ -1,5 +1,6 @@
 package tr.velzon.aiogretmen.web;
 
+import org.springframework.context.annotation.Profile;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -14,8 +15,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-/** Kitap bilgi tabanı uçları (kullanıcı eklemesi): not yapıştırma + sayfa fotoğrafı. */
+/**
+ * Kitap bilgi tabanı uçları (kullanıcı eklemesi): not yapıştırma + sayfa fotoğrafı.
+ * Faz 9b (ADR-0012): {@code site} profilinde YOK (istek → 404) — kitap notları ve vektör deposu tüm
+ * kullanıcılar için ORTAK; birinin notu diğerinin prompt'una sızardı. Kişiye ayırmak ayrı iş.
+ */
 @RestController
+@Profile("!site")
 @RequestMapping("/api")
 public class KitapController {
 

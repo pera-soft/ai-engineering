@@ -27,6 +27,12 @@ class AiOgretmenApplicationTest {
     @Autowired
     TestRestTemplate rest;
 
+    /** Faz 9b: yerel modda kitap notu uçları DEĞİŞMEDİ (yalnız site profilinde kapalı). */
+    @Test
+    void yerelModdaKitapUclariAcik() {
+        assertThat(rest.getForEntity("/api/kitaplar", String.class).getStatusCode().value()).isEqualTo(200);
+    }
+
     @Test
     void baglamYuklenirVeProgramDoner() {
         ResponseEntity<String> yanit = rest.getForEntity("/api/program", String.class);
@@ -55,5 +61,22 @@ class AiOgretmenApplicationTest {
                 new HttpEntity<>("{\"hafta\":1,\"gun\":1,\"gorevIndex\":0}", basliklar), String.class);
 
         assertThat(yanit.getStatusCode().value()).isEqualTo(403); // filtre gerçekten kayıtlı
+    }
+
+    @Test
+    void varsayilanModKimliksizVeSiteKapali() {
+        // Faz 9a (ADR-0012): site profili OLMADAN davranış aynı — login yok, kayıt ucu yok
+        ResponseEntity<String> ozellik = rest.getForEntity("/api/ozellikler", String.class);
+        assertThat(ozellik.getStatusCode().value()).isEqualTo(200);
+        assertThat(ozellik.getBody()).contains("\"site\":false").doesNotContain("kullanici");
+
+        assertThat(rest.getForEntity("/", String.class).getStatusCode().value()).isEqualTo(200);
+
+        HttpHeaders basliklar = new HttpHeaders();
+        basliklar.add("Content-Type", "application/json");
+        ResponseEntity<String> kayit = rest.postForEntity("/api/kimlik/kayit",
+                new HttpEntity<>("{\"email\":\"x@pera.software\",\"sifre\":\"0123456789ab\"}", basliklar),
+                String.class);
+        assertThat(kayit.getStatusCode().value()).isEqualTo(404);
     }
 }

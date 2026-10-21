@@ -136,7 +136,7 @@ public class OgretmenMcpAraclari {
                                 + "işlem bazında dağılım). MCP muhakemesi bu sayacı ARTIRMAZ — muhakeme "
                                 + "istemcide olduğundan sunucu token'ı yanmaz. Argüman almaz.",
                         semaBos(),
-                        (ex, req) -> json(om, kullanimService.istatistik())));
+                        (ex, req) -> json(om, kullanimService.istatistik(McpKullaniciKimligi.kullaniciKimligiVeyaYerel()))));
     }
 
     /** Ortak sarmalayıcı: BulunamadiException/IllegalArgumentException → zarif hata sonucu (isError). */

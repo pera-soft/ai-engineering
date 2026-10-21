@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="referrer" content="no-referrer">
+<title>Yeni şifre — AI Öğretmen</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; connect-src 'self'; form-action 'self'">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="style.css">
+</head>
+<body data-sayfa="sifirla">
+<main class="kimlik-sayfa">
+  <div class="kimlik-kart">
+    <span class="eyebrow">AI Öğretmen · pera</span>
+    <h1>Yeni şifre belirle</h1>
+    <p>Şifren değişince açık tüm oturumların kapanır; yeni şifrenle giriş yaparsın.</p>
+    <div id="mesaj" class="kimlik-mesaj" hidden></div>
+    <form id="sifirla-formu" class="kimlik-form" novalidate>
+      <label>Yeni şifre
+        <input type="password" name="sifre" autocomplete="new-password" minlength="10" required>
+        <span class="ipucu">En az 10 karakter.</span>
+      </label>
+      <label>Yeni şifre (tekrar)
+        <input type="password" name="sifre2" autocomplete="new-password" minlength="10" required>
+      </label>
+      <button class="btn" type="submit" id="sifirla-btn">Şifremi güncelle</button>
+    </form>
+    <p class="kimlik-alt"><a href="/sifremi-unuttum.html">Yeni bağlantı iste</a> · <a href="/giris.html">Giriş yap</a></p>
+  </div>
+</main>
+<script src="kimlik.js"></script>
+</body>
+</html>

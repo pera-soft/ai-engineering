@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Doğrulama bekleniyor — AI Öğretmen</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; connect-src 'self'; form-action 'self'">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="style.css">
+</head>
+<body data-sayfa="bekleniyor">
+<main class="kimlik-sayfa">
+  <div class="kimlik-kart">
+    <span class="eyebrow">AI Öğretmen · pera</span>
+    <h1>E-postanı kontrol et</h1>
+    <p>Kayıt alındı. <strong id="hedef-eposta">E-posta adresine</strong> bir doğrulama bağlantısı gönderdik.
+      Bağlantıya tıklayınca hesabın açılır (bağlantı 24 saat geçerlidir).</p>
+    <p>E-posta gelmediyse istenmeyen (spam) klasörüne bak ya da aşağıdan yeni bağlantı iste (saatte en çok 3).</p>
+    <div id="mesaj" class="kimlik-mesaj" hidden></div>
+    <form id="yeniden-formu" class="kimlik-form" novalidate>
+      <label>Şirket e-postası
+        <input type="email" name="email" autocomplete="username" placeholder="ad.soyad@pera.software" required>
+      </label>
+      <button class="btn" type="submit" id="yeniden-btn">Doğrulama e-postasını yeniden gönder</button>
+    </form>
+    <p class="kimlik-alt"><a href="/giris.html">Giriş sayfasına dön</a></p>
+  </div>
+</main>
+<script src="kimlik.js"></script>
+</body>
+</html>

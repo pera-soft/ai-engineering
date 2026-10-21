@@ -1,0 +1,76 @@
+# AI Öğretmen sitesi — nginx sunucu bloğu (ŞABLON, Faz 9d). Kurulum: docs/kurulum-site.md
+#   sudo cp deploy/nginx-site.conf.ornek /etc/nginx/sites-available/ai-ogretmen-site.conf
+#   sudo ln -s /etc/nginx/sites-available/ai-ogretmen-site.conf /etc/nginx/sites-enabled/
+#   sudo nginx -t && sudo systemctl reload nginx
+#
+# egitim.pera.software = ÖRNEK alan adı (DNS'i pera açar). Sertifika yolları certbot'un varsayılanıdır:
+#   sudo certbot certonly --webroot -w /var/www/certbot -d egitim.pera.software
+# Uygulama yalnız 127.0.0.1:8090'da dinler; TLS burada sonlanır, uygulamaya http ile iletilir ve
+# X-Forwarded-Proto/Host eklenir (uygulama: server.forward-headers-strategy=native — yalnız 127.0.0.1'e güvenir).
+
+# --- HTTP: yalnız ACME doğrulaması + HTTPS'e yönlendirme ---
+server {
+    listen 80;
+    listen [::]:80;
+    server_name egitim.pera.software;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+# --- HTTPS ---
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;            # nginx < 1.25.1 ise bu satırı sil, "listen 443 ssl http2;" yaz
+    server_name egitim.pera.software;
+
+    ssl_certificate     /etc/letsencrypt/live/egitim.pera.software/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/egitim.pera.software/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers off;
+    ssl_session_timeout 1d;
+    ssl_session_cache shared:AiOgretmenTLS:10m;
+    ssl_session_tickets off;
+
+    # Gövde sınırı: sitede dosya yükleme yok (kitap notu kapalı); cevap/sohbet metinleri küçük.
+    client_max_body_size 2m;
+
+    # Güvenlik başlıkları. Uygulama (Spring Security) zaten X-Content-Type-Options, X-Frame-Options,
+    # Cache-Control yazar; CSP sayfalarda <meta> ile. HSTS'yi tek kaynaktan (burada) veriyoruz →
+    # uygulamanınkini gizle ki başlık iki kez gitmesin.
+    proxy_hide_header Strict-Transport-Security;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
+
+    access_log /var/log/nginx/ai-ogretmen-site.access.log;
+    error_log  /var/log/nginx/ai-ogretmen-site.error.log warn;
+
+    location / {
+        proxy_pass http://127.0.0.1:8090;
+        proxy_http_version 1.1;
+
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host  $host;
+        proxy_set_header X-Forwarded-Port  $server_port;
+        proxy_set_header Connection        "";
+
+        # AI çağrıları (değerlendirme, rapor, sohbet) ~150 sn sürebilir → okuma zaman aşımı geniş.
+        proxy_connect_timeout 10s;
+        proxy_send_timeout    180s;
+        proxy_read_timeout    180s;
+        send_timeout          180s;
+
+        proxy_buffering on;
+        proxy_redirect off;
+    }
+}

@@ -1,0 +1,57 @@
+# Çok kullanıcılı eğitim sitesi profili (Faz 9, ADR-0012) — pera ekibi, @pera.software hesapları.
+# Çalıştırma:  java -jar target/ai-ogretmen-0.1.0-SNAPSHOT.jar --spring.profiles.active=site
+# Yerel http denemesi:  APP_SITE_GUVENLI_CEREZ=false (yoksa Secure çerez http'de geri gönderilmez)
+#
+# Uygulama yine 127.0.0.1'e bağlanır (AGENTS.md NEVER); dışarıya yalnız önündeki nginx/TLS açılır.
+# Varsayılan (profilsiz) yerel mod BU dosyadan etkilenmez: kimliksiz, tek kullanıcı ('yerel').
+
+server:
+  # nginx arkasında X-Forwarded-Proto/For yalnız güvenilen vekilden (Tomcat RemoteIpValve: 127.0.0.1)
+  # kabul edilir → https algılanır (Secure çerez, doğru yönlendirmeler). 'framework' herkese güvenirdi.
+  forward-headers-strategy: native
+  servlet:
+    session:
+      timeout: 8h                 # bir çalışma günü; sunucu tarafı HTTP oturumu (tek örnek)
+      cookie:
+        http-only: true
+        secure: ${APP_SITE_GUVENLI_CEREZ:true}
+        same-site: lax
+
+app:
+  site:
+    guvenli-cerez: ${APP_SITE_GUVENLI_CEREZ:true}         # XSRF-TOKEN çerezi için (oturum çereziyle aynı)
+    izinli-originler: ${APP_SITE_IZINLI_ORIGINLER:}       # ör. https://egitim.pera.software (virgülle çoklu)
+    temel-url: ${APP_SITE_TEMEL_URL:http://127.0.0.1:${server.port}}   # e-posta bağlantılarının kökü
+    # Faz 9c (ADR-0013): SMTP yoksa site AÇILMAZ (canlı gizli bağlantıları log'a yazmasın).
+    # Yalnız yerel deneme: APP_SITE_EPOSTA_ZORUNLU=false → bağlantılar uygulama loguna yazılır.
+    eposta-zorunlu: ${APP_SITE_EPOSTA_ZORUNLU:true}
+    gonderici: "${APP_SITE_GONDERICI:AI Öğretmen <noreply@pera.software>}"   # e-postaların "Kimden"i
+
+# SMTP (Faz 9c, ADR-0013) — DEĞERLER YALNIZ ORTAM DEĞİŞKENİNDEN, dosyaya/git'e yazılmaz:
+#   SPRING_MAIL_HOST, SPRING_MAIL_PORT (varsayılan 587), SPRING_MAIL_USERNAME, SPRING_MAIL_PASSWORD
+# Host burada TANIMLANMAZ: SPRING_MAIL_HOST verilmedikçe Boot JavaMailSender kurmaz.
+spring:
+  # Veritabanı (Faz 9d, ADR-0014) — canlıda PostgreSQL, YALNIZ ortam değişkeninden:
+  #   SPRING_DATASOURCE_URL=jdbc:postgresql://127.0.0.1:5432/ai_ogretmen
+  #   SPRING_DATASOURCE_USERNAME, SPRING_DATASOURCE_PASSWORD
+  # URL'in varsayılanı YOK → verilmezse site AÇILMAZ (canlı sessizce yerel H2 dosyasına düşmesin).
+  # Sürücü URL'den çıkarılır (application.yml'deki org.h2.Driver burada temizlenir); yerel duman testi
+  # açık bir H2 URL'i verebilir: SPRING_DATASOURCE_URL='jdbc:h2:file:./data/site-deneme'
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    driver-class-name: ${SPRING_DATASOURCE_DRIVER_CLASS_NAME:}
+    hikari:
+      maximum-pool-size: ${APP_SITE_DB_HAVUZ:10}   # 60 kişi, tek örnek: 10 bağlantı bol
+  mail:
+    port: ${SPRING_MAIL_PORT:587}
+    default-encoding: UTF-8
+    properties:
+      mail:
+        smtp:
+          auth: ${APP_SITE_SMTP_AUTH:true}
+          starttls:
+            enable: ${APP_SITE_SMTP_STARTTLS:true}
+            required: ${APP_SITE_SMTP_STARTTLS:true}   # TLS'siz sunucuya şifre/bağlantı düz gitmesin
+          connectiontimeout: 10000
+          timeout: 10000
+          writetimeout: 10000

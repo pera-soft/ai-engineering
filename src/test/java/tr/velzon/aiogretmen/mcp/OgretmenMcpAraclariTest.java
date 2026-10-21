@@ -117,7 +117,8 @@ class OgretmenMcpAraclariTest {
 
     @Test
     void kullanimIstatistikSayaciSunar() {
-        when(kullanim.istatistik()).thenReturn(Map.of("aiAktif", false, "toplamCagri", 0L));
+        // ADR-0008 açık kimlik: MCP aracı kimliği parametre olarak geçirir (stdio → yerel)
+        when(kullanim.istatistik("yerel")).thenReturn(Map.of("aiAktif", false, "toplamCagri", 0L));
 
         assertThat(metin(cagir("kullanim_istatistik", Map.of()))).contains("aiAktif");
     }

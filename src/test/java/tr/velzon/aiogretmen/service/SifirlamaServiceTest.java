@@ -18,9 +18,10 @@ class SifirlamaServiceTest {
     SohbetRepo sohbetRepo = mock(SohbetRepo.class);
     MulakatCevapRepo mulakatCevapRepo = mock(MulakatCevapRepo.class);
     HafizaService hafizaService = mock(HafizaService.class);
+    RaporService raporService = mock(RaporService.class);
     SifirlamaService servis = new SifirlamaService(
             ilerlemeRepo, gonderimRepo, quizSonucRepo, sohbetRepo, mulakatCevapRepo,
-            hafizaService, () -> "yerel");
+            hafizaService, raporService, () -> "yerel");
 
     @Test
     void yalnizAktifKullanicininTumTablolariniTemizler() {
@@ -40,6 +41,20 @@ class SifirlamaServiceTest {
     @Test
     void ogrenciHafizasiniDaTemizler() {
         servis.sifirla();
-        verify(hafizaService).ogrenciNotlariniSil(); // AI eski öğrenciyi hatırlamasın (inceleme bulgusu)
+        verify(hafizaService).ogrenciNotlariniSil("yerel"); // AI eski öğrenciyi hatırlamasın (inceleme bulgusu)
+    }
+
+    @Test
+    void raporOnbeleginiDeTemizler() {
+        servis.sifirla();
+        verify(raporService).raporOnbeleginiSil("yerel"); // eski ilerlemenin raporu yeni başlangıçta görünmesin
+    }
+
+    @Test
+    void acikKimlikleYalnizOKullaniciyiTemizler() {
+        servis.sifirla("a@pera.software");
+        verify(ilerlemeRepo).deleteByKullaniciId("a@pera.software");
+        verify(hafizaService).ogrenciNotlariniSil("a@pera.software");
+        verify(raporService).raporOnbeleginiSil("a@pera.software");
     }
 }

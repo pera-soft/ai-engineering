@@ -1,0 +1,11 @@
+Merhaba,
+
+AI Öğretmen (pera) hesabını açmak için e-posta adresini doğrula. Aşağıdaki bağlantıyı tarayıcında aç:
+
+{{baglanti}}
+
+Bağlantı 24 saat geçerlidir ve yalnız bir kez kullanılabilir.
+
+Bu kaydı sen yapmadıysan bu e-postayı yok sayabilirsin; doğrulanmayan hesap açılmaz.
+
+— AI Öğretmen

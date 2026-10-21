@@ -2,6 +2,7 @@ package tr.velzon.aiogretmen.service;
 
 import org.springframework.stereotype.Service;
 import tr.velzon.aiogretmen.ai.PromptFactory;
+import tr.velzon.aiogretmen.config.CalismaModu;
 import tr.velzon.aiogretmen.config.KullaniciBaglami;
 import tr.velzon.aiogretmen.repo.ContentRepo;
 import tr.velzon.aiogretmen.repo.IlerlemeRepo;
@@ -25,11 +26,14 @@ public class BaglamServisi {
     private final KitapService kitapService;
     private final KaynakService kaynakService;
     private final KullaniciBaglami kullaniciBaglami;
+    /** Faz 9b: site profilinde ortak kitap notu/vektör bağlamı prompt'a GİRMEZ (kullanıcıya ayrılmamış veri). */
+    private final boolean kitapBaglamiAcik;
 
     public BaglamServisi(ContentRepo contentRepo, IlerlemeRepo ilerlemeRepo,
                          QuizSonucRepo quizSonucRepo, PromptFactory promptFactory,
                          HafizaService hafizaService, KitapService kitapService,
-                         KaynakService kaynakService, KullaniciBaglami kullaniciBaglami) {
+                         KaynakService kaynakService, KullaniciBaglami kullaniciBaglami,
+                         CalismaModu calismaModu) {
         this.contentRepo = contentRepo;
         this.ilerlemeRepo = ilerlemeRepo;
         this.quizSonucRepo = quizSonucRepo;
@@ -38,6 +42,7 @@ public class BaglamServisi {
         this.kitapService = kitapService;
         this.kaynakService = kaynakService;
         this.kullaniciBaglami = kullaniciBaglami;
+        this.kitapBaglamiAcik = !calismaModu.siteMi();
     }
 
     /** @param gun null olabilir — o zaman yalnız hafta bağlamı verilir (sorgu = ders metni). */
@@ -57,7 +62,8 @@ public class BaglamServisi {
                 "gun_icerik", gun == null ? "(belirli bir gün seçilmedi)" : contentRepo.hamGun(hafta, gun),
                 "ilerleme_ozeti", ilerlemeOzeti(hafta),
                 "hafiza", hafizaService.hafizaBaglami(hafta),
-                "kitaplar", kitapService.baglamIcinAnlam(etkinSorgu, hafta),
+                "kitaplar", kitapBaglamiAcik ? kitapService.baglamIcinAnlam(etkinSorgu, hafta)
+                        : "(Kitap notu bağlamı bu sitede kapalı.)",
                 "kaynaklar", kaynakService.baglamIcin(hafta)));
     }
 

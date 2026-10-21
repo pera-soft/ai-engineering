@@ -11,6 +11,7 @@ import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import tr.velzon.aiogretmen.config.AppProperties;
+import tr.velzon.aiogretmen.config.KullaniciBaglami;
 import tr.velzon.aiogretmen.repo.KullanimRepo;
 import tr.velzon.aiogretmen.types.AiKullanim;
 
@@ -19,7 +20,9 @@ import java.util.List;
 
 /**
  * OpenRouter üzerinden Claude (OpenAI-uyumlu API — ADR-0004).
- * Her çağrının token kullanımını ai_kullanim'a yazar (brief 7.6).
+ * Her çağrının token kullanımını ai_kullanim'a yazar (brief 7.6) — Faz 9b: çağıran kullanıcının
+ * kimliğiyle. Kimlik çağrıdan ÖNCE çözülür: site profilinde oturumsuz bir yol varsa model HİÇ
+ * çağrılmaz (fail-closed; kimliksiz harcama yok).
  */
 public class SpringAiOgretmenClient implements OgretmenAiClient {
 
@@ -28,11 +31,14 @@ public class SpringAiOgretmenClient implements OgretmenAiClient {
     private final ChatModel chatModel;
     private final AppProperties props;
     private final KullanimRepo kullanimRepo;
+    private final KullaniciBaglami kullaniciBaglami;
 
-    public SpringAiOgretmenClient(ChatModel chatModel, AppProperties props, KullanimRepo kullanimRepo) {
+    public SpringAiOgretmenClient(ChatModel chatModel, AppProperties props, KullanimRepo kullanimRepo,
+                                  KullaniciBaglami kullaniciBaglami) {
         this.chatModel = chatModel;
         this.props = props;
         this.kullanimRepo = kullanimRepo;
+        this.kullaniciBaglami = kullaniciBaglami;
     }
 
     @Override
@@ -69,6 +75,7 @@ public class SpringAiOgretmenClient implements OgretmenAiClient {
     }
 
     private AiYanit calistir(Islem islem, String model, List<Message> mesajlar, int maxTokens) {
+        String kullaniciId = kullaniciBaglami.aktifKullanici(); // çağrıdan ÖNCE: kimliksiz çağrı para harcamasın
         OpenAiChatOptions secenekler = OpenAiChatOptions.builder()
                 .model(model)
                 .maxTokens(maxTokens)
@@ -89,7 +96,7 @@ public class SpringAiOgretmenClient implements OgretmenAiClient {
         int input = kullanim == null || kullanim.getPromptTokens() == null ? 0 : kullanim.getPromptTokens();
         int output = kullanim == null || kullanim.getCompletionTokens() == null ? 0 : kullanim.getCompletionTokens();
 
-        kullanimRepo.save(AiKullanim.kayit(islem.name(), model, input, output));
+        kullanimRepo.save(AiKullanim.kayit(kullaniciId, islem.name(), model, input, output));
         log.info("AI çağrısı: islem={} model={} input={} output={} token", islem, model, input, output);
 
         return new AiYanit(metin, input, output, model);

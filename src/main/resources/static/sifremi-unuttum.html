@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Şifremi unuttum — AI Öğretmen</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; connect-src 'self'; form-action 'self'">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="style.css">
+</head>
+<body data-sayfa="unuttum">
+<main class="kimlik-sayfa">
+  <div class="kimlik-kart">
+    <span class="eyebrow">AI Öğretmen · pera</span>
+    <h1>Şifremi unuttum</h1>
+    <p>Şirket e-posta adresini yaz; hesabın varsa şifre sıfırlama bağlantısı gönderelim (1 saat geçerli).</p>
+    <div id="mesaj" class="kimlik-mesaj" hidden></div>
+    <form id="unuttum-formu" class="kimlik-form" novalidate>
+      <label>Şirket e-postası
+        <input type="email" name="email" autocomplete="username" placeholder="ad.soyad@pera.software" required>
+      </label>
+      <button class="btn" type="submit" id="unuttum-btn">Sıfırlama bağlantısı gönder</button>
+    </form>
+    <p class="kimlik-alt"><a href="/giris.html">Giriş sayfasına dön</a></p>
+  </div>
+</main>
+<script src="kimlik.js"></script>
+</body>
+</html>

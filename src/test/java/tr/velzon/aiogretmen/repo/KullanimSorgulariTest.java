@@ -24,11 +24,11 @@ class KullanimSorgulariTest {
 
     @Test
     void doluTablodaIslemBazindaToplamDoner() {
-        kullanimRepo.save(AiKullanim.kayit("SOHBET", "m", 100, 50));
-        kullanimRepo.save(AiKullanim.kayit("SOHBET", "m", 200, 80));
-        kullanimRepo.save(AiKullanim.kayit("DEGERLENDIRME", "m", 500, 300));
+        kullanimRepo.save(AiKullanim.kayit("yerel", "SOHBET", "m", 100, 50));
+        kullanimRepo.save(AiKullanim.kayit("yerel", "SOHBET", "m", 200, 80));
+        kullanimRepo.save(AiKullanim.kayit("yerel", "DEGERLENDIRME", "m", 500, 300));
 
-        List<Map<String, Object>> toplam = sorgular.islemBazindaToplam();
+        List<Map<String, Object>> toplam = sorgular.islemBazindaToplam("yerel");
 
         assertThat(toplam).hasSize(2);
         // JSON sözleşmesi: anahtarlar küçük harf serileşmeli (get() case-insensitive olduğundan
@@ -45,6 +45,21 @@ class KullanimSorgulariTest {
 
     @Test
     void bosTablodaBosListeDoner() {
-        assertThat(sorgular.islemBazindaToplam()).isEmpty();
+        assertThat(sorgular.islemBazindaToplam("yerel")).isEmpty();
+    }
+
+    /** Faz 9b: /api/kullanim yalnız aktif kullanıcının çağrılarını sayar. */
+    @Test
+    void toplamYalnizVerilenKullanicininSatirlariniSayar() {
+        kullanimRepo.save(AiKullanim.kayit("a@pera.software", "SOHBET", "m", 100, 50));
+        kullanimRepo.save(AiKullanim.kayit("a@pera.software", "RAPOR", "m", 10, 5));
+        kullanimRepo.save(AiKullanim.kayit("b@pera.software", "SOHBET", "m", 7, 3));
+
+        List<Map<String, Object>> b = sorgular.islemBazindaToplam("b@pera.software");
+        assertThat(b).hasSize(1);
+        assertThat(((Number) b.get(0).get("cagri")).longValue()).isEqualTo(1);
+        assertThat(((Number) b.get(0).get("input_tokens")).longValue()).isEqualTo(7);
+        assertThat(sorgular.islemBazindaToplam("a@pera.software")).hasSize(2);
+        assertThat(sorgular.islemBazindaToplam("yerel")).isEmpty();
     }
 }

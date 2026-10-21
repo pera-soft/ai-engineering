@@ -32,6 +32,9 @@ import java.util.stream.Collectors;
 /**
  * Haftalık rapor (brief 7.5): haftanın tüm verisi guclu modele verilir; markdown rapor
  * data/raporlar/hafta-NN.md olarak CACHE'lenir (varsa dosyadan döner, yenile=true zorlar).
+ *
+ * <p>Faz 9b (ADR-0012): önbellek KULLANICI BAŞINADIR ({@link KisiselDizin}) — yerel kullanıcı eski
+ * {@code data/raporlar/hafta-NN.md}, diğerleri {@code data/raporlar/kullanicilar/<sha256>/hafta-NN.md}.
  */
 @Service
 @LlmKullanan
@@ -39,7 +42,7 @@ public class RaporService {
 
     static final int MAX_TOKENS = 3000;
 
-    private final Path raporDir;
+    private final Path raporKok;
     private final OgretmenAiClient aiClient;
     private final BaglamServisi baglamServisi;
     private final PromptFactory promptFactory;
@@ -61,7 +64,7 @@ public class RaporService {
                         IlerlemeRepo ilerlemeRepo, QuizSonucRepo quizSonucRepo,
                         GonderimRepo gonderimRepo, SohbetRepo sohbetRepo,
                         KullaniciBaglami kullaniciBaglami) {
-        this.raporDir = Path.of(props.raporDir() == null ? "./data/raporlar" : props.raporDir());
+        this.raporKok = Path.of(props.raporDir() == null ? "./data/raporlar" : props.raporDir());
         this.aiClient = aiClient;
         this.baglamServisi = baglamServisi;
         this.promptFactory = promptFactory;
@@ -80,7 +83,8 @@ public class RaporService {
         contentRepo.hafta(hafta)
                 .orElseThrow(() -> new BulunamadiException("Hafta bulunamadı: " + hafta));
 
-        Path cache = raporDir.resolve(String.format("hafta-%02d.md", hafta));
+        Path cache = KisiselDizin.coz(raporKok, kullaniciBaglami.aktifKullanici())
+                .resolve(String.format("hafta-%02d.md", hafta));
         if (!yenile && Files.isRegularFile(cache)) {
             String md = oku(cache);
             return new Rapor(hafta, md, htmlRenderer.render(mdParser.parse(md)), true);
@@ -99,6 +103,36 @@ public class RaporService {
         String md = yanit.metin();
         yaz(cache, md);
         return new Rapor(hafta, md, htmlRenderer.render(mdParser.parse(md)), false);
+    }
+
+    private static final java.util.regex.Pattern RAPOR_DOSYASI =
+            java.util.regex.Pattern.compile("hafta-\\d{2}\\.md(\\.tmp)?");
+
+    /**
+     * VERİLEN kullanıcının rapor önbelleğini siler (sıfırlama). Yerel: eski kökte yalnız
+     * {@code hafta-NN.md} dosyaları ({@code kullanicilar/} korunur); diğerleri: kişisel dizin bütünüyle.
+     * Best-effort ve idempotent — hata loglanır, çağıranın (DB) işlemini bozmaz.
+     */
+    public void raporOnbeleginiSil(String kullaniciId) {
+        try {
+            Path dizin = KisiselDizin.coz(raporKok, kullaniciId);
+            if (!tr.velzon.aiogretmen.config.KullaniciBaglami.YEREL.equals(kullaniciId)) {
+                KisiselDizin.agaciSil(dizin);
+                return;
+            }
+            if (!Files.isDirectory(dizin)) {
+                return;
+            }
+            try (var alt = Files.list(dizin)) {
+                for (Path f : alt.filter(Files::isRegularFile)
+                        .filter(f -> RAPOR_DOSYASI.matcher(f.getFileName().toString()).matches()).toList()) {
+                    Files.deleteIfExists(f);
+                }
+            }
+        } catch (IOException | RuntimeException e) {
+            org.slf4j.LoggerFactory.getLogger(RaporService.class)
+                    .warn("Rapor önbelleği silinemedi: {}", e.getMessage());
+        }
     }
 
     private String gorevOzeti(int haftaNo) {

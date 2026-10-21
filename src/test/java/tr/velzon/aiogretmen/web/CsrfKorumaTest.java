@@ -77,6 +77,41 @@ class CsrfKorumaTest {
     }
 
     @Test
+    void yapilandirilmisPublicOriginGecer_nginxArkasi() throws Exception {
+        // site profili (ADR-0012): nginx/TLS arkasında tarayıcı origin'i https://<alan-adı> olur
+        CsrfKoruma siteFiltresi = new CsrfKoruma(java.util.List.of("https://egitim.pera.software", " https://diger.pera.software/ "));
+        assertThat(calistir(siteFiltresi, "https://egitim.pera.software", 8090).getStatus()).isEqualTo(200);
+        assertThat(calistir(siteFiltresi, "https://diger.pera.software", 8090).getStatus()).isEqualTo(200); // trim + sondaki /
+        // yerel origin davranışı korunur
+        assertThat(calistir(siteFiltresi, "http://127.0.0.1:8090", 8090).getStatus()).isEqualTo(200);
+    }
+
+    @Test
+    void listedeOlmayanOriginYineReddedilir() throws Exception {
+        CsrfKoruma siteFiltresi = new CsrfKoruma(java.util.List.of("https://egitim.pera.software"));
+        assertThat(calistir(siteFiltresi, "https://kotu-site.example", 8090).getStatus()).isEqualTo(403);
+        assertThat(calistir(siteFiltresi, "http://egitim.pera.software", 8090).getStatus()).isEqualTo(403); // şema farklı
+        assertThat(calistir(siteFiltresi, "https://egitim.pera.software.kotu.example", 8090).getStatus()).isEqualTo(403);
+    }
+
+    @Test
+    void varsayilanFiltredeListeBos_publicOriginReddedilir() throws Exception {
+        // yerel modda (liste boş) hiçbir public origin kabul edilmez — mevcut davranış
+        assertThat(calistir(filtre, "https://egitim.pera.software", 8090).getStatus()).isEqualTo(403);
+    }
+
+    private static MockHttpServletResponse calistir(CsrfKoruma f, String origin, int port)
+            throws ServletException, IOException {
+        MockHttpServletRequest istek = new MockHttpServletRequest("POST", "/api/sohbet");
+        istek.setLocalPort(port);
+        istek.addHeader("Sec-Fetch-Site", "same-origin");
+        istek.addHeader("Origin", origin);
+        MockHttpServletResponse yanit = new MockHttpServletResponse();
+        f.doFilter(istek, yanit, new MockFilterChain());
+        return yanit;
+    }
+
+    @Test
     void crossSiteAmaApiDisiYolGecer() throws Exception {
         // statik varlıklar (html/css/js) filtre kapsamı dışında — sayfa her yerden açılabilir
         assertThat(calistir("/index.html", "GET", "cross-site", null).getStatus()).isEqualTo(200);

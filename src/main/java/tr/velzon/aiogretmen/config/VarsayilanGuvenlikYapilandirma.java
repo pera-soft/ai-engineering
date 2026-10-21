@@ -7,7 +7,7 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
 
 /**
- * Web/stdio (mcp-http DIŞI) profillerinde güvenlik zinciri — <strong>auth YOK, permitAll</strong>.
+ * Web/stdio (mcp-http ve site DIŞI) profillerinde güvenlik zinciri — <strong>auth YOK, permitAll</strong>.
  *
  * <p><strong>Neden gerekli:</strong> {@code spring-boot-starter-security} classpath'e girince Spring Boot
  * TÜM endpoint'leri varsayılan olarak korur (401 + üretilen parola). Web arayüzü (127.0.0.1:8090) ve
@@ -18,10 +18,11 @@ import org.springframework.security.web.SecurityFilterChain;
  * (Sec-Fetch-Site/Origin) siteler-arası korumayı zaten sağlıyor; Spring CSRF açık kalsaydı token'sız
  * POST'ları 403'lerdi. httpBasic/formLogin de kapalı — permitAll'da tetiklenmez, temizlik için kapatıldı.
  *
- * <p>Auth SADECE {@code mcp-http} profilinde {@code /mcp} için: bkz {@link McpHttpGuvenlikYapilandirma}.
+ * <p>Auth SADECE {@code mcp-http} profilinde {@code /mcp} için ({@link McpHttpGuvenlikYapilandirma}) ve
+ * çok kullanıcılı {@code site} profilinde form/oturum login ile ({@link SiteGuvenlikYapilandirma}, ADR-0012).
  */
 @Configuration
-@Profile("!mcp-http")
+@Profile("!mcp-http & !site")
 public class VarsayilanGuvenlikYapilandirma {
 
     @Bean

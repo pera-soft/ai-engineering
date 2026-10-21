@@ -18,6 +18,7 @@ import tr.velzon.aiogretmen.types.Gonderim;
 import tr.velzon.aiogretmen.types.QuizSonucKaydi;
 import tr.velzon.aiogretmen.types.SohbetMesaji;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
@@ -43,6 +44,7 @@ class RaporServiceTest {
     GonderimRepo gonderimRepo = mock(GonderimRepo.class);
     SohbetRepo sohbetRepo = mock(SohbetRepo.class);
     RaporService servis;
+    String aktif = "yerel";
 
     @BeforeEach
     void kur() {
@@ -51,7 +53,7 @@ class RaporServiceTest {
         servis = new RaporService(props, aiClient, baglamServisi,
                 new PromptFactory(Path.of("prompts")),
                 new ContentRepo(Path.of("src/test/resources/test-content")),
-                ilerlemeRepo, quizSonucRepo, gonderimRepo, sohbetRepo, () -> "yerel");
+                ilerlemeRepo, quizSonucRepo, gonderimRepo, sohbetRepo, () -> aktif);
 
         when(baglamServisi.sistemBaglami(anyInt(), any())).thenReturn("SISTEM");
         when(ilerlemeRepo.findByKullaniciIdAndHafta(anyString(), anyInt())).thenReturn(List.of());
@@ -97,5 +99,52 @@ class RaporServiceTest {
 
         assertThat(yenilenen.cacheden()).isFalse();
         verify(aiClient, times(2)).cagir(any());
+    }
+
+    // ---------- Faz 9b: kullanıcı başına rapor önbelleği ----------
+
+    @Test
+    void yerelRaporEskiYoldaOnbelleklenir() {
+        servis.rapor(1, false);
+        assertThat(tempDir.resolve("raporlar/hafta-01.md")).exists();
+        assertThat(tempDir.resolve("raporlar/kullanicilar")).doesNotExist();
+    }
+
+    @Test
+    void birKullanicininRaporuDigerineOnbellektenGitmez() {
+        aktif = "a@pera.software";
+        when(aiClient.cagir(any())).thenReturn(new AiYanit("# A RAPORU", 1, 1, "m"));
+        assertThat(servis.rapor(1, false).markdown()).contains("A RAPORU");
+
+        aktif = "b@pera.software";
+        when(aiClient.cagir(any())).thenReturn(new AiYanit("# B RAPORU", 1, 1, "m"));
+        var b = servis.rapor(1, false);
+        assertThat(b.cacheden()).isFalse();
+        assertThat(b.markdown()).contains("B RAPORU").doesNotContain("A RAPORU");
+
+        aktif = "a@pera.software";
+        var a = servis.rapor(1, false);
+        assertThat(a.cacheden()).isTrue();
+        assertThat(a.markdown()).contains("A RAPORU");
+        assertThat(tempDir.resolve("raporlar/hafta-01.md")).doesNotExist(); // yerel kova kirlenmedi
+    }
+
+    @Test
+    void onbellekSilmeYalnizVerilenKullaniciyiEtkiler() throws Exception {
+        Files.createDirectories(tempDir.resolve("raporlar"));
+        Files.writeString(tempDir.resolve("raporlar/hafta-02.md"), "yerel rapor");
+        aktif = "a@pera.software";
+        servis.rapor(1, false);
+        aktif = "b@pera.software";
+        servis.rapor(1, false);
+
+        servis.raporOnbeleginiSil("b@pera.software");
+        assertThat(KisiselDizin.coz(tempDir.resolve("raporlar"), "b@pera.software")).doesNotExist();
+        assertThat(KisiselDizin.coz(tempDir.resolve("raporlar"), "a@pera.software").resolve("hafta-01.md")).exists();
+        assertThat(tempDir.resolve("raporlar/hafta-02.md")).exists();
+
+        servis.raporOnbeleginiSil("yerel");
+        assertThat(tempDir.resolve("raporlar/hafta-02.md")).doesNotExist();
+        assertThat(KisiselDizin.coz(tempDir.resolve("raporlar"), "a@pera.software").resolve("hafta-01.md")).exists();
     }
 }

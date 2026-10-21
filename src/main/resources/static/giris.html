@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Giriş — AI Öğretmen</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; connect-src 'self'; form-action 'self'">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="style.css">
+</head>
+<body data-sayfa="giris">
+<main class="kimlik-sayfa">
+  <div class="kimlik-kart">
+    <span class="eyebrow">AI Öğretmen · pera</span>
+    <h1>Giriş yap</h1>
+    <div id="mesaj" class="kimlik-mesaj" hidden></div>
+    <form id="giris-formu" class="kimlik-form" method="post" action="/api/kimlik/giris">
+      <input type="hidden" name="_csrf" id="csrf-alani" value="">
+      <label>E-posta
+        <input type="email" name="email" autocomplete="username" placeholder="ad.soyad@pera.software" required>
+      </label>
+      <label>Şifre
+        <input type="password" name="sifre" autocomplete="current-password" required>
+      </label>
+      <button class="btn" type="submit">Giriş yap</button>
+    </form>
+    <p class="kimlik-alt"><a href="/sifremi-unuttum.html">Şifremi unuttum</a></p>
+    <p class="kimlik-alt">Hesabın yok mu? <a href="/kayit.html">Kayıt ol</a></p>
+  </div>
+</main>
+<script src="kimlik.js"></script>
+</body>
+</html>

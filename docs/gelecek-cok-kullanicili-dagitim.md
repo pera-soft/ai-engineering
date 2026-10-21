@@ -1,9 +1,14 @@
 # Gelecek: Çok-Kullanıcılı / Ekip Dağıtımı ve Kimlik Doğrulama
 
-> **Durum: ERTELENDİ (bilinçli).** Önce tüm eğitim/müfredat bitirilecek, sonra
-> sistemdeki açıklar kapatılacak; dağıtım ve çok-kullanıcı işi ondan sonra
-> değerlendirilecek. Bu dosya, o güne kadar düşünceyi kaybetmemek için tutulan
-> karar notudur. (Kaynak: 11 Tem 2026 tartışması.)
+> **Durum: TARİHSEL — Faz 9'da uygulandı.** Erteleme 2026-10-22'de kullanıcı isteğiyle kalktı;
+> çok kullanıcılı site `site` profili olarak hayata geçirildi. Güncel kararlar için:
+> [docs/exec-plans/active/faz-9-cok-kullanicili-site.md](exec-plans/active/faz-9-cok-kullanicili-site.md)
+> ve [ADR-0012](adr/0012-cok-kullanicili-site-profili.md) (e-posta: ADR-0013, PostgreSQL: ADR-0014;
+> kurulum: [kurulum-site.md](kurulum-site.md)). Aşağıdaki metin 11 Tem 2026 tartışmasının notu
+> olarak olduğu gibi bırakıldı; "bugünkü durum" ve seçenekler o tarihe aittir ve artık güncel değildir.
+>
+> (Eski durum satırı: "ERTELENDİ (bilinçli). Önce tüm eğitim/müfredat bitirilecek, sonra sistemdeki
+> açıklar kapatılacak; dağıtım ve çok-kullanıcı işi ondan sonra değerlendirilecek.")
 
 ## Soru
 "Yalnız yerelde değil, ekip içinde (hatta internete açık) kullanmak istesek nasıl

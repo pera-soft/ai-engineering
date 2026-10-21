@@ -549,3 +549,28 @@ details.mulakat-soru > .q { padding: 14px 16px 8px; margin-bottom: 0; }
 .karsilama-kart p { font-size: 13px; color: var(--muted); line-height: 1.55; flex: 1; }
 .karsilama-kart .btn { margin-top: 10px; align-self: flex-start; }
 @media (max-width: 640px) { .karsilama-kartlar { grid-template-columns: 1fr; } }
+
+/* ---------- Faz 9a: site profili kimlik sayfaları (giriş/kayıt/doğrulama — ADR-0012) ---------- */
+.kimlik-sayfa { display: flex; align-items: center; justify-content: center; padding: 48px 16px; min-height: 100vh; }
+.kimlik-kart { width: 100%; max-width: 420px; background: var(--ink-2); border: 1px solid var(--line);
+  border-radius: var(--radius-lg); box-shadow: var(--shadow-md); padding: 32px 28px; }
+.kimlik-kart .eyebrow { font-size: 12px; font-weight: 600; letter-spacing: .05em; color: var(--cyan); text-transform: uppercase; }
+.kimlik-kart h1 { font-size: 22px; font-weight: 700; margin: 4px 0 18px; }
+.kimlik-kart p { font-size: 14px; color: var(--muted); margin-bottom: 14px; }
+.kimlik-form { display: flex; flex-direction: column; gap: 14px; }
+.kimlik-form label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; }
+.kimlik-form input { font: inherit; font-weight: 400; font-size: 14px; color: var(--paper); background: var(--ink-2);
+  border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; }
+.kimlik-form input:focus { outline: none; border-color: var(--primary); box-shadow: var(--focus); }
+.kimlik-form .ipucu { font-size: 12px; font-weight: 400; color: var(--muted); }
+.kimlik-form .btn { margin-top: 4px; }
+.kimlik-mesaj { font-size: 13.5px; border-radius: var(--radius-sm); padding: 10px 12px; margin-bottom: 14px; }
+.kimlik-mesaj.hata { color: var(--red); background: rgba(190,68,51,.07); border: 1px solid rgba(190,68,51,.3); }
+.kimlik-mesaj.bilgi { color: var(--green); background: rgba(37,128,76,.07); border: 1px solid rgba(37,128,76,.3); }
+.kimlik-alt { font-size: 13px; color: var(--muted); margin-top: 18px; text-align: center; }
+.kimlik-alt a { color: var(--cyan); }
+.kimlik-kvkk { font-size: 11.5px; color: var(--muted); border-top: 1px solid var(--line-soft); padding-top: 12px; margin-top: 18px; line-height: 1.5; }
+/* Ana uygulama üst barı: oturumdaki kullanıcı + Çıkış (yalnız site modunda görünür) */
+.oturum { display: flex; align-items: center; gap: 10px; }
+.oturum .eposta { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.oturum .btn-ikincil { margin-left: 0; }

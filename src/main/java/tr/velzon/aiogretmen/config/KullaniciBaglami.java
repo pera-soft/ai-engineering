@@ -3,12 +3,14 @@ package tr.velzon.aiogretmen.config;
 /**
  * Aktif kullanıcının izolasyon kimliğini profile göre soyutlar (Faz 2a-3, ADR-0008).
  *
- * <p><strong>İki mod:</strong>
+ * <p><strong>Üç mod:</strong>
  * <ul>
  *   <li><strong>web / stdio</strong> (varsayılan, {@code !mcp-http}): auth yok, tek kullanıcı →
  *       {@link YerelKullaniciBaglami} sabit {@link #YEREL} döndürür.</li>
  *   <li><strong>mcp-http</strong> (JWT): çok kullanıcı → {@link JwtKullaniciBaglami} doğrulanmış
  *       token'ın email/sub kimliğini döndürür.</li>
+ *   <li><strong>site</strong> (form/oturum login, ADR-0012): çok kullanıcı → {@link OturumKullaniciBaglami}
+ *       oturumdaki {@code @pera.software} e-postasını döndürür.</li>
  * </ul>
  *
  * <p><strong>Katman/ArchUnit:</strong> {@code config} katmanındadır; repo/service/ai/web/mcp

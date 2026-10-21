@@ -2,6 +2,7 @@ package tr.velzon.aiogretmen.service;
 
 import org.junit.jupiter.api.Test;
 import tr.velzon.aiogretmen.ai.PromptFactory;
+import tr.velzon.aiogretmen.config.CalismaModu;
 import tr.velzon.aiogretmen.repo.ContentRepo;
 import tr.velzon.aiogretmen.repo.IlerlemeRepo;
 import tr.velzon.aiogretmen.repo.QuizSonucRepo;
@@ -15,6 +16,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class BaglamServisiTest {
@@ -27,7 +29,7 @@ class BaglamServisiTest {
     KitapService kitapService = mock(KitapService.class);
     KaynakService kaynakService = mock(KaynakService.class);
     BaglamServisi servis = new BaglamServisi(contentRepo, ilerlemeRepo, quizSonucRepo,
-            promptFactory, hafizaService, kitapService, kaynakService, () -> "yerel");
+            promptFactory, hafizaService, kitapService, kaynakService, () -> "yerel", CalismaModu.yerelIcin());
 
     @Test
     void sistemBaglamiHaftaVeGunIcerigiIcerir() {
@@ -62,5 +64,22 @@ class BaglamServisiTest {
 
         assertThat(baglam).contains("belirli bir gün seçilmedi");
         assertThat(baglam).contains("quiz henüz çözülmedi");
+    }
+
+    /** Faz 9b: site profilinde kitap notları/vektör deposu ORTAK → prompt'a hiç girmez (sızıntı yok). */
+    @Test
+    void siteModundaKitapBaglamiEnjekteEdilmez() {
+        BaglamServisi site = new BaglamServisi(contentRepo, ilerlemeRepo, quizSonucRepo,
+                promptFactory, hafizaService, kitapService, kaynakService, () -> "a@pera.software",
+                CalismaModu.siteIcin());
+        when(ilerlemeRepo.findByKullaniciIdAndHafta(anyString(), anyInt())).thenReturn(List.of());
+        when(quizSonucRepo.findByKullaniciIdAndHaftaOrderByTarihDesc(anyString(), anyInt())).thenReturn(List.of());
+        when(hafizaService.hafizaBaglami(1)).thenReturn("HAFIZA");
+        when(kaynakService.baglamIcin(1)).thenReturn("KAYNAK_ISARETI");
+
+        String baglam = site.sistemBaglami(1, 1, "soru");
+
+        assertThat(baglam).contains("KAYNAK_ISARETI").contains("HAFIZA");
+        verifyNoInteractions(kitapService);
     }
 }

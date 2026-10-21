@@ -12,6 +12,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import tr.velzon.aiogretmen.config.AppProperties;
+import tr.velzon.aiogretmen.config.CalismaModu;
+import tr.velzon.aiogretmen.config.KullaniciBaglami;
 import tr.velzon.aiogretmen.repo.KullanimRepo;
 import tr.velzon.aiogretmen.types.AiDevreDisiException;
 import tr.velzon.aiogretmen.types.BenzerNot;
@@ -35,7 +37,7 @@ public class AiYapilandirma {
     public OgretmenAiClient ogretmenAiClient(
             @Value("${spring.ai.openai.api-key:}") String apiKey,
             @Value("${spring.ai.openai.base-url:https://openrouter.ai/api}") String baseUrl,
-            AppProperties props, KullanimRepo kullanimRepo) {
+            AppProperties props, KullanimRepo kullanimRepo, KullaniciBaglami kullaniciBaglami) {
 
         if (apiKey == null || apiKey.isBlank()) {
             log.warn("OPENROUTER_API_KEY tanımlı değil — AI özellikleri devre dışı; müfredat+ilerleme çalışıyor.");
@@ -67,29 +69,30 @@ public class AiYapilandirma {
         OpenAiChatModel chatModel = OpenAiChatModel.builder().openAiApi(api).build();
         log.info("AI öğretmen aktif — sağlayıcı={} guclu={} hizli={}",
                 baseUrl, props.ai().model().guclu(), props.ai().model().hizli());
-        return new SpringAiOgretmenClient(chatModel, props, kullanimRepo);
+        return new SpringAiOgretmenClient(chatModel, props, kullanimRepo, kullaniciBaglami);
     }
 
     /**
      * Anlam-eşleşmeli bağlam (ADR-0005): OpenAiEmbeddingModel + SimpleVectorStore (bellek-içi,
      * JSON persist). Anahtar yoksa no-op — {@link AnlamArama#benzerleri} boş döner ve
      * KitapService hafta-etiketi eşleşmesine düşer (uygulama anahtarsız da açılır).
+     *
+     * <p>Faz 9b: {@code site} profilinde de no-op — kitap notları ve vektör deposu kullanıcıya AYRILMAMIŞ
+     * (ortak) olduğundan çok kullanıcılı sitede yüklenmez/indekslenmez/sorgulanmaz (ADR-0012).
      */
     @Bean
     public AnlamArama anlamArama(
             @Value("${spring.ai.openai.api-key:}") String apiKey,
             @Value("${spring.ai.openai.base-url:https://openrouter.ai/api}") String baseUrl,
-            AppProperties props) {
+            AppProperties props, CalismaModu calismaModu) {
 
+        if (calismaModu.siteMi()) {
+            log.info("site profili — ortak kitap/vektör deposu KAPALI (kullanıcıya ayrılmamış veri).");
+            return kapaliAnlamArama();
+        }
         if (apiKey == null || apiKey.isBlank()) {
             log.warn("OPENROUTER_API_KEY yok — anlam araması devre dışı; hafta-etiketi eşleşmesine düşülür.");
-            return new AnlamArama() {
-                @Override public boolean aktif() { return false; }
-                @Override public void indexle(List<NotParcasi> parcalar) { /* no-op */ }
-                @Override public List<BenzerNot> benzerleri(String sorgu, int k) { return List.of(); }
-                @Override public void temizle() { /* no-op */ }
-                @Override public int sayac() { return 0; }
-            };
+            return kapaliAnlamArama();
         }
 
         String embModel = props.ai() != null && props.ai().model() != null
@@ -112,6 +115,16 @@ public class AiYapilandirma {
 
         log.info("Anlam araması aktif — embedding={} depo={}", embModel, yol);
         return new SpringAiAnlamArama(vektorDepo, new File(yol));
+    }
+
+    private static AnlamArama kapaliAnlamArama() {
+        return new AnlamArama() {
+            @Override public boolean aktif() { return false; }
+            @Override public void indexle(List<NotParcasi> parcalar) { /* no-op */ }
+            @Override public List<BenzerNot> benzerleri(String sorgu, int k) { return List.of(); }
+            @Override public void temizle() { /* no-op */ }
+            @Override public int sayac() { return 0; }
+        };
     }
 
     /**

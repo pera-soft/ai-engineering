@@ -1,0 +1,11 @@
+Merhaba,
+
+AI Öğretmen (pera) hesabın için şifre sıfırlama istendi. Yeni şifre belirlemek için aşağıdaki bağlantıyı tarayıcında aç:
+
+{{baglanti}}
+
+Bağlantı 1 saat geçerlidir ve yalnız bir kez kullanılabilir. Şifren değişince açık tüm oturumların kapanır.
+
+Bu isteği sen yapmadıysan bu e-postayı yok sayabilirsin; şifren değişmez.
+
+— AI Öğretmen

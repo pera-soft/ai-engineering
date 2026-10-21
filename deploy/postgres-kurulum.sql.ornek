@@ -1,0 +1,32 @@
+-- AI Öğretmen sitesi — PostgreSQL rolü + veritabanı (Faz 9d, ADR-0014). ŞABLON: şifreyi değiştir.
+-- Çalıştırma (sunucuda, postgres yönetici hesabıyla):
+--   sudo -u postgres psql -v ON_ERROR_STOP=1 -f deploy/postgres-kurulum.sql.ornek
+--
+-- En az yetki: uygulama rolü süper kullanıcı DEĞİL, rol/veritabanı oluşturamaz. Yalnız KENDİ
+-- veritabanının sahibidir — schema.sql her açılışta CREATE TABLE/INDEX IF NOT EXISTS çalıştırdığı için
+-- tablo oluşturma yetkisi gerekir. Not: PostgreSQL'de her veritabanı varsayılan olarak PUBLIC'e CONNECT
+-- verir; sunucuda başka veritabanı varsa onlarda da 'REVOKE CONNECT ON DATABASE <ad> FROM PUBLIC;' yap.
+
+CREATE ROLE ai_ogretmen WITH LOGIN PASSWORD '<veritabani-sifresi>'
+  NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS
+  CONNECTION LIMIT 30;
+
+CREATE DATABASE ai_ogretmen
+  OWNER ai_ogretmen
+  ENCODING 'UTF8'
+  TEMPLATE template0;
+
+-- Herkese açık varsayılan bağlanma/geçici tablo yetkisini kaldır; yalnız uygulama rolü bağlansın.
+REVOKE ALL ON DATABASE ai_ogretmen FROM PUBLIC;
+GRANT CONNECT, TEMPORARY ON DATABASE ai_ogretmen TO ai_ogretmen;
+
+-- public şeması: PostgreSQL 14 ve öncesinde herkes yazabilir → yalnız sahibe bırak.
+-- (15+ sürümde zaten pg_database_owner'a ait; aşağıdaki komutlar orada da zararsızdır.)
+\connect ai_ogretmen
+REVOKE CREATE ON SCHEMA public FROM PUBLIC;
+ALTER SCHEMA public OWNER TO ai_ogretmen;
+
+-- Doğrulama:
+--   psql "host=127.0.0.1 dbname=ai_ogretmen user=ai_ogretmen" -c 'select current_user'
+-- pg_hba.conf: uygulama 127.0.0.1'den bağlanır; 'host ai_ogretmen ai_ogretmen 127.0.0.1/32 scram-sha-256'
+-- satırı varsayılan kurallarla genelde zaten kapsanır. PostgreSQL'i dışarıya açma (listen_addresses='localhost').

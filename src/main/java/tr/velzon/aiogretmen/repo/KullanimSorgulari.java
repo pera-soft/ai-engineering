@@ -19,7 +19,8 @@ public class KullanimSorgulari {
         this.jdbc = jdbc;
     }
 
-    public List<Map<String, Object>> islemBazindaToplam() {
+    /** Yalnız verilen kullanıcının çağrıları (Faz 9b: başka kullanıcının kullanımı görünmez). */
+    public List<Map<String, Object>> islemBazindaToplam(String kullaniciId) {
         // Takma adlar tırnaklı küçük harf: H2 tırnaksızları BÜYÜTÜR ve Map anahtarları
         // JSON'a büyük harf sızardı (inceleme 2. tur — API sözleşme tutarlılığı).
         return jdbc.sql("""
@@ -28,8 +29,10 @@ public class KullanimSorgulari {
                                SUM(input_tokens)  AS "input_tokens",
                                SUM(output_tokens) AS "output_tokens"
                         FROM ai_kullanim
+                        WHERE kullanici_id = :kullaniciId
                         GROUP BY islem
                         ORDER BY islem""")
+                .param("kullaniciId", kullaniciId)
                 .query()
                 .listOfRows();
     }

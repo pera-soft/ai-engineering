@@ -44,16 +44,32 @@ function gorevTipiCikar(metin) {
 
 // ---------- yardımcılar ----------
 /** timeoutMs: AI uçları için uzun (varsayılan 180sn) — asılı kalan istek UI'ı kilitlemesin. */
+/** site profili (ADR-0012): Spring Security'nin XSRF-TOKEN çerezi. Yerel modda çerez yoktur → "". */
+function csrfToken() {
+  const m = document.cookie.match(/(?:^|;\s*)XSRF-TOKEN=([^;]+)/);
+  return m ? decodeURIComponent(m[1]) : "";
+}
+
 async function api(yol, secenekler = {}, timeoutMs = 180000) {
   const iptal = new AbortController();
   const zamanlayici = setTimeout(() => iptal.abort(), timeoutMs);
+  // Durum değiştiren istekler CSRF token'ını başlıkta taşır (site profili; yerelde çerez yok → eklenmez)
+  const basliklar = new Headers(secenekler.headers || {});
+  const metod = (secenekler.method || "GET").toUpperCase();
+  const token = csrfToken();
+  if (token && metod !== "GET" && metod !== "HEAD") basliklar.set("X-XSRF-TOKEN", token);
   let yanit;
   try {
-    yanit = await fetch(yol, { ...secenekler, signal: iptal.signal });
+    yanit = await fetch(yol, { ...secenekler, headers: basliklar, signal: iptal.signal });
   } catch (h) {
     throw h.name === "AbortError" ? new Error("İstek zaman aşımına uğradı — tekrar dene.") : h;
   } finally {
     clearTimeout(zamanlayici);
+  }
+  if (yanit.status === 401) {
+    // site profili: oturum yok/bitmiş → giriş sayfası (yerel modda 401 oluşmaz)
+    location.href = "/giris.html";
+    throw new Error("Oturum gerekli — giriş sayfasına yönlendiriliyorsun.");
   }
   if (!yanit.ok) {
     const govde = await yanit.json().catch(() => ({}));
@@ -1529,9 +1545,32 @@ function karsilamaCiz(ilkAcik) {
  *  Hata durumunda güvenli varsayılan: mülakat KAPALI. */
 const ozellikler = api("/api/ozellikler").catch(() => ({ mulakat: false }));
 
+/** site profili (ADR-0012): üst barda oturumdaki e-posta + "Çıkış". Yerel modda hiçbir şey eklenmez. */
+function oturumAlaniKur(oz) {
+  if (!oz.site || !oz.kullanici) return;
+  const hwrap = document.querySelector("header .hwrap");
+  if (!hwrap || document.getElementById("oturum")) return;
+  const kutu = el("div", "oturum");
+  kutu.id = "oturum";
+  const cikis = el("button", "btn btn-ikincil", "Çıkış");
+  cikis.type = "button";
+  cikis.addEventListener("click", async () => {
+    cikis.disabled = true;
+    try {
+      await fetch("/api/kimlik/cikis", { method: "POST", headers: { "X-XSRF-TOKEN": csrfToken() } });
+    } finally {
+      location.href = "/giris.html?cikis";
+    }
+  });
+  kutu.append(el("span", "eposta", oz.kullanici), cikis);
+  hwrap.appendChild(kutu);
+}
+
 (async function basla() {
   try {
-    durum.mulakatEtkin = !!(await ozellikler).mulakat;
+    const oz = await ozellikler;
+    durum.mulakatEtkin = !!oz.mulakat;
+    oturumAlaniKur(oz);
     const kullanim = await api("/api/kullanim").catch(() => ({ aiAktif: false }));
     durum.aiAktif = !!kullanim.aiAktif;
     durum.kaynaklar = await api("/api/kaynaklar").catch(() => []);
