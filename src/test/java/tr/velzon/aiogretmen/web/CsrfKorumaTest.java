@@ -17,8 +17,14 @@ class CsrfKorumaTest {
 
     private MockHttpServletResponse calistir(String uri, String metod,
                                              String fetchSite, String origin) throws ServletException, IOException {
+        return calistir(uri, metod, fetchSite, origin, 8090);
+    }
+
+    private MockHttpServletResponse calistir(String uri, String metod, String fetchSite,
+                                             String origin, int sunucuPortu) throws ServletException, IOException {
         MockHttpServletRequest istek = new MockHttpServletRequest(metod, uri);
         istek.setRequestURI(uri);
+        istek.setLocalPort(sunucuPortu);
         if (fetchSite != null) istek.addHeader("Sec-Fetch-Site", fetchSite);
         if (origin != null) istek.addHeader("Origin", origin);
         MockHttpServletResponse yanit = new MockHttpServletResponse();
@@ -47,6 +53,20 @@ class CsrfKorumaTest {
         assertThat(calistir("/api/program", "GET", "same-origin", null).getStatus()).isEqualTo(200);
         assertThat(calistir("/api/sohbet", "POST", "same-origin", "http://127.0.0.1:8090").getStatus()).isEqualTo(200);
         assertThat(calistir("/api/sohbet", "POST", "same-origin", "http://localhost:8090").getStatus()).isEqualTo(200);
+    }
+
+    @Test
+    void farkliPorttaCalisanSunucudaKendiOriginiGecer() throws Exception {
+        // port 8090'a sabit değil: sunucu hangi porttaysa (server.port) o porttaki yerel origin geçer
+        assertThat(calistir("/api/sohbet", "POST", "same-origin", "http://127.0.0.1:9000", 9000).getStatus()).isEqualTo(200);
+        assertThat(calistir("/api/sohbet", "POST", "same-origin", "http://localhost:9000", 9000).getStatus()).isEqualTo(200);
+    }
+
+    @Test
+    void yereldekiBaskaPorttanGelenOrigin403() throws Exception {
+        // aynı makinedeki başka bir yerel uygulama (farklı port) da yabancı origin sayılır
+        assertThat(calistir("/api/sohbet", "POST", null, "http://127.0.0.1:3000", 8090).getStatus()).isEqualTo(403);
+        assertThat(calistir("/api/sohbet", "POST", null, "http://127.0.0.1:8090", 9000).getStatus()).isEqualTo(403);
     }
 
     @Test

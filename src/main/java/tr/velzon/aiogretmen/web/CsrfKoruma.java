@@ -14,7 +14,9 @@ import java.io.IOException;
  * BAŞKA bir sitenin bu sunucuya istek göndermesini engellemez (multipart "simple
  * request" sayılır, <img> GET tetikler). Bu filtre siteler-arası istekleri reddeder:
  *  - Modern tarayıcılar Sec-Fetch-Site başlığı gönderir: "cross-site" → 403.
- *  - Origin başlığı varsa yalnız kendi origin'lerimize izin verilir.
+ *  - Origin başlığı varsa yalnız kendi origin'lerimize izin verilir: 127.0.0.1/localhost +
+ *    sunucunun GERÇEK portu (soketten; Host başlığından değil — o istemci kontrolünde).
+ *    Böylece server.port değişince arayüz bozulmaz, yereldeki başka bir port da yabancı sayılır.
  * Sunucu tarafı araçlar (curl) bu başlıkları göndermez ve etkilenmez.
  */
 @Component
@@ -27,7 +29,7 @@ public class CsrfKoruma extends OncePerRequestFilter {
         String origin = istek.getHeader("Origin");
 
         boolean crossSite = "cross-site".equalsIgnoreCase(fetchSite)
-                || (origin != null && !yerelOrigin(origin));
+                || (origin != null && !yerelOrigin(origin, istek.getLocalPort()));
 
         if (crossSite && istek.getRequestURI().startsWith("/api/")) {
             yanit.setStatus(403);
@@ -38,7 +40,7 @@ public class CsrfKoruma extends OncePerRequestFilter {
         zincir.doFilter(istek, yanit);
     }
 
-    private static boolean yerelOrigin(String origin) {
-        return origin.equals("http://127.0.0.1:8090") || origin.equals("http://localhost:8090");
+    private static boolean yerelOrigin(String origin, int sunucuPortu) {
+        return origin.equals("http://127.0.0.1:" + sunucuPortu) || origin.equals("http://localhost:" + sunucuPortu);
     }
 }

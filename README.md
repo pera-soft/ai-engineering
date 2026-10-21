@@ -441,9 +441,10 @@ bağlama kuralı sayesinde her özellik bir ortam değişkeniyle geçersiz kıl�
 
 > Yollar göreli olduğundan uygulamayı **depo kökünden** çalıştırın.
 
-> Port değiştirirseniz dikkat: CSRF filtresi (`web/CsrfKoruma`) tarayıcıdan gelen `Origin`
-> başlığını yalnızca `http://127.0.0.1:8090` ve `http://localhost:8090` için kabul eder; farklı
-> porttan arayüz POST istekleri 403 alır.
+> Portu değiştirebilirsiniz (ör. `SERVER_PORT=9000`). CSRF filtresi (`web/CsrfKoruma`) izinli
+> `Origin`'i sabit bir porttan değil, sunucunun **gerçekten dinlediği porttan** türetir:
+> `http://127.0.0.1:<port>` ve `http://localhost:<port>`. Aynı makinedeki başka bir porttan gelen
+> istekler yine 403 alır.
 
 ### Ortam değişkenleri
 
@@ -798,7 +799,7 @@ tehditler:
 
 | Tehdit | Önlem |
 |---|---|
-| Siteler arası istek (CSRF) | `Sec-Fetch-Site: cross-site` veya yabancı `Origin` içeren `/api/` istekleri → 403 (`web/CsrfKoruma`) |
+| Siteler arası istek (CSRF) | `Sec-Fetch-Site: cross-site` veya yabancı `Origin` içeren `/api/` istekleri → 403 (`web/CsrfKoruma`); izinli origin yalnız `127.0.0.1`/`localhost` + sunucunun gerçek portu |
 | Kalıcı XSS | Kullanıcı verisi DOM'a `textContent` ile basılır; CSP `default-src 'self'`; Markdown HTML'e `escapeHtml` ile çevrilir |
 | Yan etkili GET | Rapor yenileme POST'a taşındı |
 | Asılı YZ çağrısı | Bağlantı 10 sn / okuma 150 sn; arayüzde 180 sn iptal |

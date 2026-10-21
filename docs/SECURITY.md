@@ -9,7 +9,7 @@ işlenmesi (XSS) ve AI çıktılarının kalıcı dosyalara yazılması (hafıza
 ## Önlemler (2026-07-03 code review döngüsünde eklendi)
 | Tehdit | Önlem | Yer |
 |---|---|---|
-| Siteler-arası istek (CSRF) | `Sec-Fetch-Site: cross-site` ve yabancı `Origin` → 403 | `web/CsrfKoruma` |
+| Siteler-arası istek (CSRF) | `Sec-Fetch-Site: cross-site` ve yabancı `Origin` → 403; izinli origin = `127.0.0.1`/`localhost` + sunucunun soketten okunan gerçek portu (Host başlığı değil) | `web/CsrfKoruma` |
 | Stored XSS (kitap adı) | Kullanıcı verisi DOM'a `textContent` ile basılır; CSP `default-src 'self'` | `app.js`, `index.html` |
 | Yan etkili GET | Rapor yenileme POST'a taşındı (`/api/rapor/{h}/yenile`) | `OgretmenController` |
 | Asılı AI çağrısı | Backend connect 10sn / read 150sn; frontend AbortController 180sn | `AiYapilandirma`, `app.js` |
