@@ -1,0 +1,30 @@
+# MCP sunucusu profili (stdio) — ADR-0007.
+# Çalıştırma:  java -Dspring.profiles.active=mcp -jar target/ai-ogretmen-0.1.0-SNAPSHOT.jar
+# ya da:       ./mvnw spring-boot:run -Dspring-boot.run.profiles=mcp
+#
+# Bu profilde web sunucusu KAPALIDIR ve stdout yalnız MCP JSON-RPC'ye ayrılır; log gürültüsü
+# stdout'u kirletirse protokol bozulur (bu yüzden banner + konsol log kapalı, loglar dosyaya).
+# MUTLAK İLKE: MCP adaptörü LLM ÇAĞIRMAZ — OPENROUTER_API_KEY olmadan da çalışır; muhakeme istemcide.
+
+spring:
+  main:
+    web-application-type: none   # stdio modunda HTTP sunucusu gerekmez; stdin/stdout kanaldır
+    banner-mode: "off"           # banner stdout'a yazılmasın (JSON-RPC'yi kirletir)
+  ai:
+    mcp:
+      server:
+        enabled: true
+        stdio: true              # transport = stdio (StdioServerTransportProvider)
+        type: SYNC               # senkron sunucu (araç/kaynak/prompt handler'ları bloklamaz)
+        name: ai-ogretmen
+        version: 0.1.0-SNAPSHOT
+        instructions: >-
+          AI Öğretmen — 12 haftalık yazılım mimarlığı programının içerik + araç + prompt sunucusu.
+          Muhakeme senin (istemci) tarafında yapılır; sunucu LLM çağırmaz. Program özeti için
+          'program_ozeti' aracıyla başla; öğretmenlik için 'ogretmen-sistem'/'sokratik' prompt'larını kullan.
+
+logging:
+  threshold:
+    console: "OFF"               # konsol (stdout) log çıktısını KAPAT — stdout yalnız MCP JSON-RPC'ye ait
+  file:
+    name: ./data/mcp-server.log  # loglar dosyaya (teşhis için)

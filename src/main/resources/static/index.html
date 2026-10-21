@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Öğretmen — Mimar Defteri</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; connect-src 'self'">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+  <div class="hwrap">
+    <div class="brand">
+      <span class="eyebrow">AI Öğretmen · 12 Haftalık Program</span>
+      <h1>Mimar Defteri</h1>
+    </div>
+    <div class="stat">
+      <span class="lab">Toplam İlerleme</span>
+      <span class="val" id="toplam-ilerleme">—</span>
+    </div>
+    <button class="btn btn-ikincil" id="kilavuz-ac" title="Nasıl kullanılır?">❓ Nasıl kullanılır</button>
+  </div>
+</header>
+
+<dialog id="kilavuz">
+  <div class="kilavuz-icerik">
+    <h2>📖 Bu sayfa nasıl kullanılır?</h2>
+    <p class="kilavuz-ozet">Kısa özet: <strong>Dersi oku → Görevi AI öğretmenle üstünden geç
+      (öğretmen “geçtin” deyince sistem işaretler) → Takılınca Sohbet'te sor → Hafta bitince quiz + rapor</strong></p>
+
+    <h3>Ekranda ne ne demek?</h3>
+    <p><strong>Hafta başlığı ve altındaki cümle</strong> → o haftanın hedefi: hafta bitince
+      bunu yapabiliyor olmalısın. Altındaki <em>Kaynak:</em> satırı, dersin hangi yazı/kitaba
+      dayandığını söyler.</p>
+    <p><strong>📚 “Bu haftanın kaynakları” kutusu</strong> → o yazıların Türkçe çalışma
+      metinleri. Bir görev “yazıyı oku” diyorsa ya da derse başlamadan okumak istersen,
+      buradan aç — yazı sayfada açılır (başka siteye gitmene gerek yok).</p>
+    <p><strong>GÜN 1…5 kartları</strong> → haftanın günlük dersleri. Karta tıkla: ders metni
+      ve görevler açılır. Başlıktaki <strong>“1/3” sayacı</strong> o günün görevlerinden kaçını
+      bitirdiğini gösterir (1/3 = üç görevden biri tamam).</p>
+    <p><strong>Görev satırları</strong> → sırayla yapılacak işler; biri bitmeden bir sonraki
+      açılmaz. Her görevin türü bellidir: <em>📖 Oku</em>, <em>✍️ Yaz</em>, <em>💬 Tartış</em>.
+      Yanındaki butona basınca ne yapacağın açılır.</p>
+
+    <h3>1 · Haftayı seç, günün dersini oku</h3>
+    <p>Sol menüden haftayı seç (kilitli haftalar için önce öncekini bitirmen gerekir).
+      Gün kartına tıkla — ders metni açılır. Yazıların tamamı Türkçe.</p>
+
+    <h3>2 · Görevleri sırayla yap</h3>
+    <p><strong>📖 Oku görevi:</strong> “Oku” butonuna bas, yazı sayfada açılır. Okuyunca
+      <em>“✓ Okudum”</em>a bas — sonra AI öğretmen kısaca üstünden geçmen için bir soru sorar;
+      en kritik 1-2 noktayı kendi cümlelerinle yazınca öğretmen görevi geçirir.</p>
+    <p><strong>✍️ Yaz görevi:</strong> “Yaz” butonuna bas, ferah bir çalışma alanı açılır.
+      Cevabını yaz, <em>“Cevabımı AI öğretmene değerlendirt”</em>e bas. Öğretmen 100 üzerinden
+      puanlar; doğru noktalarını, eksiklerini ve sonraki adımını söyler — görev otomatik işaretlenir.
+      Takılırsan aynı ekranda <em>🔍 Soruyu aç</em> ve <em>💡 Örnek cevap göster</em> var.</p>
+    <p>Not: Kutucukları <strong>sen doldurmuyorsun</strong>. Görevleri AI öğretmenle üstünden
+      geçerek tamamlarsın (Okudum → kısa cevap · yazıyı değerlendirt · tartış); öğretmen “geçtin”
+      deyince sistem işaretler ve sıradaki görev açılır. İlerleme sol menüye ve üst bara yansır.</p>
+
+    <h3>3 · Takıldığında sohbette sor</h3>
+    <p>Sağdaki <strong>AI Öğretmen</strong> paneline yaz. Öğretmen hazır cevap vermez;
+      sorularla seni cevaba yürütür. “Ben şunu yaptım / şunu anlamadım” demek de serbest —
+      seni hatırlar, sonraki konuşmalarda buna göre davranır.</p>
+    <p><strong>“Gönder”in üstündeki görev barı</strong> → sohbette hep o an yapman gereken
+      görevi ve <em>“→ göreve geç”</em> butonunu gösterir. Butona bas: oku için yazı açılır,
+      yaz için çalışma alanı, tartış için sohbet — görevi hep AI öğretmenle üstünden geçerek
+      tamamlarsın.</p>
+
+    <h3>4 · Haftayı kapat: quiz + rapor</h3>
+    <p>Haftanın tüm günlerini bitirince haftalık quiz açılır — çöz (geçme eşiği %60).
+      İstersen <em>“AI'dan yeni sorular”</em> ile taze sorular al. Sonra <strong>Haftalık Rapor</strong>
+      düğmesiyle öğretmenden hafta özetini iste: neredesin, neyi tekrar etmelisin.
+      Quiz'i %60+ geçince bir sonraki hafta açılır.</p>
+
+    <p class="kilavuz-ritim">💡 Önerilen ritim: her sabah e-postadan önce 20 dakika
+      (Richards &amp; Ford'un “20 dakika kuralı”) — bir günü bitirmek zorunda değilsin,
+      kaldığın yerden devam et.</p>
+
+    <button class="btn" id="kilavuz-kapat">Anladım, başlayalım</button>
+  </div>
+</dialog>
+
+<div class="layout">
+
+  <aside>
+    <details class="menu-bolum">
+      <summary class="map-title">Eğitim — Program Haritası (Başlangıç + Hafta 1 → 12)</summary>
+      <div class="layer-stack" id="katman-haritasi"></div>
+    </details>
+    <!-- Mülakat bölümü varsayılan GİZLİ (ADR-0011): mulakat.js yalnız /api/ozellikler
+         mulakat=true dönerse açar. -->
+    <details class="menu-bolum" id="mulakat-bolumu" hidden>
+      <summary class="map-title">Mülakat Hazırlığı — 14 Kademe</summary>
+      <div class="layer-stack" id="mulakat-haritasi"></div>
+    </details>
+  </aside>
+
+  <main id="icerik">
+    <div class="panel" id="hafta-paneli">Yükleniyor…</div>
+  </main>
+
+  <div class="chat-aside">
+    <div class="chat-panel">
+      <div class="chat-head">
+        <span class="dot" id="chat-dot"></span>
+        <span class="t">AI Öğretmen</span>
+        <span class="s mono" id="chat-durum">…</span>
+      </div>
+      <div class="chat-mesajlar" id="chat-mesajlar"></div>
+      <div class="chat-giris">
+        <div class="gorev-bar" id="gorev-bar" hidden></div>
+        <textarea id="chat-girdi" placeholder="…" disabled></textarea>
+        <button class="btn" id="chat-gonder" disabled>Gönder</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script src="app.js"></script>
+<script src="mulakat.js"></script>
+</body>
+</html>

@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.5.16</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>tr.velzon</groupId>
+    <artifactId>ai-ogretmen</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <name>AI Öğretmen</name>
+    <description>Yerel AI destekli öğrenme koçu — 12 haftalık mimarlık programı</description>
+
+    <properties>
+        <java.version>17</java.version>
+        <spring-ai.version>1.1.8</spring-ai.version>
+        <archunit.version>1.4.2</archunit.version>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.springframework.ai</groupId>
+                <artifactId>spring-ai-bom</artifactId>
+                <version>${spring-ai.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-starter-model-openai</artifactId>
+            <!-- OpenRouter OpenAI-uyumlu API sunar; Claude modellerine buradan erişiyoruz (ADR-0004) -->
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-vector-store</artifactId>
+            <!-- SimpleVectorStore (bellek-içi cosine + JSON persist): anlam-eşleşmeli bağlam (ADR-0005) -->
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-starter-mcp-server</artifactId>
+            <!-- Yerel MCP sunucusu (stdio, ADR-0007). mcp/ adaptörü MCP Java SDK (io.modelcontextprotocol)
+                 tiplerini kullanır; org.springframework.ai import ETMEZ → LLM sunucuda çağrılmaz, muhakeme istemcide. -->
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-starter-mcp-server-webmvc</artifactId>
+            <!-- Faz 2 transport: streamable-HTTP MCP sunucusu (WebMVC; ADR-0007). WebFlux DEĞİL —
+                 Faz 2 auth için mcp-security WebMVC ister. Yalnız 'mcp-http' profilinde
+                 (protocol=STREAMABLE) etkinleşir; stdio ve web profillerinde McpServerStdioDisabledCondition
+                 / enabled:false ile KAPALI kalır. stdio starter ile aynı common auto-config'i paylaşır ve
+                 aynı Sync*Specification bean'lerini toplar → Faz 1 sağlayıcıları transport-agnostik, değişmez. -->
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+            <!-- Faz 2a-2: MCP /mcp endpoint'i OAuth 2.1 resource server (JWT) ile korunur (ADR-0007).
+                 DİKKAT: starter TÜM endpoint'leri otomatik korur → web profili (8090) auth'suz kalsın diye
+                 config/VarsayilanGuvenlikYapilandirma (profil !mcp-http) permitAll zinciri sağlar. -->
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+            <!-- Bearer JWT doğrulama (NimbusJwtDecoder, spring-security-oauth2-jose). Boot'un eager
+                 JwtDecoder auto-config'i TETİKLENMEZ: issuer 'spring.security...' değil, custom 'mcp.oauth2.*'
+                 property'sinden okunur (lazy withIssuerLocation → açılışta ağ çağrısı yok). -->
+        </dependency>
+        <dependency>
+            <groupId>org.springaicommunity</groupId>
+            <artifactId>mcp-server-security</artifactId>
+            <version>0.0.6</version>
+            <!-- Topluluk modülü (Spring resmi DEĞİL; WebMVC + JWT-only, opaque token yok, WebFlux yok).
+                 0.1.x Spring AI 2.0 ister; biz 1.1.8'deyiz → 0.0.6 (bkz ADR-0007 Faz 2a-2).
+                 McpServerOAuth2Configurer + /.well-known/oauth-protected-resource (RFC 9728) filtresi +
+                 aud doğrulaması (RFC 8707) sağlar. -->
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jdbc</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.commonmark</groupId>
+            <artifactId>commonmark</artifactId>
+            <version>0.24.0</version>
+        </dependency>
+        <!-- Markdown tablo desteği (GFM); commonmark çekirdeği tablo bilmez — ADR-0006 -->
+        <dependency>
+            <groupId>org.commonmark</groupId>
+            <artifactId>commonmark-ext-gfm-tables</artifactId>
+            <version>0.24.0</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-test</artifactId>
+            <scope>test</scope>
+            <!-- mockJwt() post-processor: geçerli JWT'yi decoder'a gerek kalmadan enjekte eder
+                 (auth testi TDD — token'sız 401, geçerli JWT 200). -->
+        </dependency>
+        <dependency>
+            <groupId>com.tngtech.archunit</groupId>
+            <artifactId>archunit-junit5</artifactId>
+            <version>${archunit.version}</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <!-- Varsayılan desenler + MimariTestleri (ArchUnit) — sessiz atlanmasın -->
+                    <includes>
+                        <include>**/*Test.java</include>
+                        <include>**/*Tests.java</include>
+                        <include>**/MimariTestleri.java</include>
+                    </includes>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

@@ -1,0 +1,62 @@
+# MCP sunucusu profili (streamable-HTTP) — ADR-0007 Faz 2, ilk adım (AUTH YOK — sonraki adım).
+# Çalıştırma:  ./mvnw spring-boot:run -Dspring-boot.run.profiles=mcp-http
+# ya da:       java -Dspring.profiles.active=mcp-http -jar target/ai-ogretmen-0.1.0-SNAPSHOT.jar
+#
+# Smoke test (initialize + tools/list; OpenRouter'a çağrı YOK — model:none, muhakeme istemcide):
+#   curl -sN http://127.0.0.1:8091/mcp \
+#     -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' \
+#     -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18",
+#          "capabilities":{},"clientInfo":{"name":"curl","version":"0"}}}'
+#
+# MUTLAK İLKE (stdio ile aynı): MCP adaptörü LLM ÇAĞIRMAZ — OPENROUTER_API_KEY olmadan da çalışır.
+# ÜÇ MOD:  web (varsayılan, MCP kapalı) · mcp (stdio, Faz 1) · mcp-http (BU, streamable-HTTP).
+
+server:
+  port: 8091          # web arayüzünden (8090) AYRI port — ikisi aynı makinede yan yana çalışabilir
+  address: 127.0.0.1  # Uygulama ASLA public'e bind ETMEZ (AGENTS.md NEVER korunur). Dışarıya açılan tek
+                      # şey nginx'in TLS ile terminate ettiği ai.velzon.tr/mcp; ADR-0007 gevşetmeyi yalnız
+                      # bu yol için ve auth (OAuth 2.1) ile birlikte verir — auth kuruludur (bkz. ADR-0007 Faz 2b).
+  # Nginx/TLS-terminasyonu ARKASINDA çalışır (ai.velzon.tr → 127.0.0.1:8091). ForwardedHeaderFilter,
+  # X-Forwarded-Proto/Host'u onurlandırır → request origin http://127.0.0.1:8091 DEĞİL https://ai.velzon.tr
+  # olur. KRİTİK: RFC 9728 metadata ve RFC 8707 resource identifier (aud) bu origin'den kurulur; forward
+  # olmadan token audience'ı public URL ile eşleşmez ve OAuth doğrulaması patlar.
+  forward-headers-strategy: framework
+  servlet:
+    encoding:
+      charset: UTF-8
+      force: true
+
+spring:
+  ai:
+    mcp:
+      server:
+        enabled: true
+        stdio: false             # HTTP transport → stdio KAPALI (aksi halde McpServerStdioDisabledCondition
+                                 # HTTP transport'unu bastırır). Üç modun net ayrımı için açıkça yazıldı.
+        protocol: STREAMABLE     # SSE/STATELESS değil — streamable-HTTP (WebMvcStreamableServerTransportProvider)
+        type: SYNC               # senkron sunucu (araç/kaynak/prompt handler'ları bloklamaz)
+        name: ai-ogretmen
+        version: 0.1.0-SNAPSHOT
+        streamable-http:
+          mcp-endpoint: /mcp     # JSON-RPC uç noktası: http://127.0.0.1:8091/mcp
+        instructions: >-
+          AI Öğretmen — 12 haftalık yazılım mimarlığı programının içerik + araç + prompt sunucusu.
+          Muhakeme senin (istemci) tarafında yapılır; sunucu LLM çağırmaz. Program özeti için
+          'program_ozeti' aracıyla başla; öğretmenlik için 'ogretmen-sistem'/'sokratik' prompt'larını kullan.
+
+# --- OAuth 2.1 resource server (Faz 2a-2, ADR-0007) — /mcp bearer JWT ile korunur ---
+# SAĞLAYICI-BAĞIMSIZ: issuer bir env değeri; gerçek AS (Auth0 vb.) deploy adımında bağlanır.
+# NOT: Custom namespace ('mcp.oauth2.*') bilinçli — Boot'un 'spring.security.oauth2.resourceserver.jwt.*'
+# auto-config'i EAGER JwtDecoder kurup açılışta issuer'a ağ çağrısı yapardı. McpHttpGuvenlikYapilandirma
+# LAZY decoder (NimbusJwtDecoder.withIssuerLocation) kurar → açılışta ağ yok; yerel test placeholder ile boot olur.
+mcp:
+  oauth2:
+    issuer-uri: ${MCP_ISSUER_URI:https://auth.local.test/}  # DEPLOY: gerçek issuer (ör. https://<tenant>.eu.auth0.com/)
+    jwk-set-uri: ${MCP_JWK_SET_URI:}                        # verilirse LAZY decoder (açılışta ağ yok); prod'da boş bırak → issuer discovery
+    resource-path: ${MCP_RESOURCE_PATH:/mcp}                # aud = <istek-origin> + bu yol (RFC 8707 resource indicator)
+    resource-name: ${MCP_RESOURCE_NAME:AI Öğretmen MCP}     # /.well-known metadata'da görünen ad
+    validate-audience: ${MCP_VALIDATE_AUD:true}             # aud claim'i bu sunucunun resource kimliğini içermeli
+
+logging:
+  file:
+    name: ./data/mcp-http-server.log   # teşhis için dosyaya (stdout'a gerek yok — HTTP protokolü stdout kullanmaz)

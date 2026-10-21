@@ -1,0 +1,60 @@
+server:
+  port: 8090
+  address: 127.0.0.1   # yerel kişisel araç — dışarı açılmaz (AGENTS.md: NEVER)
+  servlet:
+    encoding:
+      charset: UTF-8   # Türkçe içerik her yanıtta açıkça UTF-8 — istemci tahmine bırakılmaz
+      force: true
+
+spring:
+  application:
+    name: ai-ogretmen
+  web:
+    resources:
+      cache:
+        cachecontrol:
+          no-store: true   # yerel dev: statik app.js/style.css asla cache'lenmesin — tarayıcı hep en günceli alır (⌘⇧R derdi biter)
+  servlet:
+    multipart:
+      max-file-size: 10MB      # kitap sayfası fotoğrafı üst sınırı
+      max-request-size: 12MB
+  datasource:
+    url: jdbc:h2:file:./data/ogrenme;AUTO_SERVER=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  sql:
+    init:
+      mode: always   # schema.sql her açılışta çalışır (CREATE TABLE IF NOT EXISTS — idempotent)
+  ai:
+    mcp:
+      server:
+        enabled: false   # web profilinde MCP KAPALI — stdio yalnız `mcp` profilinde açılır (ADR-0007).
+                         # Böylece normal web açılışı MCP transport'u aramaz; stdout JSON-RPC'ye ayrılmaz.
+    model:
+      chat: none                       # auto-config kalıcı kapalı — ChatModel'i ai/AiYapilandirma kurar
+      # OpenAI starter'ın diğer model auto-config'leri de kapalı — boş anahtarla açılış
+      # patlamasın (inceleme 2. tur bulgusu: anahtarsız boot OpenRouter geçişinden beri bozuktu)
+      embedding: none
+      image: none
+      moderation: none
+      audio:
+        speech: none
+        transcription: none
+    openai:
+      api-key: ${OPENROUTER_API_KEY:}  # boş olabilir — AI uçları 503 döner, uygulama çalışır
+      base-url: https://openrouter.ai/api   # OpenRouter (ADR-0004); Spring AI /v1/chat/completions ekler
+
+app:
+  content-dir: ./content
+  prompt-dir: ./prompts
+  hafiza-dir: ./data/hafiza   # AI öğretmenin öğrenci hafızası (md ağacı) — git dışı
+  rapor-dir: ./data/raporlar  # haftalık rapor cache'i (brief 7.5) — git dışı
+  vektor-dosyasi: ./data/hafiza/vektor.json   # anlam-eşleşmeli bağlam deposu (SimpleVectorStore JSON; ADR-0005) — git dışı
+  mulakat:
+    etkin: false   # Mülakat modülü KAPALI (ADR-0011): bean/uç/arayüz yok; kod repoda durur. Açmak: APP_MULAKAT_ETKIN=true
+  ai:
+    model:
+      guclu: anthropic/claude-sonnet-4.6   # değerlendirme, sohbet, rapor (OpenRouter kimliği; ADR-0003/0004)
+      hizli: anthropic/claude-haiku-4.5    # quiz üretimi, hafıza, kısa yardımcı işler
+      embedding: google/gemini-embedding-001   # anlam-eşleşmeli kitap bağlamı (OpenRouter /v1/embeddings; ADR-0005)

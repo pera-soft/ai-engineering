@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mimar Defteri — 12 Haftalık AI Çağı Mimarlık Programı</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#F2F6F9;        /* açık zemin */
+  --ink-2:#FFFFFF;      /* panel zemin */
+  --line:#C3D3DF;       /* grid / kenarlık */
+  --line-soft:#DCE6EE;
+  --paper:#1C3247;      /* ana metin (koyu lacivert) */
+  --muted:#5D7789;      /* ikincil metin */
+  --cyan:#186399;       /* vurgu mavi */
+  --amber:#C77F00;      /* ilerleme / aksiyon */
+  --green:#25804C;      /* tamamlandı */
+  --red:#BE4433;        /* yanlış cevap */
+  --radius:6px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  font-family:'Inter',system-ui,-apple-system,sans-serif;
+  background:
+    linear-gradient(rgba(24,99,153,.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(24,99,153,.07) 1px, transparent 1px),
+    var(--ink);
+  background-size:28px 28px, 28px 28px, auto;
+  color:var(--paper);
+  min-height:100vh;
+  line-height:1.6;
+}
+.mono{font-family:'IBM Plex Mono',monospace}
+h1,h2,h3,.disp{font-family:'Space Grotesk',sans-serif}
+
+/* ---------- ÜST BAR ---------- */
+header{
+  border-bottom:1px solid var(--line);
+  background:rgba(255,255,255,.94);
+  backdrop-filter:blur(6px);
+  box-shadow:0 1px 6px rgba(28,50,71,.06);
+  position:sticky;top:0;z-index:50;
+}
+.hwrap{max-width:1180px;margin:0 auto;padding:14px 20px;display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+.brand{display:flex;flex-direction:column;gap:2px;margin-right:auto}
+.brand .eyebrow{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.18em;color:var(--cyan);text-transform:uppercase}
+.brand h1{font-size:20px;font-weight:700;letter-spacing:-.01em}
+.stat{display:flex;flex-direction:column;align-items:flex-end;gap:2px;min-width:90px}
+.stat .lab{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;color:var(--muted);text-transform:uppercase}
+.stat .val{font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:700;color:var(--amber)}
+.stat .val.g{color:var(--green)}
+.progress-rail{width:100%;height:6px;background:var(--line-soft);border-radius:3px;overflow:hidden;margin-top:2px}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--cyan),var(--amber));border-radius:3px;transition:width .5s ease}
+
+/* ---------- YERLEŞİM ---------- */
+.layout{max-width:1180px;margin:0 auto;padding:24px 20px;display:grid;grid-template-columns:280px 1fr;gap:24px}
+@media(max-width:860px){.layout{grid-template-columns:1fr}}
+
+/* ---------- SOL: KATMAN HARİTASI (imza öğe) ---------- */
+aside{position:sticky;top:96px;align-self:start}
+@media(max-width:860px){aside{position:static}}
+.map-title{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.16em;color:var(--muted);text-transform:uppercase;margin-bottom:10px}
+.layer-stack{display:flex;flex-direction:column;gap:6px}
+.layer{
+  display:flex;align-items:center;gap:10px;
+  border:1px solid var(--line);border-radius:var(--radius);
+  background:var(--ink-2);
+  padding:9px 12px;cursor:pointer;
+  transition:border-color .2s, transform .15s;
+  position:relative;overflow:hidden;
+}
+.layer:hover{border-color:var(--cyan);transform:translateX(3px)}
+.layer.active{border-color:var(--amber)}
+.layer .fillbar{position:absolute;left:0;top:0;bottom:0;background:rgba(37,128,76,.10);transition:width .4s ease;z-index:0}
+.layer>*{position:relative;z-index:1}
+.layer .no{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--cyan);width:30px;flex-shrink:0}
+.layer .nm{font-size:13px;font-weight:500;flex:1;line-height:1.3}
+.layer .pct{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted)}
+.layer.done .pct{color:var(--green)}
+.layer.done .no{color:var(--green)}
+.legend{margin-top:14px;font-size:11px;color:var(--muted);font-family:'IBM Plex Mono',monospace;line-height:1.9}
+.legend b{color:var(--cyan);font-weight:500}
+
+/* ---------- SAĞ: İÇERİK ---------- */
+.panel{border:1px solid var(--line);border-radius:var(--radius);background:var(--ink-2);padding:22px;margin-bottom:20px;box-shadow:0 1px 4px rgba(28,50,71,.05)}
+.week-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:6px}
+.week-head .tag{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.14em;color:var(--amber);text-transform:uppercase;border:1px solid var(--amber);border-radius:3px;padding:2px 8px}
+.week-head h2{font-size:24px;font-weight:700;letter-spacing:-.01em}
+.week-goal{color:var(--muted);font-size:14px;margin-bottom:4px}
+.week-src{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--cyan);margin-bottom:0}
+
+.day{border:1px solid var(--line-soft);border-radius:var(--radius);margin-top:14px;overflow:hidden}
+.day-head{display:flex;align-items:center;gap:10px;padding:12px 16px;cursor:pointer;background:rgba(24,99,153,.05)}
+.day-head:hover{background:rgba(24,99,153,.10)}
+.day-head .dno{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--cyan);flex-shrink:0;width:52px}
+.day-head .dtitle{font-weight:600;font-size:14px;flex:1}
+.day-head .dstat{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted)}
+.day-head .dstat.done{color:var(--green)}
+.day-head .chev{color:var(--muted);transition:transform .2s;font-size:12px}
+.day.open .chev{transform:rotate(90deg)}
+.day-body{display:none;padding:14px 16px 18px;border-top:1px solid var(--line-soft)}
+.day.open .day-body{display:block}
+.day-body p{font-size:14px;color:var(--paper);margin-bottom:12px}
+.day-body p em{color:var(--cyan);font-style:normal}
+.tasklist{display:flex;flex-direction:column;gap:8px}
+.task{display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:13.5px;padding:8px 10px;border:1px solid var(--line-soft);border-radius:4px;transition:background .15s}
+.task:hover{background:rgba(24,99,153,.05)}
+.task input{margin-top:3px;accent-color:var(--green);width:15px;height:15px;flex-shrink:0;cursor:pointer}
+.task.checked{color:var(--muted)}
+.task.checked span{text-decoration:line-through;text-decoration-color:rgba(111,191,143,.6)}
+
+/* ---------- QUIZ ---------- */
+.quiz{margin-top:20px;border:1px dashed var(--cyan);border-radius:var(--radius);padding:18px}
+.quiz h3{font-size:16px;margin-bottom:4px;color:var(--cyan)}
+.quiz .qmeta{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);margin-bottom:14px}
+.q{margin-bottom:18px}
+.q .qt{font-size:14px;font-weight:600;margin-bottom:8px}
+.opts{display:flex;flex-direction:column;gap:6px}
+.opt{
+  text-align:left;font:inherit;font-size:13.5px;color:var(--paper);
+  background:transparent;border:1px solid var(--line);border-radius:4px;
+  padding:9px 12px;cursor:pointer;transition:border-color .15s, background .15s;
+}
+.opt:hover{border-color:var(--cyan)}
+.opt.correct{border-color:var(--green);background:rgba(37,128,76,.08);color:var(--green);font-weight:600}
+.opt.wrong{border-color:var(--red);background:rgba(190,68,51,.07);color:var(--red)}
+.opt:disabled{cursor:default}
+.expl{display:none;font-size:12.5px;color:var(--muted);border-left:2px solid var(--green);padding:6px 10px;margin-top:8px}
+.expl.show{display:block}
+.quiz-result{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;margin-top:6px}
+.quiz-result.pass{color:var(--green)}
+.quiz-result.fail{color:var(--amber)}
+.btn{
+  font:inherit;font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.08em;
+  color:#FFFFFF;background:var(--amber);border:none;border-radius:4px;
+  padding:9px 16px;cursor:pointer;text-transform:uppercase;font-weight:500;
+}
+.btn:hover{filter:brightness(1.08)}
+.btn.ghost{background:transparent;color:var(--cyan);border:1px solid var(--line)}
+.btn.ghost:hover{border-color:var(--cyan)}
+
+/* ---------- NOTLAR ---------- */
+.notes textarea{
+  width:100%;min-height:110px;resize:vertical;
+  font:inherit;font-size:13.5px;color:var(--paper);
+  background:#FBFDFE;border:1px solid var(--line);border-radius:4px;
+  padding:12px;line-height:1.6;
+}
+.notes textarea:focus{outline:2px solid var(--cyan);outline-offset:1px}
+.notes .saved{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--green);margin-top:6px;opacity:0;transition:opacity .3s}
+.notes .saved.show{opacity:1}
+
+/* ---------- ALT ARAÇLAR ---------- */
+.tools{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:4px}
+.storage-note{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);margin-top:10px}
+.storage-note.warn{color:var(--amber)}
+footer{max-width:1180px;margin:0 auto;padding:10px 20px 40px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted)}
+:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hwrap">
+    <div class="brand">
+      <span class="eyebrow">Harness Engineering &amp; Software Architecture</span>
+      <h1>Mimar Defteri — 12 Haftalık Program</h1>
+      <div class="progress-rail" style="width:220px"><div class="progress-fill" id="totalFill" style="width:0%"></div></div>
+    </div>
+    <div class="stat"><span class="lab">Toplam</span><span class="val" id="totalPct">0%</span></div>
+    <div class="stat"><span class="lab">Seri</span><span class="val g" id="streakVal">0 gün</span></div>
+    <div class="stat"><span class="lab">Quiz Ort.</span><span class="val" id="quizAvg">—</span></div>
+  </div>
+</header>
+
+<div class="layout">
+  <aside>
+    <div class="map-title">// Program Haritası — katmanlar aşağıdan yukarı</div>
+    <div class="layer-stack" id="layerStack"></div>
+    <div class="legend">
+      <b>Kural:</b> Her gün 1 adım.<br>
+      <b>Hafta sonu:</b> quiz ≥ %60 → katman tamam.<br>
+      <b>İlke:</b> Humans steer. Agents execute.
+    </div>
+  </aside>
+
+  <main id="main"></main>
+</div>
+
+<footer>
+  Kaynaklar: OpenAI Harness Engineering (2026) · Anthropic long-running agents (2025–26) · martinfowler.com/Böckeler · Fundamentals of Software Architecture 2e · AI Engineering (Huyen) · Get Your Hands Dirty on Clean Architecture · The Hard Parts · DDIA 2e · C4 Model
+</footer>
+
+<script>
+/* =====================================================
+   VERİ — 12 hafta × 5 gün + haftalık quiz
+   ===================================================== */
+const PROGRAM = [
+{
+  title:"Harness Mühendisliği Temelleri",
+  goal:"Rolün nasıl değiştiğini kavra: kod yazan değil, ortam/niyet/geri-besleme tasarlayan mühendis.",
+  src:"Kaynak: OpenAI 'Harness Engineering' yazısı + martinfowler.com (Böckeler) 'Agent = Model + Harness'",
+  days:[
+    {t:"'Humans steer, agents execute' ilkesi", d:"OpenAI'ın yazısını baştan sona oku. Ekibin 5 ayda, sıfır elle yazılmış kodla ~1M satırlık ürünü nasıl çıkardığına değil, <em>insanların hangi işlere kaydığına</em> odaklan: önceliklendirme, spec yazma, doğrulama, harness iyileştirme.",
+      tasks:["OpenAI Harness Engineering yazısını oku (belgedeki metin sende var)","Kendi cümlelerinle 5 maddede 'benim yeni rolüm ne?' yaz","Ekibindeki mevcut iş akışında insanların hâlâ elle yaptığı 3 işi listele"]},
+    {t:"Guides vs Sensors çerçevesi", d:"Böckeler'in iki kontrol vektörünü öğren: <em>Guides</em> (ajan davranmadan önce yönlendiren: AGENTS.md, lint kuralları, şablonlar) ve <em>Sensors</em> (davrandıktan sonra yakalayan: test, tip denetimi, mimari test).",
+      tasks:["Kendi projende mevcut guide'ları listele (varsa)","Mevcut sensor'ları listele: test, lint, CI kapıları","Her listede en büyük 1 boşluğu işaretle"]},
+    {t:"Ajan okunabilirliği (agent legibility)", d:"Kritik ilke: <em>ajanın bağlamında göremediği bilgi yok hükmündedir.</em> Slack'te kalan mimari karar, üç ay sonra işe giren birine ne kadar görünmezse ajana da o kadar görünmezdir.",
+      tasks:["Ekipte 'sadece Slack/kafalarda yaşayan' 3 kritik bilgiyi tespit et","Bunlardan 1 tanesini markdown'a çevirip repoya koy"]},
+    {t:"Kendini-değerlendirme tuzağı", d:"Anthropic'in ölçülmüş dersi: ajanlar kendi işlerini abartılı över. Çözüm: <em>işi yapan ajan ile yargılayan ajanı ayır.</em> Bağımsız şüpheci değerlendirici, generator'ı özeleştirel yapmaktan kolaydır.",
+      tasks:["Claude Code/Codex'te küçük bir işi yaptır, sonra AYNI oturumda 'işini değerlendir' de — cevabı gözlemle","Aynı işi TEMİZ bir oturumda 'bu kodu eleştirel incele' diye ver — farkı not al"]},
+    {t:"Haftalık sentez + quiz", d:"Haftanın kavramlarını tek sayfada topla: rol tanımı, guides/sensors, legibility, ayrık değerlendirici. Sonra quiz'i çöz.",
+      tasks:["1 sayfalık 'Harness 101' özetini kendi kelimelerinle yaz","Haftalık quiz'i çöz (aşağıda)"]}
+  ],
+  quiz:[
+    {q:"OpenAI deneyinde insan mühendislerin birincil işi neye dönüştü?",o:["Daha hızlı kod yazmak","Ajanların güvenilir çalışacağı ortamı, spec'leri ve geri-besleme döngülerini tasarlamak","Ajan çıktısını satır satır yeniden yazmak","Sadece toplantı yönetmek"],a:1,e:"Yazının özü: 'design environments, specify intent, and build feedback loops'. İnsan, kod işçisinden ortam mimarına kayar."},
+    {q:"'Guide' ile 'Sensor' arasındaki fark nedir?",o:["Guide Java'da, sensor Python'da kullanılır","Guide ajan davranmadan ÖNCE yönlendirir; sensor davrandıktan SONRA yakalar ve düzelttirir","İkisi aynı şeydir","Guide insanlar, sensor ajanlar içindir"],a:1,e:"AGENTS.md ve lint kuralları guide; test, tip denetimi ve mimari testler sensor'dur."},
+    {q:"'Ajan okunabilirliği' ilkesine göre Slack'te kalan bir mimari karar…",o:["Ajan için sorun değildir, model tahmin eder","Yok hükmündedir — repoya markdown olarak gömülmelidir","Sadece güvenlik riskidir","Prompt'a her seferinde kopyalanmalıdır"],a:1,e:"Repo-yerel, versiyonlu artefakt olmayan bilgi ajana görünmez. Prompt'a kopyalamak ölçeklenmez; kalıcı bilgi repoya gömülür."},
+    {q:"Ajanların kendi işini değerlendirmesindeki bilinen sorun nedir?",o:["Çok yavaş olması","Kendi işlerini abartılı biçimde övmeleri","Her zaman başarısız demeleri","Değerlendirme yapamamaları"],a:1,e:"Anthropic'in bulgusu: 'agents tend to respond by confidently praising the work'. Bu yüzden yapan ve yargılayan ajan ayrılır."},
+    {q:"Harness bileşenleri için 'rippable' (sökülebilir) olma kuralı ne anlama gelir?",o:["Harness hiç değiştirilmemeli","Her bileşen modelin bugünkü bir eksiğini varsayar; model gelişince yük taşımayan parçalar atılmalı","Harness her yeni modelde sıfırdan yazılmalı","Sadece açık kaynak araçlar kullanılmalı"],a:1,e:"Varsayımlar bayatlar. Yeni model geldiğinde harness gözden geçirilir, gereksiz parçalar çıkarılır (ör. Opus 4.6'da evaluator'ın gereksizleşmesi)."}
+  ]
+},
+{
+  title:"Repo Bilgi Sistemi: AGENTS.md + docs/",
+  goal:"Repoyu 'kayıt sistemi' yap: içindekiler-tablosu AGENTS.md, yapılandırılmış docs/, ilk ADR'ler.",
+  src:"Kaynak: OpenAI docs/ yapısı + agents.md standardı + Nygard ADR formatı (Playbook D.1–D.2)",
+  days:[
+    {t:"AGENTS.md felsefesi: ansiklopedi değil, içindekiler", d:"Monolitik dev AGENTS.md neden başarısız olur: bağlam kıt kaynaktır, 'her şey önemliyse hiçbir şey önemli değildir', anında bayatlar, mekanik doğrulanamaz. Hedef: ~100 satır + derin bilgiye işaretçiler.",
+      tasks:["Playbook'taki D.1 şablonunu incele","Kendi projen için taslak AGENTS.md yaz (<120 satır)","ln -s AGENTS.md CLAUDE.md symlink'ini kur"]},
+    {t:"docs/ iskeletini kur", d:"design-docs/, exec-plans/(active|completed), product-specs/, references/, adr/ dizinlerini + ARCHITECTURE.md, QUALITY_SCORE.md, SECURITY.md dosyalarını oluştur. Boş bile olsa yapı, bilgiye 'ev' verir.",
+      tasks:["docs/ iskeletini repoya ekle","ARCHITECTURE.md'ye mevcut sistemin 10 satırlık haritasını çiz","tech-debt-tracker.md dosyasını başlat, bilinen 3 borcu yaz"]},
+    {t:"ADR yazmayı öğren", d:"Nygard formatı: Durum / Bağlam / Karar / Alternatifler / Sonuçlar. Kural: Accepted ADR değiştirilmez, sadece supersede edilir. Yalnız 'yük taşıyan' kararlar belgelenir.",
+      tasks:["Ekipte geçmişte alınmış 1 önemli kararı geriye dönük ADR-0001 olarak yaz","Koddan ADR'ye yorum bağı ekle (// bkz docs/adr/0001)"]},
+    {t:"Progressive disclosure pratiği", d:"Ajan küçük, sabit bir giriş noktasından başlar ve <em>nereye bakacağını</em> öğrenir. AGENTS.md'deki her bölüm derin bilgiye işaret etmeli; detayı içermemeli.",
+      tasks:["AGENTS.md'ndeki her başlığın docs/ altında karşılığı olduğunu doğrula","Claude Code/Codex'e repoda bir soru sor; doğru belgeye gidip gitmediğini izle"]},
+    {t:"Doküman bahçıvanlığı planı + quiz", d:"Bayat doküman 'attractive nuisance'dır (çekici tehlike). Haftalık doc-gardening ritüeli belirle: bayatlayan belgeleri tarayıp düzelten küçük ajan görevi ya da 30 dk insan turu.",
+      tasks:["Takvimine haftalık 30 dk 'doc-gardening' bloğu koy","Haftalık quiz'i çöz"]}
+  ],
+  quiz:[
+    {q:"Monolitik (dev) AGENTS.md'nin başarısız olmasının temel nedeni nedir?",o:["Markdown desteklenmemesi","Bağlam kıt kaynaktır; dev talimat dosyası görevi ve kodu bağlamdan dışarı iter","Ajanlar uzun dosya okuyamaz","Git'te büyük dosya sorunu"],a:1,e:"Ayrıca 'her şey önemliyse hiçbir şey önemli değildir' ve dosya anında bayatlar. Çözüm: içindekiler tablosu yaklaşımı."},
+    {q:"AGENTS.md ile CLAUDE.md'yi senkron tutmanın pratik yolu nedir?",o:["İkisini elle kopyalamak","Symlink: ln -s AGENTS.md CLAUDE.md","Sadece birini kullanmak yeterli, araçlar ikisini de okur","CI'da diff kontrolü"],a:1,e:"Claude Code CLAUDE.md okur, çoğu araç AGENTS.md; symlink tek kaynaktan ikisini besler."},
+    {q:"Accepted (kabul edilmiş) bir ADR'de fikir değişirse ne yapılır?",o:["ADR silinir","ADR düzenlenip güncellenir","Yeni bir ADR yazılır ve eskisi 'Superseded by' ile işaretlenir","Sadece Slack'te duyurulur"],a:2,e:"ADR'ler karar tarihçesidir; değiştirilmez, üstüne yenisi yazılır. Böylece 'neden' bilgisi kaybolmaz."},
+    {q:"Hangi karar ADR'yi hak eder?",o:["Değişken isimlendirme tercihi","'Oturum durumunu DB'de tutuyoruz' gibi yük taşıyan bir karar","Kod formatı (tab vs space)","Toplantı saatleri"],a:1,e:"ADR yük taşıyan (load-bearing) kararlar içindir; önemsiz tercihleri belgelemek gürültü yaratır."},
+    {q:"'Progressive disclosure' ajan bağlam yönetiminde ne demektir?",o:["Bilgiyi ajandan gizlemek","Küçük sabit giriş noktası + nereye bakacağını öğretmek; tüm bilgiyi baştan yüklememek","Her prompt'a tüm docs/ içeriğini eklemek","Ajana sadece kod göstermek"],a:1,e:"OpenAI'ın deyişiyle: ajana 1000 sayfalık kılavuz değil, harita ver."}
+  ]
+},
+{
+  title:"Spec-Driven Akış ve Ajan Yönetimi",
+  goal:"İyi task spec yazmayı ve Research → Plan → Execute → Review → Ship akışını kurmayı öğren.",
+  src:"Kaynak: OpenAI Codex best practices (Goal/Context/Constraints/Completion) + Anthropic plan modu (Playbook D.3, Adım 2–3)",
+  days:[
+    {t:"Task spec anatomisi", d:"Dört unsur: <em>Goal, Context, Constraints, Completion Criteria.</em> En sık hata: kalıcı kuralları prompt'a doldurmak (onlar AGENTS.md'ye aittir) ve doğrulama yolunu vermemek. Ajan 'verify edebildiğinde' kalite sıçrar.",
+      tasks:["D.3 şablonunu kendi ekibine uyarla ve repoya koy","Gerçek bir görevi bu şablonla yaz"]},
+    {t:"Plan modu ve ExecPlan", d:"Karmaşık işlerde önce plan: ajan plan üretir, sen onaylarsın, sonra uygulama başlar. ExecPlan yaşayan belgedir — altın kural: <em>yalnızca ExecPlan'den işi yeniden başlatmak mümkün olmalı.</em>",
+      tasks:["Claude Code'da plan modunu bir görevde kullan (shift+tab)","Orta boy bir iş için docs/exec-plans/active/ altına ExecPlan yaz"]},
+    {t:"Bağlam hijyeni", d:"Görev başına tek thread. Alakasız işe geçerken /clear. Bağlam ~%40'ı geçince özetle/temizle. Compaction (yerinde özet) ile context reset (temiz devir artefaktıyla yeni oturum) farkını bil.",
+      tasks:["Bugünkü işinde görev başına ayrı oturum kuralını uygula","Bir işi bilerek /clear + devir notu ile ikinci oturumda sürdür, deneyimi not al"]},
+    {t:"Ralph Wiggum döngüsü: ajan-ajan inceleme", d:"Ajan işini somut kriterlere karşı kendi denetler, sonucu sonraki denemeye besler, kriterler karşılanana dek döner. Kritik: reviewer'a 'yalnızca doğruluğu etkileyen boşlukları işaretle' de — yoksa boşluk arayıp aşırı mühendislik üretir.",
+      tasks:["Bir PR'da ajana kendi işini D.4 kriterlerine karşı incelet","Reviewer prompt'una 'sadece doğruluk/gereksinim etkileyenler' sınırını ekle"]},
+    {t:"Uzun-koşan işler için desenler + quiz", d:"Anthropic desenleri: iki-ajan (initializer + coder) ve üç-ajan (planner/generator/evaluator, sprint contract ile). İlke: <em>en basit çözümle başla</em>; evaluator'ı yalnızca görev modelin solo yeteneğini aşıyorsa ekle.",
+      tasks:["Kendi işlerinden hangisinin 'uzun-koşan' sınıfına girdiğini belirle","Haftalık quiz'i çöz"]}
+  ],
+  quiz:[
+    {q:"İyi bir task spec'in dört unsuru nedir?",o:["Başlık, tarih, kişi, etiket","Goal, Context, Constraints, Completion Criteria","Kod, test, dokümantasyon, deploy","Problem, çözüm, maliyet, süre"],a:1,e:"OpenAI Codex best practices'in çekirdeği. Completion criteria mekanik doğrulanabilir olmalı (test/lint komutları yeşil)."},
+    {q:"Kalıcı kurallar (ör. 'main'e push yok') nereye yazılmalı?",o:["Her prompt'a","AGENTS.md'ye — prompt yalnız göreve özgü kısıtları taşır","Slack kanalına","Commit mesajlarına"],a:1,e:"Prompt'a kural yığmak hem bağlamı şişirir hem tekrar gerektirir. Kalıcı olan repoya gömülür."},
+    {q:"ExecPlan'in altın kuralı nedir?",o:["En az 10 sayfa olmalı","Yalnızca ExecPlan'den (başka hiçbir şey olmadan) işi yeniden başlatmak mümkün olmalı","Sadece yönetici okuyabilmeli","Kod içermemeli"],a:1,e:"ExecPlan yaşayan belgedir; ilerleme ve karar günlüğüyle işi taşır. Oturum ölse bile iş ölmez."},
+    {q:"Reviewer ajana sınır koymazsan ne olur?",o:["Hiçbir şey bulamaz","İş sağlam olsa bile boşluk bulur ve aşırı mühendislik yaratır","Kod siler","Daha hızlı onaylar"],a:1,e:"Boşluk aramak üzere prompt'lanan reviewer her zaman bir şey bulur. Sınır: 'yalnız doğruluğu veya gereksinimleri etkileyenleri işaretle'."},
+    {q:"Üç-ajanlı desende evaluator ne zaman değer katar?",o:["Her zaman","Görev, modelin solo güvenilir yapabildiğinin ÖTESİNDEyse","Sadece Python projelerinde","Bütçe fazlaysa"],a:1,e:"Anthropic'in kuralı: evaluator sabit bir evet/hayır değil; görev modelin solo sınırını aşıyorsa maliyetine değer."}
+  ]
+},
+{
+  title:"Guardrail'lar: Mimari Zorlama + Güvenlik",
+  goal:"ArchUnit (Java) ve import-linter (Python) ile katman kurallarını mekanikleştir; SAST kapılarını kur.",
+  src:"Kaynak: ArchUnit / import-linter docs + Veracode 2025 GenAI raporu (Playbook C bölümü)",
+  days:[
+    {t:"Neden 'belgelemek yetmez, zorlamak gerekir'", d:"OpenAI'ın dersi: ajanlar repodaki mevcut desenleri kopyalar — kötü desenler de dahil. Kural belgeyse ihlal edilir; kural mekanikse (linter/test) her satıra birden uygulanır. <em>İnsan-öncelikli dünyada pedantik olan, ajan dünyasında çarpandır.</em>",
+      tasks:["Projendeki 'yazılı ama zorlanmayan' 3 kuralı tespit et","Her biri için hangi araçla mekanikleştirilebileceğini not et"]},
+    {t:"ArchUnit ile katman testi (Java)", d:"layeredArchitecture() ile Types → Config → Repo → Service → Runtime → UI yönünü zorla; slices().beFreeOfCycles() ile döngüleri yasakla. Playbook'taki kopyala-kullan kodu temel al.",
+      tasks:["ArchUnit bağımlılığını test scope'a ekle","Katman testini yaz ve çalıştır — ihlaller listelensin","İhlalleri tech-debt-tracker.md'ye kaydet (hemen düzeltme)"]},
+    {t:"import-linter ile katman testi (Python)", d:"pyproject.toml / .importlinter içinde layers sözleşmesi kur; forbidden ve independence sözleşmelerini öğren. CI'da lint-imports komutunu bloklayıcı yap.",
+      tasks:["Python projesine import-linter kur ve layers sözleşmesi yaz","CI pipeline'ına lint-imports adımı ekle"]},
+    {t:"AI kodu güvenliği", d:"Veracode 2025: AI üretimi kodun %45'i güvenlik testlerinden kaldı; <em>Java %72 ile en riskli dil.</em> Zorunlular: her uç noktada auth+yetki, sunucu tarafı girdi doğrulama, gitleaks/trufflehog sır taraması, Semgrep OWASP kural seti, halüsinasyonlu bağımlılık kontrolü (slopsquatting).",
+      tasks:["CI'a gitleaks ekle","Semgrep OWASP kural setini PR pipeline'ına ekle","Son 5 AI-üretimi PR'ı D.4 güvenlik maddeleriyle geriye dönük tara"]},
+    {t:"LLM-dostu hata mesajları + quiz", d:"İyi sensor, ajana <em>düzeltme talimatı</em> verir: 'ERROR: complexity threshold exceeded. [Guidance: Refactor into smaller functions…]'. Özel lint kurallarının hata mesajlarını ajan okuyacak şekilde yaz.",
+      tasks:["1 özel lint kuralına remediation guidance ekle","Haftalık quiz'i çöz"]}
+  ],
+  quiz:[
+    {q:"Ajanlar repodaki kötü desenleri neden çoğaltır?",o:["Kasıtlı sabotaj","Mevcut desenleri örnek alarak çalışırlar — drift böyle oluşur","Rastgele davranırlar","Sadece eski modeller yapar"],a:1,e:"Codex/Claude repodaki kalıpları kopyalar. Bu yüzden golden principles + mekanik zorlama + düzenli temizlik gerekir."},
+    {q:"Veracode 2025 raporuna göre AI üretimi kodda en riskli dil hangisiydi?",o:["Python","JavaScript","Java (%72 güvenlik başarısızlık oranı)","C#"],a:2,e:"Java %72 ile başı çekti; genel örneklemde %45 başarısızlık ve OWASP Top 10 açıkları bulundu. Java ekibi için SAST kapıları pazarlık dışıdır."},
+    {q:"ArchUnit'te paketler arası döngüyü yasaklayan yapı hangisidir?",o:["layeredArchitecture()","slices().matching(…).should().beFreeOfCycles()","noClasses()","cycleChecker()"],a:1,e:"slices + beFreeOfCycles döngüsüz bağımlılık grafiğini test olarak zorlar; layeredArchitecture katman yönünü zorlar."},
+    {q:"'Slopsquatting' riski nedir?",o:["Kod formatı bozulması","AI'ın halüsinasyon ürettiği paket adlarının saldırganlarca kaydedilip zararlı paket olarak yayınlanması","Disk dolması","Lisans ihlali"],a:1,e:"Ajan var olmayan bir bağımlılık önerirse ve o adı biri kötü niyetle yayınladıysa zincir saldırısı olur. Her yeni bağımlılık doğrulanmalı (ve ADR istenmeli)."},
+    {q:"'İyi sensor' hata mesajı neyi içerir?",o:["Hata kodu yeter","Ajanın okuyup uygulayabileceği düzeltme talimatı (remediation guidance)","Renkli emoji","Stack trace'in tamamı"],a:1,e:"Böckeler'in kuralı: sensor çıktısı LLM için optimize edilirse ajan kendini düzeltir — döngü insan beklemeden kapanır."}
+  ]
+},
+{
+  title:"Mimari Düşünme I: Nitelikler ve Trade-off",
+  goal:"Fundamentals of Software Architecture (2e) Bölüm 1–8: mimari karakteristikler, trade-off analizi, modülerlik.",
+  src:"Kitap: Fundamentals of Software Architecture 2e (Richards & Ford) — ilk yarı",
+  days:[
+    {t:"Mimarın ilk yasası", d:"<em>'Her şey bir trade-off'tur.'</em> Mimari doğru cevabı bulmak değil, en az kötü kararı vermektir. İkinci yasa: 'neden', 'nasıl'dan önemlidir — bu yüzden ADR yazıyoruz. Kitabın 1–2. bölümlerini oku.",
+      tasks:["Bölüm 1–2'yi oku","Kendi sistemindeki 1 kararı 'trade-off' diliyle yeniden yaz (kazanılan/feda edilen)"]},
+    {t:"Mimari karakteristikler (-ility'ler)", d:"Availability, scalability, maintainability, security, testability… Kritik beceri: iş gereksinimlerinden örtük karakteristikleri çıkarmak. 'Kampanya günü trafik 10x olur' cümlesi = elasticity + availability gereksinimi.",
+      tasks:["Kendi ürünün için en kritik 3 karakteristiği seç ve gerekçele","Bu 3'ün hangi ikisinin birbiriyle çatıştığını yaz"]},
+    {t:"Modülerlik: cohesion, coupling, connascence", d:"Yüksek cohesion + düşük coupling klasik hedef; connascence (statik/dinamik) coupling'i ölçülebilir kılar. Bu kavramlar ArchUnit testlerinin 'neden'idir.",
+      tasks:["İlgili bölümleri oku","Kod tabanında 1 yüksek-coupling örneği bul, connascence türünü adlandır"]},
+    {t:"Mimari fitness fonksiyonları", d:"4. haftada yazdığın ArchUnit/import-linter testleri aslında <em>fitness function</em>'dır: mimari karakteristiği sürekli, mekanik ölçen kod. Kitabın bu kavramını harness pratiğinle birleştir.",
+      tasks:["Mevcut mimari testlerini 'hangi karakteristiği koruyor?' diye etiketle","Eksik kalan 1 karakteristik için yeni fitness function fikri yaz"]},
+    {t:"Sentez + quiz", d:"İlk yarının kavram haritasını çıkar: yasalar → karakteristikler → modülerlik → fitness functions. Quiz'i çöz.",
+      tasks:["1 sayfalık kavram haritası çiz (elle/mermaid)","Haftalık quiz'i çöz"]}
+  ],
+  quiz:[
+    {q:"Yazılım mimarisinin 'birinci yasası' nedir?",o:["Her zaman mikroservis kullan","Her şey bir trade-off'tur","Kod kraldır","Önce performans"],a:1,e:"Richards & Ford'un temel tezi. Mimari 'en iyi'yi değil, bağlama göre 'en az kötü'yü seçme disiplinidir."},
+    {q:"'Neden, nasıldan önemlidir' ilkesinin pratik karşılığı hangisidir?",o:["Daha çok yorum satırı","ADR yazmak — kararın gerekçesini kalıcılaştırmak","Daha uzun toplantılar","UML zorunluluğu"],a:1,e:"İkinci yasa: gelecekteki ekip (ve ajanlar) kararın nedenini bilmezse yanlış yerde 'düzeltme' yapar."},
+    {q:"'Kampanya günlerinde trafik 10 katına çıkar' cümlesi hangi mimari karakteristiği ima eder?",o:["Maintainability","Elasticity (ve availability)","Portability","Readability"],a:1,e:"İş cümlelerinden örtük -ility çıkarmak mimarın çekirdek becerisidir."},
+    {q:"Mimari fitness function nedir?",o:["Performans testi türü","Bir mimari karakteristiği sürekli ve mekanik ölçen/koruyan otomatik kontrol","Kod formatlayıcı","Mülakat sorusu"],a:1,e:"ArchUnit katman testi, döngü kontrolü, import-linter sözleşmesi — hepsi fitness function'dır. Harness'in 'sensor'larıyla aynı ailedendir."},
+    {q:"Yüksek cohesion + düşük coupling hedefinin ajan-first dünyadaki önemi nedir?",o:["Önemi kalmadı","Sıkı sınırlar ve öngörülebilir yapı, ajanların en verimli çalıştığı ortamdır","Sadece test için gerekir","Sadece mikroserviste geçerli"],a:1,e:"OpenAI'ın gözlemi: ajanlar katı sınırlı, öngörülebilir yapılı ortamlarda en etkilidir — modülerlik ajan verimliliğidir."}
+  ]
+},
+{
+  title:"Mimari Düşünme II: Stiller ve İletişim",
+  goal:"Fundamentals 2e ikinci yarı: mimari stiller (layered, hexagonal, microservices…) + C4 ile diyagramlama.",
+  src:"Kitap: Fundamentals of Software Architecture 2e — ikinci yarı + Simon Brown C4 Model",
+  days:[
+    {t:"Stil kataloğu: monolitler", d:"Layered, pipeline, microkernel… Her stilin yıldız haritasını (karakteristik puanlarını) incele. Layered'ın ucuz ve basit ama ölçek/elasticity'de zayıf olduğunu; çoğu ürünün buradan başlamasının rasyonel olduğunu kavra.",
+      tasks:["Monolitik stiller bölümünü oku","Kendi sisteminin hangi stile en yakın olduğunu ve puan kartını yaz"]},
+    {t:"Stil kataloğu: dağıtık stiller", d:"Event-driven, space-based, service-based, microservices. Kritik: mikroservis 'modern olan' değil, belirli trade-off'lar (bağımsız deploy, granüler ölçek) karşılığında ciddi karmaşıklık satın aldığın stildir.",
+      tasks:["Dağıtık stiller bölümünü oku","'Sistemimi neden mikroservise BÖLMEMELİYİM' başlıklı 5 maddelik savunma yaz (şeytanın avukatı egzersizi)"]},
+    {t:"C4 Modeli", d:"Context → Container → Component → Code. Dört zoom seviyesi, her seviye farklı dinleyici için. C4'ün gücü: <em>iletişim</em> aracı olması — mimari mükemmel diyagram değil, anlaşılan diyagram ister.",
+      tasks:["Kendi sistemin için Context + Container diyagramı çiz (Structurizr/draw.io/mermaid)","Diyagramı docs/design-docs/ altına koy ve AGENTS.md'den işaret et"]},
+    {t:"Diyagram + ajan sinerjisi", d:"C4 diyagramları (özellikle mermaid/metin tabanlı) ajan için de okunabilirdir. ARCHITECTURE.md + C4 = ajanın sistem haritası. OpenAI'ın 'domain haritası + katman kuralı' pratiğinin genel hali.",
+      tasks:["Container diyagramını mermaid'e çevirip ARCHITECTURE.md'ye göm","Ajana 'sistemin mimarisini anlat' diye sor; diyagramı kullanıp kullanmadığını gözle"]},
+    {t:"Sentez + quiz", d:"Stil seçim kasını çalıştır: 3 farklı senaryo için stil öner ve gerekçele. Quiz'i çöz.",
+      tasks:["3 mini senaryo yaz, her birine stil öner + 2 trade-off yaz","Haftalık quiz'i çöz"]}
+  ],
+  quiz:[
+    {q:"C4 modelinin dört seviyesi nedir?",o:["Code, CI, CD, Cloud","Context, Container, Component, Code","Class, Component, Cluster, Cloud","Concept, Case, Code, Check"],a:1,e:"Her seviye farklı zoom ve farklı dinleyici içindir; Context yöneticiyle, Component geliştiriciyle konuşur."},
+    {q:"Mikroservis stili hakkında doğru ifade hangisidir?",o:["Her modern sistem mikroservis olmalı","Bağımsız deploy/ölçek karşılığında ciddi operasyonel karmaşıklık satın alınan bir trade-off'tur","Monolitten her zaman ucuzdur","Sadece büyük şirketler içindir"],a:1,e:"Stil seçimi puan kartı işidir: kazandığın karakteristik, ödediğin karmaşıklığa değiyor mu?"},
+    {q:"Layered (katmanlı) monolitin tipik güçlü yanı nedir?",o:["Sınırsız elasticity","Basitlik ve düşük maliyet — başlangıç için rasyonel taban","En yüksek fault tolerance","Otomatik ölçekleme"],a:1,e:"Layered ucuz, anlaşılır ve ajan-dostu (öngörülebilir yapı); ölçek gereksinimleri büyüyünce evrimleştirilir."},
+    {q:"Mimari diyagramın birincil amacı nedir?",o:["UML standardına tam uyum","İletişim — dinleyicinin sistemi anlaması","Duvar süsü","Otomatik kod üretimi"],a:1,e:"Simon Brown'un tezi: diyagram, haritadır; okuyanın zihninde doğru model kurmak için vardır."},
+    {q:"Metin-tabanlı (mermaid gibi) C4 diyagramının ajan-first bonusu nedir?",o:["Daha renkli olması","Repo'da versiyonlanır ve ajan tarafından okunabilir — sistem haritası ajana da hizmet eder","Daha hızlı render","PDF'e dönüşmesi"],a:1,e:"Agent legibility ilkesi: görsel araçta hapsolmuş diyagram ajana görünmez; metin-tabanlı diyagram repo bilgisidir."}
+  ]
+},
+{
+  title:"AI Engineering I: Stack, Modeller, Prompt",
+  goal:"Chip Huyen'in kitabının ilk yarısı: AI stack, foundation model seçimi, prompt engineering disiplini.",
+  src:"Kitap: AI Engineering (Huyen, O'Reilly 2024) — Bölüm 1–5 civarı",
+  days:[
+    {t:"AI Engineering ≠ ML Engineering", d:"Klasik ML: veri topla → model eğit → deploy. AI Engineering: hazır foundation model → adapte et (prompt/RAG/fine-tune) → değerlendir → servis et. Giriş bariyeri düştü, <em>değerlendirme</em> kritikleşti.",
+      tasks:["Bölüm 1'i oku","Şirketindeki AI kullanım senaryolarını 'adaptasyon tekniği' eksenine yerleştir (prompt mu, RAG mi, fine-tune mu?)"]},
+    {t:"Model seçim çerçevesi", d:"Kapalı API vs açık model; boyut vs gecikme vs maliyet; benchmark'ların tuzakları (kontaminasyon, kendi use-case'ine uzaklık). Ders: <em>lider tablosu değil, kendi eval'in karar verir.</em>",
+      tasks:["İlgili bölümü oku","Bir iş senaryon için 2 model adayını maliyet/gecikme/kalite tablosuyla karşılaştır"]},
+    {t:"Prompt engineering'in mühendislik hali", d:"Sistem promptu vs kullanıcı promptu, few-shot örnekler, bağlam yerleşimi, prompt versiyonlama. Bunun harness'teki karşılığı: AGENTS.md ve task spec'lerin de birer 'yönetilen prompt' olduğu gerçeği.",
+      tasks:["Prompt bölümünü oku","Ekipte tekrar kullanılan 1 prompt'u versiyonlanır dosya haline getir (repoya)"]},
+    {t:"Halüsinasyon ve savunma hatları", d:"Halüsinasyonun kökleri; savunmalar: grounding (RAG), çıktı doğrulama, insan onay noktaları, 'parse, don't validate' sınır disiplini. 4. haftadaki güvenlik pratiğiyle birleşir.",
+      tasks:["İlgili bölümü oku","Kendi AI özelliğinde 'yanlış cevabın maliyeti'ni sınıflandır (düşük/orta/felaket) ve savunma kat sayısını buna göre belirle"]},
+    {t:"Sentez + quiz", d:"İlk yarının haritası: stack → model seçimi → prompt disiplini → halüsinasyon savunmaları. Quiz'i çöz.",
+      tasks:["Yarım sayfalık özet yaz","Haftalık quiz'i çöz"]}
+  ],
+  quiz:[
+    {q:"AI Engineering'i klasik ML Engineering'den ayıran temel fark nedir?",o:["Daha çok matematik gerektirmesi","Model eğitmek yerine hazır foundation model'i adapte etmek ve değerlendirmek","Sadece Python kullanılması","GPU gerektirmemesi"],a:1,e:"Huyen'in çerçevesi: model-as-a-service çağında iş, eğitimden adaptasyon + evaluation'a kaydı."},
+    {q:"Model seçiminde public benchmark'lara neden tam güvenilmez?",o:["Hepsi sahte olduğu için","Kontaminasyon riski ve kendi use-case'ine uzaklık — kendi eval setin karar vermeli","Çok pahalı oldukları için","Sadece İngilizce oldukları için"],a:1,e:"Lider tablosu genel yeteneği gösterir; senin ürününün başarı kriterini senin eval'in ölçer."},
+    {q:"Prompt'ları 'mühendislik disiplini' yapmanın pratik adımı hangisidir?",o:["Her seferinde doğaçlama yazmak","Versiyonlamak, repoya koymak, değişikliği test etmek","Mümkün olduğunca uzun yazmak","Sadece İngilizce yazmak"],a:1,e:"Prompt da koddur: versiyonlanır, incelenir, regression'a karşı test edilir. AGENTS.md de bu ailedendir."},
+    {q:"'Yanlış cevabın maliyeti felaket' olan bir AI özelliğinde ne yapılır?",o:["Özellik iptal edilir","Savunma katmanları artırılır: grounding, çıktı doğrulama, insan onayı","Daha büyük model seçmek yeter","Kullanıcıya uyarı yazısı yeter"],a:1,e:"Savunma derinliği riske orantılanır. Düşük riskte hız, yüksek riskte insan onay noktası kazanır."},
+    {q:"RAG'in halüsinasyona karşı temel katkısı nedir?",o:["Modeli yeniden eğitir","Cevabı gerçek/güncel kaynak belgelere 'ground' eder","Cevapları kısaltır","Maliyeti sıfırlar"],a:1,e:"Grounding: model kendi hafızası yerine sağlanan kaynaklardan cevap üretir; kaynak gösterilebilirlik de bonus."}
+  ]
+},
+{
+  title:"AI Engineering II: RAG, Fine-tune Kararı, Evaluation",
+  goal:"Kitabın ikinci yarısı: RAG mimarisi, ne zaman fine-tune, AI-as-judge ile değerlendirme, maliyet/gecikme.",
+  src:"Kitap: AI Engineering (Huyen) — ikinci yarı",
+  days:[
+    {t:"RAG mimarisi", d:"Chunking, embedding, vektör arama, re-ranking, bağlama yerleştirme. Java'cı için not: kavramlar dilden bağımsız; Spring AI / LangChain4j bu boru hattının Java implementasyonlarıdır.",
+      tasks:["RAG bölümünü oku","Kendi ürünün için 1 RAG boru hattı eskizi çiz (kaynak → chunk → embed → ara → cevapla)"]},
+    {t:"Fine-tune ne zaman?", d:"Sıra önemli: önce prompt, sonra RAG, en son fine-tune. Fine-tune bilgi eklemek için değil, <em>davranış/format/stil</em> kazandırmak içindir. Bakım maliyeti (model güncellenince tekrar) hesaba katılmalı.",
+      tasks:["İlgili bölümü oku","Ekipte konuşulan 1 'fine-tune yapalım' fikrini bu çerçeveyle değerlendir: gerçekten gerekli mi?"]},
+    {t:"Evaluation: AI-as-judge", d:"Açık-uçlu çıktı klasik metriklerle ölçülmez. AI-as-judge: bir modelin başka modelin çıktısını rubrik'e göre puanlaması. Tuzaklar: judge yanlılığı, pozisyon yanlılığı, kendine benzeyeni sevme. <em>Bu, harness'teki evaluator ajanın teorisidir.</em>",
+      tasks:["Evaluation bölümünü oku","Kendi AI özelliğin için 5 maddelik bir değerlendirme rubriği yaz"]},
+    {t:"Gecikme ve maliyet mühendisliği", d:"Token maliyeti, caching (prompt cache), model kademeleme (ucuz model önce, pahalı gerekirse), batch işleme. 'En iyi model her istekte' anti-pattern'dir.",
+      tasks:["İlgili bölümü oku","Bir AI iş akışında kademeleme fırsatı bul: hangi adım ucuz modele inebilir?"]},
+    {t:"Sentez + quiz", d:"İki haftalık AI Engineering bilgisini tek karar ağacına indir: problem → prompt yeter mi? → RAG gerekir mi? → fine-tune şart mı? → nasıl ölçerim? Quiz'i çöz.",
+      tasks:["Karar ağacını çiz ve docs/design-docs/ altına koy","Haftalık quiz'i çöz"]}
+  ],
+  quiz:[
+    {q:"Model adaptasyonunda doğru deneme sırası hangisidir?",o:["Fine-tune → RAG → prompt","Prompt → RAG → fine-tune","RAG → fine-tune → prompt","Hepsi aynı anda"],a:1,e:"En ucuz ve hızlı olandan başla; fine-tune en pahalı ve bakım yükü en yüksek seçenektir."},
+    {q:"Fine-tuning öncelikle ne için uygundur?",o:["Modele yeni güncel bilgi eklemek","Davranış, format ve stil kazandırmak","Maliyeti düşürmek","Halüsinasyonu sıfırlamak"],a:1,e:"Bilgi için RAG; davranış/format için fine-tune. Bilgiyi ağırlıklara gömmek bakımı zorlaştırır."},
+    {q:"AI-as-judge yaklaşımının bilinen tuzaklarından biri hangisidir?",o:["Çok ucuz olması","Pozisyon yanlılığı ve kendi çıktısına benzeyeni kayırma","Sadece İngilizce çalışması","Kod değerlendirememesi"],a:1,e:"Judge da bir modeldir; yanlılıkları vardır. Rubrik + örnekli kalibrasyon + yer değiştirme testleriyle azaltılır."},
+    {q:"Prompt caching'in temel faydası nedir?",o:["Kaliteyi artırır","Tekrarlanan uzun bağlamın maliyet ve gecikmesini düşürür","Halüsinasyonu önler","Modeli günceller"],a:1,e:"AGENTS.md gibi sabit uzun bağlamlar cache'lenince her istekte yeniden ödenmez."},
+    {q:"Model kademeleme (cascading) nedir?",o:["Modelleri alfabetik sıralamak","Önce ucuz/hızlı model; yalnız gerektiğinde pahalı modele yükseltmek","Her isteği en büyük modele göndermek","Modelleri paralel çalıştırıp hepsini kullanmak"],a:1,e:"Maliyet mühendisliğinin çekirdeği: istek zorluğuna göre model seç. Harness'te de aynısı: evaluator'ı sadece gerektiğinde çalıştır."}
+  ]
+},
+{
+  title:"Hexagonal / Clean Mimari (Elle Kirlen)",
+  goal:"Get Your Hands Dirty on Clean Architecture ile port-adapter mimarisini Java'da uygula; ArchUnit ile mühürle.",
+  src:"Kitap: Get Your Hands Dirty on Clean Architecture 2e (Hombergs) — tamamı + uygulama",
+  days:[
+    {t:"Neden katmanlı mimari yetmez", d:"Kitabın açılış tezi: geleneksel katmanlı mimari veritabanı-güdümlü tasarımı teşvik eder ve iş mantığı sızar. Hexagonal: iş mantığı merkezde, dış dünya (DB, web, mesajlaşma) <em>adapter</em>'larla bağlanır.",
+      tasks:["İlk bölümleri oku","Kendi kod tabanında 'domain'e sızmış altyapı' 2 örneği bul"]},
+    {t:"Port ve adapter'lar", d:"Incoming port (use case arayüzü) ← web adapter; outgoing port (repository arayüzü) ← persistence adapter. Bağımlılık daima içeri, domain'e doğru akar (Dependency Inversion).",
+      tasks:["Kitabın örnek yapısını (buckpal) incele","Küçük bir modülü port/adapter yapısına taslak olarak böl (kağıt üstünde)"]},
+    {t:"Sınırda eşleme (mapping) stratejileri", d:"No-mapping / two-way / full mapping trade-off'ları. 'Sınırda parse et' ilkesinin mimari hali: dış dünyanın şekli domain'e sızmasın.",
+      tasks:["Mapping bölümünü oku","Kendi API→domain eşlemende hangi stratejiyi kullandığını adlandır, bilinçli bir karara çevir"]},
+    {t:"Mimarî mühürleme: ArchUnit ile hexagonal", d:"Hombergs'in yaklaşımını 4. hafta bilginle birleştir: onionArchitecture() / özel kurallarla 'domain hiçbir adapter'a bağımlı olamaz' kuralını test olarak yaz.",
+      tasks:["Hexagonal sınırları ArchUnit kuralına dök","CI'da bloklayıcı yap"]},
+    {t:"Mini uygulama + quiz", d:"Küçük bir use-case'i (ör. 'para transferi' benzeri) hexagonal iskelede uygula — istersen ajanla, ama <em>mimari kararları sen ver, ajan uygulasın.</em> Quiz'i çöz.",
+      tasks:["Mini modülü tamamla (ajan kullanımı serbest, mimari kararlar sende)","Haftalık quiz'i çöz"]}
+  ],
+  quiz:[
+    {q:"Hexagonal mimaride bağımlılık yönü kuralı nedir?",o:["Dışarı doğru, adapter'lara","Daima içeri, domain'e doğru","Çift yönlü serbest","Sadece DB'ye doğru"],a:1,e:"Dependency Inversion: domain hiçbir dış teknolojiyi bilmez; adapter'lar domain'in tanımladığı port'lara uyar."},
+    {q:"Geleneksel katmanlı mimarinin kitapta eleştirilen ana zaafı nedir?",o:["Çok pahalı olması","Veritabanı-güdümlü tasarımı teşvik etmesi ve iş mantığının sızması","Java'da çalışmaması","Test edilememesi"],a:1,e:"Persistence katmanı temel alınınca domain, DB şemasının kölesi olur. Hexagonal bunu tersine çevirir."},
+    {q:"Incoming port neyi temsil eder?",o:["Veritabanı bağlantısını","Uygulamanın sunduğu use-case arayüzünü (dış dünya bunu çağırır)","HTTP sunucusunu","Config dosyasını"],a:1,e:"Web adapter incoming port'u çağırır; domain'in kapısıdır. Outgoing port ise domain'in dış dünyadan beklediği hizmettir."},
+    {q:"'Sınırda parse et' ilkesinin hexagonal karşılığı nedir?",o:["Her yerde DTO kullan","Dış dünyanın veri şekli adapter'da domain modeline eşlenir; ham şekil içeri sızmaz","Domain'de JSON işle","Validation'ı UI'a bırak"],a:1,e:"Mapping stratejileri tam bunu yönetir: sınırda doğrula + dönüştür, domain saf kalsın."},
+    {q:"Hexagonal sınırları kalıcı kılmanın ajan-first yolu nedir?",o:["Wiki sayfası yazmak","ArchUnit kuralıyla 'domain → adapter bağımlılığı yasak'ı CI'da bloklayıcı test yapmak","Code review'da hatırlamak","Ajana her prompt'ta söylemek"],a:1,e:"Belgelenen kural unutulur; mekanikleşen kural her PR'da, ajan dahil herkese uygulanır."}
+  ]
+},
+{
+  title:"The Hard Parts: Dağıtık Kararlar",
+  goal:"Servis granülaritesi, coupling, dağıtık veri ve transaction — 'kolay cevabı olmayan' kararlar için çerçeve.",
+  src:"Kitap: Software Architecture: The Hard Parts (Ford, Richards, Sadalage, Dehghani)",
+  days:[
+    {t:"Trade-off analizi metodolojisi", d:"Kitabın tezi: sana ne yapacağını değil, <em>nasıl karar vereceğini</em> öğretmek. Coupling'i çöz: statik (bağımlılık) vs dinamik (iletişim). Karar = bağlam + trade-off tablosu + ADR.",
+      tasks:["Bölüm 1–2'yi oku","Geçmişte 'içgüdüyle' verilmiş 1 dağıtık kararı trade-off tablosuyla yeniden değerlendir"]},
+    {t:"Servis granülaritesi", d:"Granularity disintegrator'lar (bölme gerekçeleri: değişim hızı, ölçek, hata izolasyonu, güvenlik) vs integrator'lar (birleştirme gerekçeleri: transaction, veri bağımlılığı, workflow). İkisi çekişir; denge bağlama göre kurulur.",
+      tasks:["Granularity bölümlerini oku","Kendi sistemindeki 1 servis/modül için disintegrator vs integrator listesi çıkar"]},
+    {t:"Dağıtık veri: kim sahip, kim okur", d:"Data ownership desenleri, dağıtık sorgular, eventual consistency. 'Her servis kendi verisine sahip olur' idealinin gerçek dünyadaki bedelleri.",
+      tasks:["Veri sahipliği bölümünü oku","Sistemindeki paylaşılan 1 tabloyu/şemayı sahiplik açısından analiz et"]},
+    {t:"Dağıtık transaction ve saga'lar", d:"ACID'in dağıtıkta karşılığı yok; saga desenleri (epik yolculuk, telefon oyunu vb.), telafi edici işlemler, atomiklik vs eventual consistency trade-off'u.",
+      tasks:["Saga bölümünü oku","1 iş akışın için 'burada gerçekten atomiklik şart mı?' sorusunu cevapla"]},
+    {t:"Sentez + quiz", d:"Hard Parts karar çerçevesini tek şablona indir: bağlam → seçenekler → trade-off tablosu → karar → ADR. Bu şablon, mimar olarak günlük aletindir. Quiz'i çöz.",
+      tasks:["Karar şablonunu docs/ altına koy","Haftalık quiz'i çöz"]}
+  ],
+  quiz:[
+    {q:"The Hard Parts kitabının temel amacı nedir?",o:["En iyi mimariyi ezberletmek","Ne yapacağını değil, nasıl karar vereceğini (trade-off analizi) öğretmek","Mikroservisi savunmak","Monoliti savunmak"],a:1,e:"'Hard parts' = kolay cevabı olmayan kararlar. Çerçeve: bağlam + trade-off + belgelenmiş karar."},
+    {q:"Statik coupling ile dinamik coupling farkı nedir?",o:["Derleme hızı farkı","Statik: yapısal bağımlılıklar; dinamik: çalışma zamanı iletişimi (senkron/asenkron)","İkisi aynıdır","Statik sadece monolitte olur"],a:1,e:"Bir servisi bölmek statik coupling'i azaltabilir ama dinamik coupling'i (ağ çağrıları) patlatabilir — trade-off tam burada."},
+    {q:"Hangisi bir 'granularity disintegrator' (bölme gerekçesi) DEĞİLDİR?",o:["Farklı ölçekleme ihtiyacı","Hata izolasyonu","Kodun farklı hızda değişmesi","İki modülün aynı transaction'a ihtiyaç duyması"],a:3,e:"Transaction ihtiyacı tam tersine bir integrator'dır — birleştirme yönünde bastırır."},
+    {q:"Saga deseni neyi çözer?",o:["UI tasarımını","Dağıtık sistemde çok-servisli iş akışının tutarlılığını (telafi edici işlemlerle)","Kod formatını","Model seçimini"],a:1,e:"ACID dağıtıkta yoktur; saga, adım adım ilerleyip hata durumunda telafi ederek tutarlılığı yönetir."},
+    {q:"'Her servis kendi verisine sahip olmalı' idealinin bedeli genellikle nedir?",o:["Bedeli yoktur","Dağıtık sorgu/rapor zorluğu ve eventual consistency yönetimi","Daha az kod","Daha ucuz altyapı"],a:1,e:"Sahiplik izolasyon getirir ama cross-service veri ihtiyacını (sorgu, tutarlılık) pahalılaştırır."}
+  ]
+},
+{
+  title:"Veri-Yoğun Sistemler (DDIA)",
+  goal:"DDIA 2e'nin çekirdeği: depolama motorları, replikasyon, partitioning, tutarlılık — veri mimarisi refleksi kazan.",
+  src:"Kitap: Designing Data-Intensive Applications 2e (Kleppmann & Riccomini, 2026) — seçilmiş bölümler",
+  days:[
+    {t:"Güvenilirlik, ölçeklenebilirlik, bakım", d:"DDIA'nın açılış üçlüsü. 'Yük' nasıl tanımlanır (load parameters), gecikme yüzdelikleri (p99 neden ortalamadan önemli), operasyonel sadelik neden bir mimari karakteristiktir.",
+      tasks:["Bölüm 1'i oku","Kendi sisteminin yük parametrelerini ve p99 hedefini yaz"]},
+    {t:"Depolama motorları", d:"B-tree vs LSM-tree; OLTP vs OLAP; index trade-off'ları (yazma hızı ↔ okuma hızı). Neden 'her iş için tek veritabanı' devri kapandı.",
+      tasks:["Depolama bölümünü oku","Kullandığın DB'nin motor ailesini ve bunun iş yüküne uygunluğunu değerlendir"]},
+    {t:"Replikasyon", d:"Single-leader, multi-leader, leaderless. Replication lag'in kullanıcıya görünen yüzü: read-your-writes, monotonic reads. 'Eventual consistency' pazarlama değil, mühendislik sözleşmesidir.",
+      tasks:["Replikasyon bölümünü oku","Sistemindeki 1 okuma yolunda replication lag'in kullanıcı etkisini analiz et"]},
+    {t:"Partitioning ve transaction'lar", d:"Key-range vs hash partitioning, hot spot problemi; transaction izolasyon seviyeleri (read committed → snapshot → serializable) ve gerçek bedelleri.",
+      tasks:["İlgili bölümleri oku","Kendi DB'nin izolasyon seviyesini öğren ve 1 potansiyel anomaliyi adlandır"]},
+    {t:"Sentez + quiz", d:"10. haftanın saga bilgisiyle birleştir: dağıtık veri kararları artık iki kitaplık bir çerçeveye oturdu. Quiz'i çöz.",
+      tasks:["'Veri mimarisi karar listem' — 10 maddelik kişisel kontrol listesi yaz","Haftalık quiz'i çöz"]}
+  ],
+  quiz:[
+    {q:"Gecikme ölçümünde p99 neden ortalamadan önemlidir?",o:["Hesaplaması kolay olduğu için","Kuyruk gecikmeleri en değerli/yoğun kullanıcıları vurur; ortalama bunu gizler","Ortalama her zaman yanlıştır","p99 pazarlamada iyi durur"],a:1,e:"Kleppmann'ın klasik noktası: en yavaş %1, çoğu zaman en çok isteği yapan kullanıcıdır."},
+    {q:"LSM-tree'nin B-tree'ye göre tipik avantajı nedir?",o:["Her zaman daha hızlı okuma","Yüksek yazma throughput'u","Daha az disk kullanımı her durumda","Transaction gerektirmemesi"],a:1,e:"LSM ardışık yazar (write-optimized); okuma tarafında compaction/bloom filter maliyeti öder. Trade-off yine iş yüküne bağlı."},
+    {q:"'Read-your-writes' garantisi neyi çözer?",o:["Yazma hızını","Kullanıcının az önce yazdığı veriyi, replikasyon gecikmesine rağmen kendi okumasında görmesini","Disk arızasını","Şifrelemeyi"],a:1,e:"Replication lag'in en can sıkıcı kullanıcı deneyimi hatasına karşı hedefli bir tutarlılık garantisidir."},
+    {q:"Hash partitioning'in key-range'e göre bedeli nedir?",o:["Hot spot'u artırması","Aralık (range) sorgularının verimsizleşmesi","Daha az ölçeklenmesi","Veri kaybı"],a:1,e:"Hash dağılımı dengeler (hot spot azalır) ama komşu anahtarlar ayrı partitionlara düşer; range scan pahalılaşır."},
+    {q:"Serializable izolasyonun bedeli tipik olarak nedir?",o:["Veri kaybı riski","Performans/throughput maliyeti (kilitleme veya yeniden deneme)","Daha çok anomali","Şema değişikliği zorunluluğu"],a:1,e:"En güçlü garanti en pahalıdır. Mimar işi: hangi iş akışı gerçekten serializable ister, hangisi snapshot'la yaşar?"}
+  ]
+},
+{
+  title:"Liderlik, Mentorluk ve Capstone",
+  goal:"Junior mentorluk sistemini kur, ekip anlaşmasını yayınla, mimari kata ile her şeyi birleştir.",
+  src:"Kaynak: Anthropic beceri çalışması (Oca 2026) + Playbook D.5–D.6, E bölümü + Neal Ford kataları",
+  days:[
+    {t:"Beceri körelmesi: kanıt ve panzehir", d:"Anthropic çalışması: AI'a tam delege eden juniorlar kavramada <em>%40'ın altı</em>; AI'ı kavramsal soru için kullananlar <em>%65+</em>. Panzehir: Conceptual Inquiry desenini norm yap, 'AI'sız gün' ritüelini kur, productive struggle'ı koru.",
+      tasks:["Çalışmanın bulgularını ekip sunumu için 5 slayta indir","D.6 haftalık junior akışını kendi ekibine uyarla"]},
+    {t:"Ekip AI anlaşmasını yayınla", d:"D.5 şablonunu ekiple BİRLİKTE gözden geçir (dayatma değil, anlaşma): sorumluluk ('commit eden sahiptir'), doğrulama zinciri, şeffaflık, prompt kütüphanesi, bağlam hijyeni, KVKK.",
+      tasks:["Ekip toplantısında anlaşmayı tartışıp v1'i yayınla","Prompt/skill kütüphanesi için repo dizinini aç (.claude/commands veya .agents/skills)"]},
+    {t:"AI-çağı code review kültürü", d:"Review sorusu değişti: 'neden böyle yazdın?' → <em>'AI ne uyguladı, anlıyor musun?'</em> D.4 kontrol listesini zorunlu kıl; insan yargısı gereken noktaları (şema göçü, dış sözleşme, veri silme) insan onayına sabitle.",
+      tasks:["D.4'ü PR şablonuna göm (GitHub PR template)","İlk 3 PR'da listeyi mentorluk aracı olarak kullan (juniora sorular sorarak)"]},
+    {t:"Mimari kata günü", d:"Neal Ford formatı: 3–5 kişi, bir RFP, moderatöre sorular, taslak mimari, sunum + savunma. Junior'lar için en hızlı 'mimari düşünme' kası. nealford.com/katas'tan rastgele kata çek.",
+      tasks:["Ekiple 90 dk'lık ilk kata seansını planla ve yap","Çıkan mimariyi C4 Context+Container ile çizdir (juniorlara)"]},
+    {t:"Capstone + final quiz", d:"Her şeyi birleştir: gerçek bir iş problemini al → spec yaz (D.3) → mimari karar + ADR → ajanla uygula → D.4 ile incele → docs/'u güncelle. 12 haftanın mezuniyet projesi.",
+      tasks:["Capstone projesini tamamla ve ekibe 15 dk sun","Final quiz'ini çöz","Programı bitirdin — şimdi harness'ini her yeni modelde gözden geçirmeyi unutma 🏗️"]}
+  ],
+  quiz:[
+    {q:"Anthropic'in beceri çalışmasında en yüksek kavrama puanını hangi kullanım deseni aldı?",o:["Kod üretimini tamamen AI'a delege etmek","AI'ı kavramsal soru sormak için kullanmak (Conceptual Inquiry)","AI'ı hiç kullanmamak","Sadece otomatik tamamlama"],a:1,e:"Tam delege <%40, kavramsal sorgu ≥%65. 'Nasıl kullandığın', 'kullanıp kullanmadığından' önemli."},
+    {q:"'Commit eden sahiptir' kuralı ne anlama gelir?",o:["AI hata yaparsa AI sorumludur","Kodu gönderen kişi, AI üretmiş olsa bile tüm sorumluluğu taşır","Sadece seniorlar commit atar","Commit'ler anonimdir"],a:1,e:"Sorumluluk devredilemez. Bu kural hem kaliteyi hem juniorun kavrama zorunluluğunu korur."},
+    {q:"AI-çağında code review'un merkez sorusu neye dönüştü?",o:["'Kaç satır yazdın?'","'AI ne uyguladı, anlıyor musun?'","'Hangi IDE kullandın?'","'Kaç prompt harcadın?'"],a:1,e:"Review artık üretimi değil kavrayışı ve doğrulamayı denetler — mentorluğun ana sahnesi burasıdır."},
+    {q:"Hangi işlem her durumda İNSAN onayına sabitlenmelidir?",o:["Değişken adlandırma","Şema göçü / dış sözleşme değişikliği / veri silme gibi geri dönüşü zor kararlar","README güncellemesi","Test ekleme"],a:1,e:"Geri dönüşü zor kararlar ajan otonomisinin dışında tutulur; AGENTS.md 'ihtimali azaltır', politika/sandbox 'imkânı kaldırır'."},
+    {q:"Mimari kata'nın temel eğitim değeri nedir?",o:["Kod yazma hızı","Gerçekçi belirsizlik altında trade-off tartışıp kararı SAVUNMA pratiği","Sertifika puanı","Ezber tekrar"],a:1,e:"Kata, mimarın gerçek işini (soru sorma, trade-off, iletişim, savunma) düşük riskli ortamda tekrarlatır."}
+  ]
+}
+];
+
+/* =====================================================
+   DURUM YÖNETİMİ — localStorage + bellek yedeği
+   ===================================================== */
+const KEY="mimarDefteri_v1";
+let memState=null, storageOK=true;
+function loadState(){
+  try{const raw=localStorage.getItem(KEY);if(raw)return JSON.parse(raw);}
+  catch(e){storageOK=false;}
+  return memState||{tasks:{},quiz:{},notes:{},streak:0,lastDay:null,openWeek:0};
+}
+function saveState(s){
+  memState=s;
+  try{localStorage.setItem(KEY,JSON.stringify(s));}
+  catch(e){storageOK=false;showStorageWarn();}
+}
+function showStorageWarn(){
+  const el=document.getElementById("storageNote");
+  if(el){el.textContent="⚠ Kalıcı kayıt bu ortamda kapalı. Dosyayı indirip bilgisayarında tarayıcıyla açarsan ilerlemen otomatik saklanır. Şimdilik 'Dışa Aktar' ile yedek alabilirsin.";el.classList.add("warn");}
+}
+
+/* ---------- streak ---------- */
+function todayStr(){const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
+function bumpStreak(s){
+  const today=todayStr();
+  if(s.lastDay===today)return;
+  const y=new Date();y.setDate(y.getDate()-1);
+  const yStr=y.getFullYear()+"-"+String(y.getMonth()+1).padStart(2,"0")+"-"+String(y.getDate()).padStart(2,"0");
+  s.streak=(s.lastDay===yStr)?(s.streak||0)+1:1;
+  s.lastDay=today;
+}
+
+/* =====================================================
+   HESAPLAMALAR
+   ===================================================== */
+function weekTaskTotal(w){return PROGRAM[w].days.reduce((n,d)=>n+d.tasks.length,0);}
+function weekTaskDone(s,w){
+  let n=0;
+  PROGRAM[w].days.forEach((d,di)=>d.tasks.forEach((_,ti)=>{if(s.tasks[w+"-"+di+"-"+ti])n++;}));
+  return n;
+}
+function weekQuizPassed(s,w){const q=s.quiz[w];return q&&q.best>=60;}
+function weekPct(s,w){
+  const t=weekTaskTotal(w), d=weekTaskDone(s,w);
+  const taskPart=t?d/t*80:0;
+  const quizPart=weekQuizPassed(s,w)?20:0;
+  return Math.round(taskPart+quizPart);
+}
+function totalPct(s){
+  let sum=0;for(let w=0;w<PROGRAM.length;w++)sum+=weekPct(s,w);
+  return Math.round(sum/PROGRAM.length);
+}
+function quizAvg(s){
+  const scores=Object.values(s.quiz).map(q=>q.best).filter(v=>v!=null);
+  if(!scores.length)return null;
+  return Math.round(scores.reduce((a,b)=>a+b,0)/scores.length);
+}
+
+/* =====================================================
+   RENDER
+   ===================================================== */
+function renderHeader(s){
+  document.getElementById("totalPct").textContent=totalPct(s)+"%";
+  document.getElementById("totalFill").style.width=totalPct(s)+"%";
+  document.getElementById("streakVal").textContent=(s.streak||0)+" gün";
+  const qa=quizAvg(s);
+  document.getElementById("quizAvg").textContent=qa==null?"—":qa+"%";
+}
+function renderSidebar(s){
+  const stack=document.getElementById("layerStack");
+  stack.innerHTML="";
+  /* katman metaforu: 12. hafta en üstte (UI gibi), 1. hafta en altta (Types gibi) */
+  for(let w=PROGRAM.length-1;w>=0;w--){
+    const pct=weekPct(s,w);
+    const el=document.createElement("button");
+    el.className="layer"+(w===s.openWeek?" active":"")+(pct===100?" done":"");
+    el.setAttribute("aria-label","Hafta "+(w+1)+": "+PROGRAM[w].title+", %"+pct+" tamamlandı");
+    el.innerHTML='<div class="fillbar" style="width:'+pct+'%"></div>'+
+      '<span class="no">H'+String(w+1).padStart(2,"0")+'</span>'+
+      '<span class="nm">'+PROGRAM[w].title+'</span>'+
+      '<span class="pct">'+(pct===100?"✓":pct+"%")+'</span>';
+    el.onclick=()=>{const st=loadState();st.openWeek=w;saveState(st);renderAll();window.scrollTo({top:0});};
+    stack.appendChild(el);
+  }
+}
+function renderMain(s){
+  const w=s.openWeek, wk=PROGRAM[w];
+  const main=document.getElementById("main");
+  let html='<div class="panel">'+
+    '<div class="week-head"><span class="tag">Hafta '+(w+1)+' / 12</span><h2>'+wk.title+'</h2></div>'+
+    '<p class="week-goal">'+wk.goal+'</p>'+
+    '<p class="week-src">'+wk.src+'</p>';
+
+  wk.days.forEach((d,di)=>{
+    const done=d.tasks.filter((_,ti)=>s.tasks[w+"-"+di+"-"+ti]).length;
+    const allDone=done===d.tasks.length;
+    html+='<div class="day" id="day-'+di+'">'+
+      '<div class="day-head" role="button" tabindex="0" onclick="toggleDay('+di+')" onkeydown="if(event.key===\'Enter\')toggleDay('+di+')">'+
+        '<span class="dno">GÜN '+(di+1)+'</span>'+
+        '<span class="dtitle">'+d.t+'</span>'+
+        '<span class="dstat'+(allDone?" done":"")+'">'+done+'/'+d.tasks.length+(allDone?" ✓":"")+'</span>'+
+        '<span class="chev">▸</span>'+
+      '</div>'+
+      '<div class="day-body"><p>'+d.d+'</p><div class="tasklist">';
+    d.tasks.forEach((t,ti)=>{
+      const k=w+"-"+di+"-"+ti, c=!!s.tasks[k];
+      html+='<label class="task'+(c?" checked":"")+'"><input type="checkbox" '+(c?"checked":"")+' onchange="toggleTask(\''+k+'\')"><span>'+t+'</span></label>';
+    });
+    html+='</div></div></div>';
+  });
+
+  /* quiz */
+  const qs=s.quiz[w];
+  html+='<div class="quiz" id="quizBox"><h3>Hafta '+(w+1)+' Quiz\'i</h3>'+
+    '<div class="qmeta">'+wk.quiz.length+' soru · geçme eşiği %60 · en iyi skorun: '+(qs&&qs.best!=null?qs.best+"%":"—")+'</div>'+
+    '<div id="quizArea"></div>'+
+    '<button class="btn" onclick="startQuiz()">'+(qs&&qs.best!=null?"Quiz'i Tekrar Çöz":"Quiz'e Başla")+'</button>'+
+    '</div>';
+
+  /* notlar */
+  html+='<div class="notes" style="margin-top:20px"><h3 class="disp" style="font-size:16px;margin-bottom:8px;color:var(--cyan)">Hafta Notlarım</h3>'+
+    '<textarea id="noteArea" placeholder="Bu haftadan aklında kalanlar, sorular, ekipte deneyeceklerin…" oninput="saveNote()">'+(s.notes[w]||"")+'</textarea>'+
+    '<div class="saved" id="noteSaved">✓ kaydedildi</div></div>';
+
+  /* araçlar */
+  html+='<div class="tools">'+
+    '<button class="btn ghost" onclick="exportProgress()">İlerlemeyi Dışa Aktar</button>'+
+    '<button class="btn ghost" onclick="document.getElementById(\'importFile\').click()">İçe Aktar</button>'+
+    '<input type="file" id="importFile" accept=".json" style="display:none" onchange="importProgress(event)">'+
+    '<button class="btn ghost" onclick="resetAll()">Sıfırla</button>'+
+    '</div>'+
+    '<div class="storage-note" id="storageNote">İlerlemen bu tarayıcıda otomatik saklanır. Yedek için arada bir "Dışa Aktar" kullan.</div>';
+
+  html+='</div>';
+  main.innerHTML=html;
+  if(!storageOK)showStorageWarn();
+}
+function renderAll(){const s=loadState();renderHeader(s);renderSidebar(s);renderMain(s);}
+
+/* =====================================================
+   ETKİLEŞİMLER
+   ===================================================== */
+function toggleDay(di){
+  const el=document.getElementById("day-"+di);
+  el.classList.toggle("open");
+}
+function toggleTask(k){
+  const s=loadState();
+  s.tasks[k]=!s.tasks[k];
+  if(s.tasks[k])bumpStreak(s);
+  saveState(s);
+  renderHeader(s);renderSidebar(s);
+  /* satırın görünümünü yenile (paneli komple çizmeden) */
+  const parts=k.split("-");renderMainKeepOpen(s);
+}
+function renderMainKeepOpen(s){
+  const openDays=[...document.querySelectorAll(".day.open")].map(e=>e.id);
+  renderMain(s);
+  openDays.forEach(id=>{const e=document.getElementById(id);if(e)e.classList.add("open");});
+}
+function saveNote(){
+  const s=loadState();
+  s.notes[s.openWeek]=document.getElementById("noteArea").value;
+  saveState(s);
+  const sv=document.getElementById("noteSaved");
+  sv.classList.add("show");clearTimeout(sv._t);sv._t=setTimeout(()=>sv.classList.remove("show"),1200);
+}
+
+/* ---------- quiz ---------- */
+let quizAnswers=[];
+function startQuiz(){
+  const s=loadState(), wk=PROGRAM[s.openWeek];
+  quizAnswers=new Array(wk.quiz.length).fill(null);
+  let html="";
+  wk.quiz.forEach((q,qi)=>{
+    html+='<div class="q"><div class="qt">'+(qi+1)+'. '+q.q+'</div><div class="opts">';
+    q.o.forEach((o,oi)=>{
+      html+='<button class="opt" id="opt-'+qi+'-'+oi+'" onclick="answer('+qi+','+oi+')">'+o+'</button>';
+    });
+    html+='</div><div class="expl" id="expl-'+qi+'">'+q.e+'</div></div>';
+  });
+  html+='<div class="quiz-result" id="quizResult"></div>';
+  document.getElementById("quizArea").innerHTML=html;
+}
+function answer(qi,oi){
+  const s=loadState(), q=PROGRAM[s.openWeek].quiz[qi];
+  if(quizAnswers[qi]!=null)return;
+  quizAnswers[qi]=oi;
+  q.o.forEach((_,i)=>{
+    const b=document.getElementById("opt-"+qi+"-"+i);
+    b.disabled=true;
+    if(i===q.a)b.classList.add("correct");
+    else if(i===oi)b.classList.add("wrong");
+  });
+  document.getElementById("expl-"+qi).classList.add("show");
+  if(quizAnswers.every(a=>a!=null))finishQuiz();
+}
+function finishQuiz(){
+  const s=loadState(), wk=PROGRAM[s.openWeek];
+  const correct=quizAnswers.filter((a,i)=>a===wk.quiz[i].a).length;
+  const score=Math.round(correct/wk.quiz.length*100);
+  const prev=s.quiz[s.openWeek]||{best:null,attempts:0};
+  s.quiz[s.openWeek]={best:prev.best==null?score:Math.max(prev.best,score),attempts:prev.attempts+1};
+  bumpStreak(s);saveState(s);
+  const r=document.getElementById("quizResult");
+  if(score>=60){r.className="quiz-result pass";r.textContent="Skor: %"+score+" — Geçtin! Katman mühürlendi. ✓";}
+  else{r.className="quiz-result fail";r.textContent="Skor: %"+score+" — Eşik %60. Açıklamaları oku, günü sindir, tekrar dene.";}
+  renderHeader(s);renderSidebar(s);
+  const meta=document.querySelector("#quizBox .qmeta");
+  if(meta)meta.textContent=wk.quiz.length+" soru · geçme eşiği %60 · en iyi skorun: "+s.quiz[s.openWeek].best+"%";
+}
+
+/* ---------- dışa/içe aktarım ---------- */
+function exportProgress(){
+  const s=loadState();
+  const blob=new Blob([JSON.stringify(s,null,2)],{type:"application/json"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download="mimar-defteri-ilerleme-"+todayStr()+".json";
+  a.click();URL.revokeObjectURL(a.href);
+}
+function importProgress(ev){
+  const f=ev.target.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=()=>{
+    try{const s=JSON.parse(r.result);saveState(s);renderAll();}
+    catch(e){alert("Dosya okunamadı: geçerli bir ilerleme yedeği değil.");}
+  };
+  r.readAsText(f);
+}
+function resetAll(){
+  if(!confirm("Tüm ilerleme, quiz skorları ve notlar silinecek. Emin misin?"))return;
+  const empty={tasks:{},quiz:{},notes:{},streak:0,lastDay:null,openWeek:0};
+  saveState(empty);renderAll();
+}
+
+renderAll();
+</script>
+</body>
+</html>

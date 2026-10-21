@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# pera-soft (herkese açık) uzak deposuna YALNIZ pera-soft-yayin dalı gidebilir.
+# Kurulum (repo başına bir kez): git config core.hooksPath tools/git-kancalari
+uzak_url="$2"
+case "$uzak_url" in
+  *pera-soft/*) ;;
+  *) exit 0 ;;
+esac
+while read -r yerel_ref _ _ _; do
+  [ "$yerel_ref" = "(delete)" ] && continue
+  if [ "$yerel_ref" != "refs/heads/pera-soft-yayin" ]; then
+    echo "ENGEL: pera-soft herkese açık; yalnız pera-soft-yayin gönderilebilir (denenen: $yerel_ref)." >&2
+    echo "Önce: bash tools/yayin-hazirla.sh  →  git push pera-soft pera-soft-yayin:main" >&2
+    exit 1
+  fi
+done
+exit 0

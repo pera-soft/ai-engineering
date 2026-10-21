@@ -1,0 +1,5 @@
+---
+slug: banka-java-developer
+baslik: "Kademe 8 · Banka Java Developer (kredili sistemler)"
+aciklama: "Banka Java geliştirici mülakatına özel alan. ÖNEMLİ: hedef banka TİCARİ/KURUMSAL ve İHRACAT finansmanı odaklıdır, bireysel (tüketici) kredi ürünü yoktur — bu yüzden alan bilgisi için önce 243-244-245'i çalış: ticari nakit krediler (spot/rotatif/taksitli, sabit-değişken faiz, TL/döviz), gayrinakdi krediler (teminat mektubu, kontrgaranti, aval/iskonto, tazmin ve nakde dönüşüm) ve ihracat finansmanı (İGE kefaleti, sevk öncesi/sonrası, taahhüt-mahsup-kapatma). 239 bireysel kredi yaşam döngüsünü anlatır; genel kültür olarak değerlidir ama bu bankanın ürünü değildir. Alanın geri kalanı: 238 hazırlık haritası ve mülakat stratejisi (ilan maddesi → Kademe 1-6'daki konu numaraları + 7 günlük plan), 240 kredi kullanıcı ekranlarının backend'i, 241 uçtan uca mimari, 242 bankada davranışsal sorular. Teknik derinlik (Spring Boot, JPA/transaction, mikroservis, Docker/K8s, JVM, system design) Kademe 1-6'da yerinde durur; 238 seni oraya yönlendirir."
+---
