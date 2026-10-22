@@ -152,6 +152,8 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <configuration>
+                    <!-- Testler daima tr_TR'de koşar: "id" → "İD" katlama hatası her makinede yakalansın -->
+                    <argLine>-Duser.language=tr -Duser.country=TR</argLine>
                     <!-- Varsayılan desenler + MimariTestleri (ArchUnit) — sessiz atlanmasın -->
                     <includes>
                         <include>**/*Test.java</include>
