@@ -53,7 +53,8 @@ import java.io.IOException;
  *   <li><strong>Kimliksiz erişim:</strong> {@code /api/**} → 401 (JSON istemcisi yönlendirme izlemesin);
  *       sayfalar → {@code /giris.html}'e yönlendirme. Açık uçlar: giriş/kayıt/doğrulama/şifre sıfırlama
  *       sayfaları, {@code style.css}, {@code kimlik.js}, kayıt, doğrulama, yeniden gönder, şifremi unuttum ve
- *       şifre sıfırla uçları (Faz 9c; hepsi CSRF'li).</li>
+ *       şifre sıfırla uçları (Faz 9c; hepsi CSRF'li), kayıt yöntemi bayrağı {@code GET /api/kimlik/ayarlar}
+ *       (ADR-0015).</li>
  *   <li><strong>CSRF token AÇIK:</strong> {@link CookieCsrfTokenRepository} → {@code XSRF-TOKEN} çerezi
  *       (JS okur, HttpOnly DEĞİL) ↔ {@code X-XSRF-TOKEN} başlığı / {@code _csrf} form alanı. Düz (XOR'suz)
  *       işleyici: statik ön yüz çerezdeki değeri aynen geri yollar. {@link CsrfCerezFiltresi} her yanıtta
@@ -132,7 +133,7 @@ public class SiteGuvenlikYapilandirma {
                 .authorizeHttpRequests(yetki -> yetki
                         .requestMatchers(HttpMethod.GET, GIRIS_SAYFASI, "/kayit.html", "/dogrulama-bekleniyor.html",
                                 "/dogrulama-sonuc.html", "/sifremi-unuttum.html", "/sifre-sifirla.html", "/kimlik.js",
-                                "/style.css", "/api/kimlik/dogrula").permitAll()
+                                "/style.css", "/api/kimlik/dogrula", "/api/kimlik/ayarlar").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/kimlik/kayit", "/api/kimlik/dogrulama-yeniden",
                                 "/api/kimlik/sifremi-unuttum", "/api/kimlik/sifre-sifirla").permitAll()
                         .requestMatchers("/error").permitAll()

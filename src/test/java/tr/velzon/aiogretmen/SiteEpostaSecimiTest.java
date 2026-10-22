@@ -23,6 +23,7 @@ class SiteEpostaSecimiTest {
         List<String> arg = new ArrayList<>(List.of("--server.port=0",
                 "--spring.datasource.url=jdbc:h2:mem:" + db + ";DB_CLOSE_DELAY=-1",
                 "--spring.ai.openai.api-key=",
+                "--app.site.kayit=eposta",
                 "--app.hafiza-dir=target/test-hafiza-epostasecim",
                 "--app.rapor-dir=target/test-raporlar-epostasecim"));
         arg.addAll(List.of(ek));

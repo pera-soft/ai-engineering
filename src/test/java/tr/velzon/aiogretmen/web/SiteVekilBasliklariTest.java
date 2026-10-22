@@ -25,6 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
         "app.hafiza-dir=target/test-hafiza-site",
         "app.rapor-dir=target/test-raporlar-site",
         "app.site.eposta-zorunlu=false",
+        "app.site.kayit=eposta",
         "app.site.guvenli-cerez=false",
         "server.servlet.session.cookie.secure=false"
 })

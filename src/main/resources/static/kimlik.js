@@ -1,7 +1,7 @@
 /* AI Öğretmen — site profili kimlik sayfaları (giriş, kayıt, doğrulama). Framework yok; CSP-temiz
  * (inline betik/stil YOK). Sayfa türü <body data-sayfa="..."> ile seçilir. CSRF: sunucu XSRF-TOKEN
  * çerezini yazar; form gönderiminde _csrf alanı, fetch'te X-XSRF-TOKEN başlığı olarak geri yollanır
- * (ADR-0012). */
+ * (ADR-0012). Kayıt yöntemi (ekip kodu / e-posta, ADR-0015) kimliksiz GET /api/kimlik/ayarlar'dan okunur. */
 "use strict";
 
 function csrfToken() {
@@ -38,6 +38,8 @@ function epostaFormu(form, btn, yol, notrMesaj) {
     try {
       const yanit = await postJson(yol, { email });
       if (yanit.ok) mesajGoster(notrMesaj, "bilgi");
+      else if (yanit.status === 404) mesajGoster("Bu sitede e-posta gönderimi yok (ekip kodu ile kayıt). "
+          + "Şifreni unuttuysan site sorumlusuna yaz.");
       else mesajGoster("İstek gönderilemedi (HTTP " + yanit.status + "). Sayfayı yenileyip tekrar dene.");
     } catch (h) {
       mesajGoster("Sunucuya ulaşılamadı — bağlantını kontrol et.");
@@ -45,6 +47,17 @@ function epostaFormu(form, btn, yol, notrMesaj) {
       btn.disabled = false;
     }
   });
+}
+
+/** Kayıt yöntemi (ADR-0015): "ekip-kodu" | "eposta"; okunamazsa null (sayfa e-posta düzenini korur). */
+async function kayitYontemi() {
+  try {
+    const yanit = await fetch("/api/kimlik/ayarlar", { headers: { "Accept": "application/json" } });
+    if (!yanit.ok) return null;
+    return (await yanit.json()).kayit || null;
+  } catch (h) {
+    return null;
+  }
 }
 
 const ALAN_ADI = "@pera.software";
@@ -62,6 +75,13 @@ const sayfalar = {
     if (params.has("hata")) mesajGoster(hatalar[params.get("hata")] || hatalar.bilgi, "hata");
     else if (params.has("cikis")) mesajGoster("Çıkış yaptın.", "bilgi");
     else if (params.has("sifirlandi")) mesajGoster("Şifren güncellendi. Yeni şifrenle giriş yap.", "bilgi");
+    else if (params.has("kayit")) mesajGoster("Hesabın açıldı. Şimdi giriş yapabilirsin.", "bilgi");
+    // ekip kodu modunda e-posta yok: "Şifremi unuttum" yerine site sorumlusu
+    kayitYontemi().then((yontem) => {
+      const ekip = yontem === "ekip-kodu";
+      document.getElementById("unuttum-baglantisi").hidden = ekip;
+      document.getElementById("unuttum-sorumlu").hidden = !ekip;
+    });
     const form = document.getElementById("giris-formu");
     form.addEventListener("submit", () => {
       // düz HTML form POST'u (Spring Security form login) — token gizli alanla gider
@@ -72,6 +92,12 @@ const sayfalar = {
   kayit() {
     const form = document.getElementById("kayit-formu");
     const btn = document.getElementById("kayit-btn");
+    const kodAlani = document.getElementById("ekip-kodu-alani");
+    let ekipKoduModu = false;
+    kayitYontemi().then((yontem) => {
+      ekipKoduModu = yontem === "ekip-kodu";
+      kodAlani.hidden = !ekipKoduModu;
+    });
     form.addEventListener("submit", async (olay) => {
       olay.preventDefault();
       const email = form.email.value.trim().toLowerCase();
@@ -82,15 +108,20 @@ const sayfalar = {
       }
       if (sifre.length < MIN_SIFRE) { mesajGoster("Şifre en az " + MIN_SIFRE + " karakter olmalı."); return; }
       if (sifre !== form.sifre2.value) { mesajGoster("Şifreler aynı değil."); return; }
+      const govdeIstek = { email, sifre };
+      if (ekipKoduModu) {
+        const ekipKodu = form.ekipKodu.value.trim();
+        if (!ekipKodu) { mesajGoster("Ekip kodunu gir (site sorumlusundan al)."); return; }
+        govdeIstek.ekipKodu = ekipKodu;
+      }
       btn.disabled = true;
       try {
-        const yanit = await fetch("/api/kimlik/kayit", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "X-XSRF-TOKEN": csrfToken() },
-          body: JSON.stringify({ email, sifre }),
-        });
+        const yanit = await postJson("/api/kimlik/kayit", govdeIstek);
         if (yanit.ok) {
-          location.href = "/dogrulama-bekleniyor.html?email=" + encodeURIComponent(email);
+          const sonuc = await yanit.json().catch(() => ({}));
+          location.href = sonuc.durum === "kayit-tamam"
+            ? "/giris.html?kayit=1"
+            : "/dogrulama-bekleniyor.html?email=" + encodeURIComponent(email);
           return;
         }
         const govde = await yanit.json().catch(() => ({}));

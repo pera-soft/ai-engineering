@@ -21,6 +21,11 @@ public record Kullanici(@Id Long id, String email, String sifreHash, boolean dog
         return new Kullanici(null, email, sifreHash, false, true, Instant.now(), 0, null);
     }
 
+    /** Ekip koduyla açılan hesap (ADR-0015): e-posta doğrulaması yok, doğrulanmış başlar. */
+    public static Kullanici yeniDogrulanmis(String email, String sifreHash) {
+        return new Kullanici(null, email, sifreHash, true, true, Instant.now(), 0, null);
+    }
+
     public Kullanici sifreyle(String yeniHash) {
         return new Kullanici(id, email, yeniHash, dogrulandi, etkin, olusturma, basarisizDeneme, kilitBitis);
     }

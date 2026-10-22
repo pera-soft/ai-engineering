@@ -5,9 +5,13 @@
 - Derle+test: `./mvnw verify`
 - Çalıştır: `OPENROUTER_API_KEY=... ./mvnw spring-boot:run`  (http://127.0.0.1:8090; sağlayıcı: OpenRouter, ADR-0004)
   - Mülakat modülü varsayılan KAPALI; açmak için başına `APP_MULAKAT_ETKIN=true` ekle (ADR-0011)
-  - Çok kullanıcılı site: `--spring.profiles.active=site` (ADR-0012). SMTP ŞART (ADR-0013): `SPRING_MAIL_HOST`,
-    `SPRING_MAIL_PORT`, `SPRING_MAIL_USERNAME`, `SPRING_MAIL_PASSWORD` (+ `APP_SITE_TEMEL_URL`, `APP_SITE_GONDERICI`);
-    SMTP yoksa açılmaz. Yalnız yerel deneme: `APP_SITE_EPOSTA_ZORUNLU=false APP_SITE_GUVENLI_CEREZ=false` (bağlantılar loga)
+  - Çok kullanıcılı site: `--spring.profiles.active=site` (ADR-0012). Kayıt ekip koduyla (ADR-0015, varsayılan):
+    `APP_SITE_EKIP_KODU` ŞART (≥12 karakter, `openssl rand -base64 18`), yoksa açılmaz; e-posta/SMTP YOK.
+    E-postalı kayıt yalnız `APP_SITE_KAYIT=eposta` ile — o modda SMTP ŞART (ADR-0013): `SPRING_MAIL_HOST`,
+    `SPRING_MAIL_PORT`, `SPRING_MAIL_USERNAME`, `SPRING_MAIL_PASSWORD` (+ `APP_SITE_GONDERICI`); yerel deneme
+    `APP_SITE_EPOSTA_ZORUNLU=false` (bağlantılar loga). Yerel http denemesi: `APP_SITE_GUVENLI_CEREZ=false`
+  - Şifre sıfırlama bağlantısı (işletmen, ekip kodu modu): `bash tools/sifre-baglantisi.sh <email> [site.env]`
+    (psql + `SPRING_DATASOURCE_*` + `APP_SITE_TEMEL_URL`; uygulamayla aynı sunucuda)
   - Site veritabanı (ADR-0014): `SPRING_DATASOURCE_URL` (+ `_USERNAME`, `_PASSWORD`) ŞART — canlıda
     PostgreSQL; yoksa açılmaz. Yerel deneme: `SPRING_DATASOURCE_URL='jdbc:h2:file:./data/site-deneme'`
   - Site dağıtımı/işletmesi: `docs/kurulum-site.md` (runbook) + `deploy/` (systemd, nginx, env, PostgreSQL

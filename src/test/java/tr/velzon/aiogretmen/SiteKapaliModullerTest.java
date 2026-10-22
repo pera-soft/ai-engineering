@@ -30,7 +30,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
         "app.mulakat.etkin=true",   // birisi APP_MULAKAT_ETKIN=true verse bile
         "app.hafiza-dir=target/test-hafiza-sitekapali",
         "app.rapor-dir=target/test-raporlar-sitekapali",
-        "app.site.eposta-zorunlu=false"  // SMTP yok → log gönderici (ADR-0013)
+        "app.site.eposta-zorunlu=false",  // SMTP yok → log gönderici (ADR-0013)
+        "app.site.kayit=eposta"
 })
 @ActiveProfiles("site")
 class SiteKapaliModullerTest {
@@ -72,7 +73,7 @@ class SiteKapaliModullerTest {
                 .run("--server.port=0",
                         "--spring.datasource.url=jdbc:h2:mem:sitemcp;DB_CLOSE_DELAY=-1",
                         "--spring.ai.openai.api-key=",
-                        "--app.site.eposta-zorunlu=false",
+                        "--app.site.eposta-zorunlu=false", "--app.site.kayit=eposta",
                         "--spring.ai.mcp.server.enabled=true").close())
                 .hasStackTraceContaining("MCP");
     }

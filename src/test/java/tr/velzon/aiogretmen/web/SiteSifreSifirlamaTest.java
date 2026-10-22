@@ -47,7 +47,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "spring.ai.openai.api-key=",
         "app.hafiza-dir=target/test-hafiza-sifirlama",
         "app.rapor-dir=target/test-raporlar-sifirlama",
-        "app.site.temel-url=https://egitim.pera.software"
+        "app.site.temel-url=https://egitim.pera.software",
+        "app.site.kayit=eposta"  // "şifremi unuttum" e-posta akışı (ADR-0013)
 })
 @ActiveProfiles("site")
 @AutoConfigureMockMvc

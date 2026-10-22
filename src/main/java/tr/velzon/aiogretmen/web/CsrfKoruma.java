@@ -44,7 +44,7 @@ public class CsrfKoruma extends OncePerRequestFilter {
     /** ObjectProvider: @WebMvcTest dilimlerinde {@link SiteAyarlari} bean'i yoktur → boş liste (yerel). */
     @Autowired
     public CsrfKoruma(ObjectProvider<SiteAyarlari> ayarlar) {
-        this(ayarlar.getIfAvailable(() -> new SiteAyarlari(List.of(), true, null, true, null)).izinliOriginler());
+        this(ayarlar.getIfAvailable(() -> new SiteAyarlari(List.of(), true, null, true, null, null, null)).izinliOriginler());
     }
 
     public CsrfKoruma(List<String> izinliOriginler) {

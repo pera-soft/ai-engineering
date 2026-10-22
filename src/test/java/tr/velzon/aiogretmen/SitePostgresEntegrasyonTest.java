@@ -12,6 +12,7 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.init.ScriptUtils;
 import org.springframework.mock.web.MockHttpSession;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -25,7 +26,13 @@ import tr.velzon.aiogretmen.service.EpostaGonderici;
 import javax.sql.DataSource;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.sql.Connection;
+import java.sql.Timestamp;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -52,7 +59,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  *     ./mvnw -Dtest=SitePostgresEntegrasyonTest test
  *   dropdb ai_ogretmen_test_x
  * </pre>
- * Her koşu rastgele e-posta kullanır → aynı veritabanında tekrar koşulabilir.
+ * Her koşu rastgele e-posta kullanır → aynı veritabanında tekrar koşulabilir. Ayrıca işletmen betiği
+ * {@code tools/sifre-baglantisi.sh} (ADR-0015) bu veritabanına karşı çalıştırılır ({@code psql} gerekir).
  */
 @EnabledIfEnvironmentVariable(named = "PG_TEST_URL", matches = ".+")
 @SpringBootTest(properties = "spring.ai.openai.api-key=")
@@ -68,6 +76,7 @@ class SitePostgresEntegrasyonTest {
         r.add("spring.datasource.username", () -> Objects.requireNonNullElse(System.getenv("PG_TEST_USERNAME"), ""));
         r.add("spring.datasource.password", () -> Objects.requireNonNullElse(System.getenv("PG_TEST_PASSWORD"), ""));
         r.add("app.site.eposta-zorunlu", () -> "false");
+        r.add("app.site.kayit", () -> "eposta");
         var kok = Files.createTempDirectory("site-pg");
         r.add("app.hafiza-dir", () -> kok.resolve("hafiza").toString());
         r.add("app.rapor-dir", () -> kok.resolve("raporlar").toString());
@@ -87,6 +96,86 @@ class SitePostgresEntegrasyonTest {
 
     @MockitoBean
     OgretmenAiClient ai;
+
+    @Autowired
+    PasswordEncoder sifreKodlayici;
+
+    private record BetikSonucu(int kod, String cikti, String hata) {
+    }
+
+    /** {@code tools/sifre-baglantisi.sh}'yi çalıştırır; env dosyası verilirse DB değişkenleri ortamdan SİLİNİR. */
+    private static BetikSonucu betik(String email, Path envDosyasi) throws Exception {
+        ProcessBuilder pb = envDosyasi == null
+                ? new ProcessBuilder("bash", "tools/sifre-baglantisi.sh", email)
+                : new ProcessBuilder("bash", "tools/sifre-baglantisi.sh", email, envDosyasi.toString());
+        Map<String, String> ortam = pb.environment();
+        ortam.remove("SPRING_DATASOURCE_URL");
+        ortam.remove("SPRING_DATASOURCE_USERNAME");
+        ortam.remove("SPRING_DATASOURCE_PASSWORD");
+        ortam.remove("APP_SITE_TEMEL_URL");
+        if (envDosyasi == null) {
+            ortam.put("SPRING_DATASOURCE_URL", System.getenv("PG_TEST_URL"));
+            ortam.put("SPRING_DATASOURCE_USERNAME", Objects.requireNonNullElse(System.getenv("PG_TEST_USERNAME"), ""));
+            ortam.put("SPRING_DATASOURCE_PASSWORD", Objects.requireNonNullElse(System.getenv("PG_TEST_PASSWORD"), ""));
+            ortam.put("APP_SITE_TEMEL_URL", "https://egitim.pera.software/");
+        }
+        Process p = pb.start();
+        String cikti = new String(p.getInputStream().readAllBytes(), StandardCharsets.UTF_8).trim();
+        String hata = new String(p.getErrorStream().readAllBytes(), StandardCharsets.UTF_8);
+        return new BetikSonucu(p.waitFor(), cikti, hata);
+    }
+
+    private static String tokenOf(BetikSonucu s) {
+        assertThat(s.kod()).as(s.hata()).isZero();
+        assertThat(s.cikti()).startsWith("https://egitim.pera.software/sifre-sifirla.html?token=");
+        return s.cikti().substring(s.cikti().indexOf("token=") + 6);
+    }
+
+    @Test
+    void isletmenBetigiSifirlamaBaglantisiUretir() throws Exception {
+        String email = "betik-" + UUID.randomUUID().toString().substring(0, 8) + "@pera.software";
+        jdbc.update("INSERT INTO kullanici (email, sifre_hash, dogrulandi, etkin) VALUES (?, ?, TRUE, TRUE)",
+                email, sifreKodlayici.encode(SIFRE));
+
+        // olmayan hesap → hata, bağlantı yok
+        BetikSonucu yok = betik("yok-" + email, null);
+        assertThat(yok.kod()).isNotZero();
+        assertThat(yok.cikti()).isEmpty();
+        assertThat(yok.hata()).contains("hesap yok");
+
+        // büyük harf/boşluk normalleşir; süre JVM'in okuduğu biçimde ~1 saat (saat dilimi uyumu)
+        String ilk = tokenOf(betik(" " + email.toUpperCase() + " ", null));
+        Timestamp son = jdbc.queryForObject("SELECT t.son_gecerlilik FROM kullanici_token t JOIN kullanici k "
+                + "ON k.id = t.hesap_id WHERE k.email = ? AND t.tur = 'SIFRE_SIFIRLAMA'", Timestamp.class, email);
+        assertThat(son.toInstant()).isBetween(Instant.now().plus(55, ChronoUnit.MINUTES),
+                Instant.now().plus(61, ChronoUnit.MINUTES));
+
+        // env dosyasıyla ikinci bağlantı → ilki geçersiz (hesap başına tek sıfırlama token'ı)
+        Path env = Files.createTempFile("site", ".env");
+        Files.writeString(env, "# yorum\nSPRING_DATASOURCE_URL=" + System.getenv("PG_TEST_URL") + "\n"
+                + "SPRING_DATASOURCE_USERNAME=" + Objects.requireNonNullElse(System.getenv("PG_TEST_USERNAME"), "") + "\n"
+                + "SPRING_DATASOURCE_PASSWORD=" + Objects.requireNonNullElse(System.getenv("PG_TEST_PASSWORD"), "") + "\n"
+                + "APP_SITE_GONDERICI=AI Öğretmen <noreply@pera.software>\n"
+                + "APP_SITE_TEMEL_URL=https://egitim.pera.software\n");
+        String ikinci = tokenOf(betik(email, env));
+        Files.delete(env);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM kullanici_token t JOIN kullanici k ON k.id = t.hesap_id "
+                + "WHERE k.email = ?", Integer.class, email)).isEqualTo(1);
+
+        String yeni = "betikle-yeni-sifre-1";
+        mvc.perform(post("/api/kimlik/sifre-sifirla").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"token\":\"" + ilk + "\",\"sifre\":\"" + yeni + "\"}")).andExpect(status().isBadRequest());
+        mvc.perform(post("/api/kimlik/sifre-sifirla").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"token\":\"" + ikinci + "\",\"sifre\":\"" + yeni + "\"}")).andExpect(status().isOk());
+        mvc.perform(post("/api/kimlik/giris").with(csrf()).param("email", email).param("sifre", yeni))
+                .andExpect(redirectedUrl("/"));
+
+        // kapalı hesaba üretilmez
+        jdbc.update("UPDATE kullanici SET etkin = FALSE WHERE email = ?", email);
+        BetikSonucu kapali = betik(email, null);
+        assertThat(kapali.kod()).isNotZero();
+        assertThat(kapali.hata()).contains("kapalı");
+    }
 
     @Test
     void gercekPostgresKullaniliyor() {

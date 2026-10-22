@@ -19,6 +19,8 @@ import tr.velzon.aiogretmen.config.SiteAyarlari;
  *       bağlantıları sessizce log'a yazamaz;</li>
  *   <li>boş ve {@code eposta-zorunlu=false} (yalnız yerel deneme) → {@link LogEpostaGonderici} + uyarı.</li>
  * </ul>
+ * {@code app.site.kayit=ekip-kodu} (varsayılan, ADR-0015) iken e-posta hiç kullanılmaz: SMTP verilmemişse açılış
+ * HATASI YOK ve {@code eposta-zorunlu} bakılmaz; çağrılırsa hata fırlatan (bağlantıyı loglamayan) gönderici kurulur.
  * SMTP şifresi hiçbir koşulda loglanmaz.
  */
 @Configuration
@@ -30,6 +32,10 @@ public class EpostaGondericiSecimi {
     @Bean
     EpostaGonderici epostaGonderici(Environment ortam, SiteAyarlari ayarlar,
                                     ObjectProvider<JavaMailSender> mailGonderici) {
+        if (!ayarlar.epostaKaydi()) {
+            log.info("E-posta: kullanılmıyor (app.site.kayit=ekip-kodu, ADR-0015) — SMTP gerekmez");
+            return new KapaliEpostaGonderici();
+        }
         String host = ortam.getProperty("spring.mail.host", "").trim();
         if (!host.isEmpty()) {
             JavaMailSender mail = mailGonderici.getIfAvailable();
@@ -48,5 +54,21 @@ public class EpostaGondericiSecimi {
         log.warn("E-posta: SMTP YOK — doğrulama/şifre sıfırlama bağlantıları LOG'A yazılacak "
                 + "(app.site.eposta-zorunlu=false; yalnız yerel deneme, canlıda KULLANMA)");
         return new LogEpostaGonderici();
+    }
+
+    /**
+     * Ekip kodu modunda e-posta yolu kapalıdır; yine de çağrılırsa bağlantı (sır) loglanmaz, hata fırlatılır
+     * ({@code KimlikService} gönderici hatasını yutup sırsız loglar).
+     */
+    static final class KapaliEpostaGonderici implements EpostaGonderici {
+        @Override
+        public void dogrulamaBaglantisiGonder(String email, String baglanti) {
+            throw new IllegalStateException("E-posta gönderimi kapalı (app.site.kayit=ekip-kodu)");
+        }
+
+        @Override
+        public void sifreSifirlamaBaglantisiGonder(String email, String baglanti) {
+            throw new IllegalStateException("E-posta gönderimi kapalı (app.site.kayit=ekip-kodu)");
+        }
     }
 }

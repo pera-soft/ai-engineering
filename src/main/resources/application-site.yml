@@ -22,7 +22,12 @@ app:
     guvenli-cerez: ${APP_SITE_GUVENLI_CEREZ:true}         # XSRF-TOKEN çerezi için (oturum çereziyle aynı)
     izinli-originler: ${APP_SITE_IZINLI_ORIGINLER:}       # ör. https://egitim.pera.software (virgülle çoklu)
     temel-url: ${APP_SITE_TEMEL_URL:http://127.0.0.1:${server.port}}   # e-posta bağlantılarının kökü
-    # Faz 9c (ADR-0013): SMTP yoksa site AÇILMAZ (canlı gizli bağlantıları log'a yazmasın).
+    # Kayıt yöntemi (ADR-0015): ekip-kodu (varsayılan; e-posta GÖNDERİLMEZ) | eposta (Faz 9c akışı, SMTP şart).
+    kayit: ${APP_SITE_KAYIT:ekip-kodu}
+    # ekip-kodu modunda ŞART, en az 12 karakter (yoksa site AÇILMAZ); sırdır — yalnız ortam değişkeninden.
+    # Üret: openssl rand -base64 18   · Sızarsa: değeri değiştir + yeniden başlat (mevcut hesaplar etkilenmez)
+    ekip-kodu: ${APP_SITE_EKIP_KODU:}
+    # Faz 9c (ADR-0013) — YALNIZ kayit=eposta: SMTP yoksa site AÇILMAZ (canlı gizli bağlantıları log'a yazmasın).
     # Yalnız yerel deneme: APP_SITE_EPOSTA_ZORUNLU=false → bağlantılar uygulama loguna yazılır.
     eposta-zorunlu: ${APP_SITE_EPOSTA_ZORUNLU:true}
     gonderici: "${APP_SITE_GONDERICI:AI Öğretmen <noreply@pera.software>}"   # e-postaların "Kimden"i

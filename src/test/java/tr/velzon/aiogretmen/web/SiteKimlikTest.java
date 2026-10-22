@@ -40,7 +40,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "spring.datasource.url=jdbc:h2:mem:sitekimlik;DB_CLOSE_DELAY=-1",
         "spring.ai.openai.api-key=",
         "app.hafiza-dir=target/test-hafiza-site",
-        "app.rapor-dir=target/test-raporlar-site"
+        "app.rapor-dir=target/test-raporlar-site",
+        "app.site.kayit=eposta"  // e-posta doğrulama akışı (ADR-0013); ekip kodu: SiteEkipKoduTest
 })
 @ActiveProfiles("site")
 @AutoConfigureMockMvc

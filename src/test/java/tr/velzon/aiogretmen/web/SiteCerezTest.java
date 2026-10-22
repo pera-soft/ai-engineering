@@ -28,7 +28,8 @@ import static org.assertj.core.api.Assertions.assertThat;
         "spring.ai.openai.api-key=",
         "app.hafiza-dir=target/test-hafiza-site",
         "app.rapor-dir=target/test-raporlar-site",
-        "app.site.eposta-zorunlu=false"  // SMTP yok → log gönderici (ADR-0013)
+        "app.site.eposta-zorunlu=false",  // SMTP yok → log gönderici (ADR-0013)
+        "app.site.kayit=eposta"
 })
 @ActiveProfiles("site")
 class SiteCerezTest {

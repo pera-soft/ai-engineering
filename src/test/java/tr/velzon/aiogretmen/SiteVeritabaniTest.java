@@ -20,7 +20,7 @@ class SiteVeritabaniTest {
     private static ConfigurableApplicationContext ac(String profil, String... ek) {
         List<String> arg = new ArrayList<>(List.of("--server.port=0",
                 "--spring.ai.openai.api-key=",
-                "--app.site.eposta-zorunlu=false",
+                "--app.site.eposta-zorunlu=false", "--app.site.kayit=eposta",
                 "--app.hafiza-dir=target/test-hafiza-sitedb",
                 "--app.rapor-dir=target/test-raporlar-sitedb"));
         arg.addAll(List.of(ek));

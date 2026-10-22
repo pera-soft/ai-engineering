@@ -53,7 +53,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @SpringBootTest(properties = {
         "spring.datasource.url=jdbc:h2:mem:sitekisisel;DB_CLOSE_DELAY=-1",
-        "spring.ai.openai.api-key="
+        "spring.ai.openai.api-key=",
+        "app.site.kayit=eposta"  // e-posta doğrulamalı kayıt akışı (ADR-0013)
 })
 @ActiveProfiles("site")
 @AutoConfigureMockMvc

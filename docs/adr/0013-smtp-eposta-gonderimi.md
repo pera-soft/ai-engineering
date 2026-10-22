@@ -5,6 +5,11 @@
 - **Bağlam sahibi:** kullanıcı kararı (bağımlılık onayı 2026-10-22, pera'nın 3 mail hesabından biri
   gönderici) + uygulayıcı kararları (aşağıda işaretli)
 
+> **Değişiklik notu (2026-10-22, ADR-0015):** pera ekibi e-posta gönderimini istemedi. Varsayılan kayıt
+> yöntemi artık **ortak ekip kodu** (`APP_SITE_KAYIT=ekip-kodu`); bu ADR'deki SMTP akışı (doğrulama,
+> yeniden gönder, şifremi unuttum) yalnız `APP_SITE_KAYIT=eposta` iken çalışır ve SMTP zorunluluğu
+> (`app.site.eposta-zorunlu`) yalnız o modda geçerlidir. Kod ve testler korunuyor.
+
 ## Bağlam
 
 `site` profilinde (ADR-0012) kayıt e-posta doğrulamasıyla açılıyor; 9a'da tek gönderici

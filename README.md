@@ -15,7 +15,7 @@ Uygulama iki biçimde çalışır; her ikisinde de süreç yalnızca `127.0.0.1`
 | Mod | Nasıl açılır | Kimin için |
 |---|---|---|
 | **Yerel mod** (varsayılan) | profilsiz: `./mvnw spring-boot:run` | **Tek kişi, kendi bilgisayarında.** Giriş yok, kimlik sabit `yerel`, H2 dosya veritabanı. |
-| **Site modu** (`site` profili, Faz 9) | `--spring.profiles.active=site` | **pera ekibi için çok kullanıcılı eğitim sitesi.** Yalnız `@pera.software` adresiyle kayıt + e-posta doğrulaması, herkes yalnız kendi ilerlemesini görür; PostgreSQL, SMTP, önde nginx/TLS (ADR-0012/0013/0014). |
+| **Site modu** (`site` profili, Faz 9) | `--spring.profiles.active=site` | **pera ekibi için çok kullanıcılı eğitim sitesi.** Yalnız `@pera.software` adresi + ortak ekip koduyla kayıt (e-posta gönderilmez), herkes yalnız kendi ilerlemesini görür; PostgreSQL, önde nginx/TLS (ADR-0012/0014/0015; e-postalı kayıt isteğe bağlı, ADR-0013). |
 
 Aynı içerik, isteğe bağlı bir **MCP sunucusu (Model Context Protocol server)** olarak da
 sunulabilir (yalnız yerel kullanım; site moduyla birlikte açılamaz); bu modda sunucu hiçbir YZ
@@ -191,16 +191,23 @@ Site modunda (`site` profili, ADR-0012) uygulama bir eğitim sitesi gibi çalı�
   adları ve `pera.software.ornek.com` gibi sonek hileleri reddedilir. Şifre en az **10 karakter**
   (en çok 72 bayt — BCrypt sınırı), BCrypt ile saklanır. Kayıt sayfasında kısa bir KVKK aydınlatması
   bulunur.
-- **E-posta doğrulaması zorunludur:** hesap doğrulanmadan giriş yapılamaz. Doğrulama bağlantısı
-  24 saat geçerli ve tek kullanımlıktır; "Doğrulama e-postasını yeniden gönder" seçeneği vardır.
-- **Şifremi unuttum:** doğrulanmış ve etkin hesaba 1 saat geçerli, tek kullanımlık bir sıfırlama
-  bağlantısı gönderilir. Şifre değişince hatalı deneme sayacı ve kilit temizlenir, kullanıcının
-  **bütün açık oturumları** düşürülür.
+- **Kayıt ortak ekip koduyla yapılır** (varsayılan, ADR-0015): site **e-posta göndermez**. Kayıt
+  formunda site sorumlusunun ekibe verdiği **ekip kodu** istenir; kod doğruysa hesap hemen açılır ve
+  giriş yapılabilir. Yanlış/eksik kodda başka hiçbir bilgi verilmez. Kod değişse de mevcut hesaplar
+  etkilenmez.
+- **Şifremi unuttum (ekip kodu modu):** kullanıcı site sorumlusuna yazar; sorumlu
+  `tools/sifre-baglantisi.sh` ile 1 saat geçerli, tek kullanımlık bir sıfırlama bağlantısı üretip
+  iletir. Şifre değişince hatalı deneme sayacı ve kilit temizlenir, kullanıcının **bütün açık
+  oturumları** düşürülür.
+- **E-postalı kayıt (isteğe bağlı, `APP_SITE_KAYIT=eposta`, ADR-0013):** hesap e-postadaki doğrulama
+  bağlantısıyla (24 saat, tek kullanımlık; "yeniden gönder" var) açılır, "Şifremi unuttum" e-postayla
+  1 saatlik sıfırlama bağlantısı gönderir; bu modda SMTP zorunludur.
 - **Kaba kuvvet kilidi:** art arda **5 yanlış şifre → hesap 15 dakika kilitlenir.** Kilit
   veritabanında tutulur; uygulamayı yeniden başlatmak kilidi kaldırmaz.
-- **Hesap varlığı sızdırılmaz:** kayıt, yeniden gönderme ve şifremi unuttum uçları adres kayıtlı olsa
-  da olmasa da aynı nötr yanıtı verir; yanlış şifre ile olmayan hesap girişte ayırt edilmez.
-- **E-posta hız sınırı:** aynı adrese tür başına (doğrulama / şifre sıfırlama) saatte en çok 3 e-posta.
+- **Hesap varlığı sızdırılmaz:** kayıt (ve e-posta modunda yeniden gönderme / şifremi unuttum) uçları
+  adres kayıtlı olsa da olmasa da aynı yanıtı verir; yanlış şifre ile olmayan hesap girişte ayırt edilmez.
+- **E-posta hız sınırı (e-posta modu):** aynı adrese tür başına (doğrulama / şifre sıfırlama) saatte en
+  çok 3 e-posta.
 - **Herkes yalnız kendi verisini görür:** görev ilerlemesi, gönderimler, quiz sonuçları, sohbet,
   YZ kullanım sayacı (veritabanında `kullanici_id` = küçük harfli e-posta), öğrenci hafızası ve rapor
   önbelleği (kullanıcı başına dizin). Herkes kendi hızında, farklı hafta/günde ilerleyebilir.
@@ -210,8 +217,8 @@ Site modunda (`site` profili, ADR-0012) uygulama bir eğitim sitesi gibi çalı�
   sunucusu ve mülakat modülü.
 - **Self-servis hesap silme YOKTUR.** Kullanıcı kendi hesabını silemez veya kapatamaz; işten ayrılan
   bir kişinin hesabını işletmen (operatör) veritabanından kapatır (`etkin = false`, bkz.
-  [docs/kurulum-site.md](docs/kurulum-site.md) §8.1). Kapatılan hesap giriş yapamaz, sıfırlama /
-  doğrulama e-postası alamaz ve açık bir oturumu varsa bir sonraki istekte düşer.
+  [docs/kurulum-site.md](docs/kurulum-site.md) §8.1). Kapatılan hesap giriş yapamaz, sıfırlama
+  bağlantısı alamaz ve açık bir oturumu varsa bir sonraki istekte düşer.
 
 ---
 
@@ -505,12 +512,12 @@ sunucuya istek atmasını önlemek için ayrıca bir CSRF filtresi vardır (bkz.
 
 ### Çok kullanıcılı site (pera sunucusu)
 Aynı uygulama `site` profiliyle pera ekibi için çok kullanıcılı bir eğitim sitesi olarak çalışır
-(ADR-0012/0013/0014). Varsayılan (profilsiz) yerel mod bundan etkilenmez.
+(ADR-0012/0014/0015; e-postalı kayıt seçilirse ADR-0013). Varsayılan (profilsiz) yerel mod bundan etkilenmez.
 
 ```
 tarayıcı ──https──▶ nginx (443, TLS) ──http──▶ uygulama 127.0.0.1:8090 (systemd, Java 17)
                                                    ├──▶ PostgreSQL 127.0.0.1:5432
-                                                   ├──▶ SMTP (STARTTLS)
+                                                   ├──▶ SMTP (yalnız APP_SITE_KAYIT=eposta)
                                                    └──▶ OpenRouter (şirket anahtarı)
 ```
 
@@ -518,7 +525,7 @@ Adım adım kurulum, güncelleme, yedekleme/geri yükleme, hesap kapatma ve soru
 **[docs/kurulum-site.md](docs/kurulum-site.md)** kılavuzundadır. Özetle:
 
 1. **Önkoşullar:** Java 17 JRE, PostgreSQL 14+, nginx, certbot, alan adı için DNS kaydı
-   (örnek: `egitim.pera.software`), bir SMTP hesabı ve OpenRouter anahtarı. Güvenlik duvarında
+   (örnek: `egitim.pera.software`) ve OpenRouter anahtarı (SMTP hesabı yalnız e-posta modunda). Güvenlik duvarında
    dışarıya yalnız 80/443 (+ SSH) açık; 8090 ve 5432 kapalı kalır.
 2. **Sistem kullanıcısı ve dizinler:** `/opt/ai-ogretmen/` (jar, `content/`, `prompts/` salt okunur;
    yazılabilir tek yer `data/`), sırlar `/etc/ai-ogretmen/site.env`.
@@ -526,32 +533,39 @@ Adım adım kurulum, güncelleme, yedekleme/geri yükleme, hesap kapatma ve soru
    veritabanı. Tablolar uygulamanın ilk açılışında `schema.sql` ile kurulur (idempotent; göç aracı yok).
 4. **Derle ve kopyala:** `./mvnw -DskipTests package` → jar + `content/` + `prompts/` sunucuya.
 5. **Ortam değişkenleri:** `deploy/site.env.ornek` → `/etc/ai-ogretmen/site.env` (izin `0640`);
-   `OPENROUTER_API_KEY`, `SPRING_DATASOURCE_*`, `SPRING_MAIL_*`, `APP_SITE_*` doldurulur. Zorunlu
-   değerler eksikse uygulama **açılmaz** ve nedenini loga yazar.
+   `OPENROUTER_API_KEY`, `SPRING_DATASOURCE_*`, `APP_SITE_EKIP_KODU` (`openssl rand -base64 18`),
+   `APP_SITE_*` doldurulur (`SPRING_MAIL_*` yalnız `APP_SITE_KAYIT=eposta` iken). Zorunlu değerler
+   eksikse uygulama **açılmaz** ve nedenini loga yazar.
 6. **systemd:** `deploy/ai-ogretmen-site.service` (`-Dspring.profiles.active=site`, sertleştirilmiş birim).
 7. **nginx + TLS:** `deploy/nginx-site.conf.ornek` (http → https, HSTS, `X-Forwarded-*` başlıkları,
    180 sn okuma zaman aşımı) + certbot sertifikası.
 8. **Sağlık kontrolü:** giriş sayfası 200, kök adres `https://…/giris.html`'e yönlenir, `XSRF-TOKEN`
-   çerezi `Secure`; bir `@pera.software` adresiyle kayıt → doğrulama e-postası → giriş.
+   çerezi `Secure`; `/api/kimlik/ayarlar` → `{"kayit":"ekip-kodu"}`; bir `@pera.software` adresi +
+   ekip koduyla kayıt → giriş.
+9. **Şifre sıfırlama bağlantısı (işletmen):**
+   `sudo bash /opt/ai-ogretmen/tools/sifre-baglantisi.sh ad.soyad@pera.software /etc/ai-ogretmen/site.env`
+   → `https://…/sifre-sifirla.html?token=…` (1 saat, tek kullanımlık; kullanıcıya elle iletilir).
 
 > Durum: kod, testler ve dağıtım paketi hazır (Faz 9a–9d); gerçek pera sunucusuna kurulum (Faz 9e)
-> sunucu, DNS ve SMTP bilgileri geldiğinde yapılacak.
+> sunucu ve DNS bilgileri geldiğinde yapılacak.
 
 #### Site modunu yerelde denemek (PostgreSQL ve SMTP olmadan)
 ```bash
 SPRING_DATASOURCE_URL='jdbc:h2:file:./data/site-deneme' \
-APP_SITE_EPOSTA_ZORUNLU=false \
+APP_SITE_EKIP_KODU=yerel-deneme-kodu \
 APP_SITE_GUVENLI_CEREZ=false \
 OPENROUTER_API_KEY=... ./mvnw spring-boot:run -Dspring-boot.run.profiles=site
 ```
 - `SPRING_DATASOURCE_URL` **açıkça** verilmelidir; site profili veritabanı adresine varsayılan
   koymaz (canlı sessizce H2'ye düşmesin). Yerel moddan ayrı bir H2 dosyası kullanılır.
-- `APP_SITE_EPOSTA_ZORUNLU=false` → SMTP olmadan açılır; doğrulama ve sıfırlama bağlantıları
-  **uygulama loguna** yazılır (canlıda asla kullanmayın).
+- `APP_SITE_EKIP_KODU` → kayıt formunda istenecek ortak kod (en az 12 karakter; yoksa site açılmaz).
+  Ekip kodu modunda SMTP gerekmez.
+- E-postalı akışı denemek için ayrıca `APP_SITE_KAYIT=eposta APP_SITE_EPOSTA_ZORUNLU=false` → SMTP
+  olmadan açılır; doğrulama ve sıfırlama bağlantıları **uygulama loguna** yazılır (canlıda asla kullanmayın).
 - `APP_SITE_GUVENLI_CEREZ=false` → çerezler `Secure` olmaz; aksi halde tarayıcı http üzerinden
   oturum çerezini geri göndermez ve giriş döngüye girer.
-- Sonra **http://127.0.0.1:8090** → `@pera.software` uzantılı herhangi bir adresle kayıt olun,
-  logdaki doğrulama bağlantısını açın, giriş yapın.
+- Sonra **http://127.0.0.1:8090** → `@pera.software` uzantılı herhangi bir adres + ekip koduyla kayıt
+  olun, giriş yapın (e-posta modunda: logdaki doğrulama bağlantısını açın).
 
 ---
 
@@ -614,14 +628,16 @@ sunucuda şablonu `deploy/site.env.ornek`, yerelde `.env.ornek`'teki yorumlu sat
 | `SPRING_DATASOURCE_USERNAME` / `SPRING_DATASOURCE_PASSWORD` | — | Veritabanı rolü ve şifresi |
 | `SPRING_DATASOURCE_DRIVER_CLASS_NAME` | boş | Boşsa sürücü URL'den çıkarılır; normalde verilmez |
 | `APP_SITE_DB_HAVUZ` | `10` | Hikari bağlantı havuzu boyutu |
-| `SPRING_MAIL_HOST` | **yok — zorunlu** (`APP_SITE_EPOSTA_ZORUNLU=true` iken) | SMTP sunucusu; verilmezse Boot e-posta göndericisini hiç kurmaz |
+| `APP_SITE_KAYIT` | `ekip-kodu` | Kayıt yöntemi (ADR-0015): `ekip-kodu` (e-posta gönderilmez) \| `eposta` (doğrulama e-postası, SMTP zorunlu — ADR-0013). Başka değerde site açılmaz |
+| `APP_SITE_EKIP_KODU` | **yok — zorunlu** (`ekip-kodu` modunda) | Kayıtta istenen ortak kod, en az 12 karakter (üret: `openssl rand -base64 18`); yoksa/kısaysa site açılmaz. Sırdır, loglanmaz. Değiştirmek: değer + `restart` (mevcut hesaplar etkilenmez) |
+| `SPRING_MAIL_HOST` | **yok — zorunlu** (yalnız `APP_SITE_KAYIT=eposta` ve `APP_SITE_EPOSTA_ZORUNLU=true` iken) | SMTP sunucusu; verilmezse Boot e-posta göndericisini hiç kurmaz |
 | `SPRING_MAIL_PORT` | `587` | SMTP portu |
 | `SPRING_MAIL_USERNAME` / `SPRING_MAIL_PASSWORD` | — | SMTP hesabı; şifre hiçbir yerde loglanmaz |
 | `APP_SITE_SMTP_AUTH` | `true` | SMTP kimlik doğrulaması |
 | `APP_SITE_SMTP_STARTTLS` | `true` | STARTTLS açık **ve zorunlu**; yalnız yerel denemede `false` |
 | `APP_SITE_GONDERICI` | `AI Öğretmen <noreply@pera.software>` | E-postaların "Kimden"i; adres SMTP hesabıyla uyumlu olmalı |
-| `APP_SITE_EPOSTA_ZORUNLU` | `true` | `true` iken SMTP yoksa site **açılmaz**; `false` → bağlantılar loga yazılır (yalnız yerel deneme) |
-| `APP_SITE_TEMEL_URL` | `http://127.0.0.1:<port>` | E-posta bağlantılarının kökü (ör. `https://egitim.pera.software`); istek `Host` başlığından türetilmez |
+| `APP_SITE_EPOSTA_ZORUNLU` | `true` | Yalnız e-posta modunda: `true` iken SMTP yoksa site **açılmaz**; `false` → bağlantılar loga yazılır (yalnız yerel deneme) |
+| `APP_SITE_TEMEL_URL` | `http://127.0.0.1:<port>` | Sıfırlama/doğrulama bağlantılarının kökü (`tools/sifre-baglantisi.sh` için ŞART) (ör. `https://egitim.pera.software`); istek `Host` başlığından türetilmez |
 | `APP_SITE_IZINLI_ORIGINLER` | boş | `CsrfKoruma`'nın yerel origin'e ek olarak kabul ettiği origin'ler, virgülle (ör. `https://egitim.pera.software`; şema dahil, sonda `/` yok) |
 | `APP_SITE_GUVENLI_CEREZ` | `true` | Oturum ve `XSRF-TOKEN` çerezlerinde `Secure`; yalnız yerel http denemesinde `false` |
 
@@ -636,7 +652,7 @@ Site profilinin sabit ayarları: oturum zaman aşımı `8h`; oturum çerezi `Htt
 | (varsayılan / web) | `application.yml` | Web arayüzü + REST API, `127.0.0.1:8090`. MCP kapalı, kimlik doğrulama yok. |
 | `mcp` | `application-mcp.yml` | MCP sunucusu, **stdio** taşıması. Web sunucusu kapalı (`web-application-type: none`), banner ve konsol logu kapalı (stdout yalnız JSON-RPC'ye ayrılır), loglar `data/mcp-server.log` dosyasına. |
 | `mcp-http` | `application-mcp-http.yml` | MCP sunucusu, **streamable-HTTP** taşıması, `127.0.0.1:8091/mcp`. Uç nokta OAuth 2.1 bearer JWT ile korunur; loglar `data/mcp-http-server.log`. |
-| `site` | `application-site.yml` | Çok kullanıcılı eğitim sitesi, `127.0.0.1:8090` (önde nginx/TLS). Form login + e-posta doğrulaması, CSRF token, PostgreSQL ve SMTP zorunlu; kitap notları, MCP ve mülakat kapalı. MCP profilleriyle birlikte açılamaz (ADR-0012). |
+| `site` | `application-site.yml` | Çok kullanıcılı eğitim sitesi, `127.0.0.1:8090` (önde nginx/TLS). Form login + ekip koduyla kayıt (isteğe bağlı e-posta doğrulaması + SMTP), CSRF token, PostgreSQL zorunlu; kitap notları, MCP ve mülakat kapalı. MCP profilleriyle birlikte açılamaz (ADR-0012). |
 
 ---
 
@@ -818,16 +834,17 @@ curl -s -X POST http://127.0.0.1:8090/api/kitap-notu/goruntu \
 
 ### Kimlik (`KimlikController` + Spring Security, yalnız site modu)
 Giriş ve çıkış Spring Security filtrelerinde, diğerleri `KimlikController`'dadır. Hepsi CSRF token
-ister (`GET /api/kimlik/dogrula` hariç); giriş ve çıkış dışındakiler oturumsuz çağrılabilir.
+ister (`GET` uçları hariç); giriş ve çıkış dışındakiler oturumsuz çağrılabilir.
 
 | Metot | Yol | Gövde | Yanıt |
 |---|---|---|---|
-| POST | `/api/kimlik/kayit` | JSON `{email, sifre}` | 200 `{"durum":"dogrulama-bekleniyor"}` (adres kayıtlı olsa da aynı yanıt) · 400 `{hata, detay}` (sonek, şifre kuralı) |
-| GET | `/api/kimlik/dogrula?token=…` | — | E-postadaki bağlantı; 302 → `/dogrulama-sonuc.html?durum=basarili\|gecersiz` |
-| POST | `/api/kimlik/dogrulama-yeniden` | JSON `{email}` | 200 `{"durum":"istek-alindi"}` (nötr) |
+| GET | `/api/kimlik/ayarlar` | — | `{"kayit":"ekip-kodu"}` ya da `{"kayit":"eposta"}` — giriş/kayıt sayfaları hangi formu göstereceğini buradan öğrenir (CSRF'siz, kimliksiz) |
+| POST | `/api/kimlik/kayit` | JSON `{email, sifre, ekipKodu}` | Ekip kodu modu: 200 `{"durum":"kayit-tamam"}` (hesap doğrulanmış açılır; adres kayıtlı olsa da aynı yanıt) · 400 `{hata, detay}` (yanlış/eksik ekip kodu — önce bakılır —, sonek, şifre kuralı). E-posta modu: `ekipKodu` yok sayılır, 200 `{"durum":"dogrulama-bekleniyor"}` |
+| GET | `/api/kimlik/dogrula?token=…` | — | Yalnız e-posta modu (ekip kodu modunda 404). E-postadaki bağlantı; 302 → `/dogrulama-sonuc.html?durum=basarili\|gecersiz` |
+| POST | `/api/kimlik/dogrulama-yeniden` | JSON `{email}` | Yalnız e-posta modu (yoksa 404). 200 `{"durum":"istek-alindi"}` (nötr) |
 | POST | `/api/kimlik/giris` | form: `email`, `sifre`, `_csrf` | 302 → `/` · hata: 302 → `/giris.html?hata=bilgi\|dogrulanmamis\|kilitli\|kapali` |
 | POST | `/api/kimlik/cikis` | — | 204 (oturum geçersiz, çerez silinir) |
-| POST | `/api/kimlik/sifremi-unuttum` | JSON `{email}` | 200 `{"durum":"istek-alindi"}` (nötr; hesap var/yok ayırt edilmez) |
+| POST | `/api/kimlik/sifremi-unuttum` | JSON `{email}` | Yalnız e-posta modu (yoksa 404). 200 `{"durum":"istek-alindi"}` (nötr; hesap var/yok ayırt edilmez) |
 | POST | `/api/kimlik/sifre-sifirla` | JSON `{token, sifre}` | 200 `{"durum":"sifre-guncellendi"}` (kullanıcının bütün oturumları düşer) · 400 `{hata, detay}` (geçersiz/kullanılmış/süresi dolmuş bağlantı, şifre kuralı) |
 
 Giriş hata kodları: `bilgi` = yanlış şifre ya da olmayan hesap (bilinçli olarak ayırt edilmez),
@@ -1005,7 +1022,7 @@ veya doğrulama/sıfırlama bağlantısı yazılmaz; e-posta adresleri yazılır
 - Sıfırlama yalnız aktif kullanıcının satırlarını, hafızasını ve rapor önbelleğini siler.
 - Kullanıcıya ayrılmamış ortak modüller (kitap notları + vektör deposu, mülakat, MCP) sitede kapalıdır.
 
-### Site modu güvenlik önlemleri (ADR-0012/0013/0014)
+### Site modu güvenlik önlemleri (ADR-0012/0013/0014/0015)
 - **Oturum çerezi** (`JSESSIONID`): `HttpOnly`, `Secure`, `SameSite=Lax`; 8 saat; girişte yeni oturum
   kimliği (oturum sabitleme koruması).
 - **CSRF:** Spring Security token'ı açık — `XSRF-TOKEN` çerezi (JavaScript okuyabilsin diye
@@ -1016,12 +1033,17 @@ veya doğrulama/sıfırlama bağlantısı yazılmaz; e-posta adresleri yazılır
   adres + tür başına saatte en çok 3 (bellek içi). SMTP gönderimi ayrı bir kuyrukta yapılır; yanıt
   süresi hesabın var olup olmadığını ele vermez.
 - **Token'lar:** 32 bayt `SecureRandom`, veritabanında yalnız SHA-256 özeti; doğrulama 24 saat,
-  sıfırlama 1 saat, ikisi de tek kullanımlık.
+  sıfırlama 1 saat, ikisi de tek kullanımlık. İşletmen betiği (`tools/sifre-baglantisi.sh`) aynı biçimi
+  üretir.
+- **Ekip kodu:** sabit zamanlı karşılaştırma (`MessageDigest.isEqual`), en az 12 karakter, loglanmaz;
+  yanlış kod diğer kurallardan önce ve hep aynı mesajla reddedilir. Kayda IP başına sınır yok (ADR-0015
+  §7: rastgele ≥12 karakterlik kod çevrim içi tahmin edilemez; gerekirse nginx `limit_req`).
 - **Oturum düşürme:** şifre sıfırlanınca kullanıcının bütün oturumları, hesap kapatılınca (`etkin =
   false`) açık oturumu bir sonraki istekte düşer.
 - **Vekil arkası:** `X-Forwarded-*` başlıklarına yalnız `127.0.0.1`'deki nginx'ten gelince güvenilir;
   e-posta bağlantı kökü `Host` başlığından değil `APP_SITE_TEMEL_URL`'den gelir.
-- **Kapalı-hata açılış:** veritabanı adresi, SMTP veya MCP çakışması sorunluysa site hiç açılmaz.
+- **Kapalı-hata açılış:** veritabanı adresi, ekip kodu (eksik/kısa), SMTP (e-posta modunda) veya MCP
+  çakışması sorunluysa site hiç açılmaz.
 - **Veritabanı:** PostgreSQL yalnız `localhost`'ta dinler; uygulama rolü süper kullanıcı değildir,
   yalnız kendi veritabanının sahibidir.
 - **Sunucu:** systemd birimi `ProtectSystem=strict`, `NoNewPrivileges` vb. ile sertleştirilmiştir;
@@ -1035,7 +1057,7 @@ internete (nginx/TLS üzerinden) açıktır; aşağıdaki tablo iki modu birlikt
 | Tehdit | Önlem |
 |---|---|
 | Siteler arası istek (CSRF) | `Sec-Fetch-Site: cross-site` veya yabancı `Origin` içeren `/api/` istekleri → 403 (`web/CsrfKoruma`); izinli origin yalnız `127.0.0.1`/`localhost` + sunucunun gerçek portu (sitede + `APP_SITE_IZINLI_ORIGINLER`). Site modunda ayrıca Spring Security CSRF token'ı zorunlu |
-| pera dışından kayıt / şirket anahtarının harcanması (site) | Yalnız `@pera.software` + zorunlu e-posta doğrulaması |
+| pera dışından kayıt / şirket anahtarının harcanması (site) | Yalnız `@pera.software` + ortak ekip kodu (e-posta modunda: zorunlu e-posta doğrulaması). Ekip kodu e-posta sahipliğini kanıtlamaz — kod sızarsa değiştirilir (ADR-0015) |
 | Şifre tahmini / kaba kuvvet (site) | BCrypt, en az 10 karakter; 5 hata → 15 dk kilit (DB'de) |
 | Hesap varlığının sızdırılması (site) | Kayıt / yeniden gönder / şifremi unuttum nötr yanıt; girişte yanlış şifre ile olmayan hesap ayırt edilmez; e-posta asenkron gönderilir |
 | Başka kullanıcının verisini görme (site) | `kullanici_id` filtresi, oturumdan fail-closed kimlik, kullanıcı başına dosya dizini, ortak modüller kapalı |
@@ -1043,7 +1065,7 @@ internete (nginx/TLS üzerinden) açıktır; aşağıdaki tablo iki modu birlikt
 | Ayrılan çalışanın erişimi (site) | İşletmen `etkin = false` yapar; açık oturum bir sonraki istekte düşer |
 | E-posta seli (site) | Adres + tür başına saatte 3 e-posta |
 | Host başlığı zehirlemesiyle sahte bağlantı (site) | Bağlantı kökü yalnız `APP_SITE_TEMEL_URL` |
-| Canlının yanlış yapılandırmayla açılması (site) | DB URL / SMTP yoksa açılmaz; MCP ile birlikte açılmaz |
+| Canlının yanlış yapılandırmayla açılması (site) | DB URL / ekip kodu (e-posta modunda SMTP) yoksa açılmaz; MCP ile birlikte açılmaz |
 | Kalıcı XSS | Kullanıcı verisi DOM'a `textContent` ile basılır; CSP `default-src 'self'`; Markdown HTML'e `escapeHtml` ile çevrilir |
 | Yan etkili GET | Rapor yenileme POST'a taşındı |
 | Asılı YZ çağrısı | Bağlantı 10 sn / okuma 150 sn; arayüzde 180 sn iptal |
@@ -1083,7 +1105,9 @@ içidir ve yeniden başlatmada sıfırlanır; kuyruktaki e-postalar kapanışta 
   düzeyde mimari, uygulama açılışı, mülakat bayrağı, site kişisel veri izolasyonu, sitede kapalı modüller ve site veritabanı testleri.
 - Site testleri (`SiteKimlikTest`, `SiteCerezTest`, `SiteSifreSifirlamaTest`, `SiteKisiselVeriTest`,
   `SiteKapaliModullerTest`, `SiteVekilBasliklariTest` …) bellek içi H2 ile çalışır; e-posta sahte
-  `JavaMailSender` ile doğrulanır, gerçek ağa çıkılmaz.
+  `JavaMailSender` ile doğrulanır, gerçek ağa çıkılmaz. E-postalı akışı sınayanlar
+  `app.site.kayit=eposta` ile koşar; ekip kodu modu `SiteEkipKoduTest` + `SiteEkipKoduAcilisTest`'te,
+  işletmen betiğinin özet biçimi `KimlikServiceOzetTest`'te sınanır.
 - YZ çağrıları testlerde taklit edilir (mock); testler için API anahtarı gerekmez.
 
 **PostgreSQL uyumluluk testi (isteğe bağlı).** `SitePostgresEntegrasyonTest` yalnız `PG_TEST_URL`
@@ -1125,7 +1149,7 @@ dropdb ai_ogretmen_test_x
 │   ├── site.env.ornek                # /etc/ai-ogretmen/site.env şablonu
 │   └── postgres-kurulum.sql.ornek    # PostgreSQL rolü + veritabanı (en az yetki)
 ├── docs/
-│   ├── adr/                   # Mimari karar kayıtları (0001–0014)
+│   ├── adr/                   # Mimari karar kayıtları (0001–0015)
 │   ├── exec-plans/            # Uygulama planları (active/, completed/)
 │   ├── kurulum-site.md        # Site kurulum ve işletme kılavuzu (runbook)
 │   ├── SECURITY.md            # Tehdit modeli
@@ -1134,6 +1158,7 @@ dropdb ai_ogretmen_test_x
 ├── tools/
 │   ├── html-to-content.mjs    # HTML → content/ dönüştürücü
 │   ├── yayin-hazirla.sh       # Yayın öncesi sızıntı taraması
+│   ├── sifre-baglantisi.sh    # Site işletmeni: tek kullanımlık şifre sıfırlama bağlantısı (ADR-0015)
 │   └── git-kancalari/         # Git kancaları (pre-push)
 ├── src/main/java/tr/velzon/aiogretmen/
 │   ├── types/  config/  repo/  service/  ai/  web/  mcp/
@@ -1173,6 +1198,7 @@ kayıtlıdır.
 | 0012 | Çok kullanıcılı site profili | `site` profili: form login + sunucu oturumu, yalnız `@pera.software` kaydı + e-posta doğrulaması, 5 hata → 15 dk kilit, CSRF token, kullanıcı başına hafıza/rapor dizini; kitap/MCP/mülakat sitede kapalı; self-servis hesap silme yok (işletmen kapatır) |
 | 0013 | SMTP e-posta gönderimi | `spring-boot-starter-mail`; doğrulama + şifre sıfırlama e-postaları, STARTTLS zorunlu, asenkron kuyruk, saatte 3 e-posta sınırı; SMTP'siz site açılmaz |
 | 0014 | Sitede PostgreSQL | `org.postgresql:postgresql`; tek taşınabilir `schema.sql` (H2 + PostgreSQL), tırnaksız JDBC adları; site veritabanını yalnız ortam değişkeninden alır; PG testi isteğe bağlı (`PG_TEST_URL`) |
+| 0015 | Ekip kodu ile kayıt | Varsayılan kayıt ortak ekip koduyla (`APP_SITE_KAYIT=ekip-kodu`, `APP_SITE_EKIP_KODU` ≥ 12 karakter, yoksa açılmaz); e-posta gönderilmez; şifre sıfırlama bağlantısını işletmen `tools/sifre-baglantisi.sh` ile üretir; e-posta modu (ADR-0013) ayarla korunur |
 
 ---
 

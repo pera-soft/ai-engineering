@@ -98,7 +98,16 @@ hakkındaki hafızasını görür; herkes kendi hızında ilerler.
   şablonu, `site.env.ornek`, `postgres-kurulum.sql.ornek`) + runbook `docs/kurulum-site.md`. Testler:
   `SemaTasinabilirlikTest`, `SiteVeritabaniTest`, `SiteVekilBasliklariTest` (gerçek Tomcat,
   X-Forwarded-*), opt-in `SitePostgresEntegrasyonTest` (`PG_TEST_URL`; yerel PostgreSQL 14'te geçti).
-- [ ] **9e — Sunucuya kurulum:** pera sunucusu + DNS + SMTP bilgileri gelince (kullanıcıyla birlikte).
+- [x] **9e öncesi — ekip kodu ile kayıt (ADR-0015)** — 2026-10-22: pera ekibi e-posta gönderimini
+  istemedi. Varsayılan `APP_SITE_KAYIT=ekip-kodu`: kayıt `{email, sifre, ekipKodu}`, kod sabit zamanlı
+  karşılaştırılır, hesap doğrulanmış açılır (`{"durum":"kayit-tamam"}`); `APP_SITE_EKIP_KODU` yok/<12
+  karakter → site açılmaz; SMTP gerekmez; `dogrula`/`dogrulama-yeniden`/`sifremi-unuttum` 404,
+  `sifre-sifirla` açık. Kimliksiz `GET /api/kimlik/ayarlar` ön yüze modu söyler. İşletmen
+  `tools/sifre-baglantisi.sh` (psql ile Java'yla aynı SHA-256 token satırı, 1 saat). E-posta modu
+  `APP_SITE_KAYIT=eposta` ile aynen duruyor. Testler: `SiteEkipKoduTest`, `SiteEkipKoduAcilisTest`,
+  `KimlikServiceOzetTest`, opt-in `SitePostgresEntegrasyonTest` (betik uçtan uca).
+- [ ] **9e — Sunucuya kurulum:** pera sunucusu + DNS bilgileri gelince (kullanıcıyla birlikte); ekip kodu
+  üretilip ekibe iletilir (SMTP gerekmez).
 
 ## Doğrulama
 `./mvnw verify` yeşil (ArchUnit dahil); her fazda yeni davranışa test; 9a/9b sonunda `site`
