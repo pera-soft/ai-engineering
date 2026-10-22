@@ -62,10 +62,11 @@ public class DegerlendirmeService {
     }
 
     public Sonuc degerlendir(int hafta, Integer gun, String tur, String icerik, String gorevMetni) {
+        // Bağlam ÖNCE: var olmayan hafta BulunamadiException (404) ile döner, yetim gönderim kaydı kalmaz.
+        String sistem = baglamServisi.sistemBaglami(hafta, gun);
         Gonderim gonderim = gonderimRepo.save(
                 Gonderim.yeni(kullaniciBaglami.aktifKullanici(), hafta, gun, tur, icerik));
 
-        String sistem = baglamServisi.sistemBaglami(hafta, gun);
         String istekMetni = promptFactory.doldur("degerlendirme",
                 Map.of("tur", tur, "icerik", icerik, "gorev", gorevBolumu(gorevMetni)));
 

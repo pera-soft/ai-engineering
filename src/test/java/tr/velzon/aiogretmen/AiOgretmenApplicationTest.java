@@ -79,4 +79,56 @@ class AiOgretmenApplicationTest {
                 String.class);
         assertThat(kayit.getStatusCode().value()).isEqualTo(404);
     }
+
+    /** Ana sayfadan sohbet: hafta=null/0/13 eskiden 500 + sunucu yolu ("./content/hafta-00/hafta.md") dönüyordu. */
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"0", "-1", "13", "999"})
+    void olmayanHaftayaSohbet404VeTurkceMesaj(String hafta) {
+        ResponseEntity<String> yanit = jsonPost("/api/sohbet", "{\"hafta\":" + hafta + ",\"gun\":null,\"mesaj\":\"selam\"}");
+
+        assertThat(yanit.getStatusCode().value()).isEqualTo(404);
+        assertThat(yanit.getBody()).contains("Hafta bulunamadı: " + hafta).doesNotContain("content/").doesNotContain(".md");
+    }
+
+    @Test
+    void haftasizSohbet400() {
+        ResponseEntity<String> yanit = jsonPost("/api/sohbet", "{\"hafta\":null,\"gun\":null,\"mesaj\":\"selam\"}");
+        assertThat(yanit.getStatusCode().value()).isEqualTo(400);
+        assertThat(yanit.getBody()).contains("hafta alanı eksik");
+    }
+
+    @Test
+    void olmayanHaftayaDegerlendirme404() {
+        ResponseEntity<String> yanit = jsonPost("/api/degerlendir", "{\"hafta\":0,\"tur\":\"OZET\",\"icerik\":\"özet\"}");
+        assertThat(yanit.getStatusCode().value()).isEqualTo(404);
+    }
+
+    /** Tarayıcıdan olmayan sayfa: Whitelabel yerine Türkçe hata sayfası (static/error/404.html). */
+    @Test
+    void htmlIstegineTurkce404Sayfasi() {
+        HttpHeaders basliklar = new HttpHeaders();
+        basliklar.add("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+        ResponseEntity<String> yanit = rest.exchange("/boyle-bir-sayfa-yok/alt", org.springframework.http.HttpMethod.GET,
+                new HttpEntity<>(basliklar), String.class);
+
+        assertThat(yanit.getStatusCode().value()).isEqualTo(404);
+        assertThat(yanit.getHeaders().getContentType().toString()).startsWith("text/html");
+        assertThat(yanit.getBody()).contains("Sayfa bulunamadı").contains("Ana sayfaya dön")
+                .contains("href=\"/style.css\"").doesNotContain("Whitelabel");
+    }
+
+    /** API istemcileri JSON almaya devam eder (frontend {hata, detay} okur). */
+    @Test
+    void apiIstegineJson404() {
+        ResponseEntity<String> yanit = rest.getForEntity("/api/boyle-bir-uc-yok", String.class);
+        assertThat(yanit.getStatusCode().value()).isEqualTo(404);
+        assertThat(yanit.getHeaders().getContentType().toString()).startsWith("application/json");
+        assertThat(yanit.getBody()).contains("\"hata\"");
+    }
+
+    private ResponseEntity<String> jsonPost(String yol, String govde) {
+        HttpHeaders basliklar = new HttpHeaders();
+        basliklar.add("Content-Type", "application/json");
+        return rest.postForEntity(yol, new HttpEntity<>(govde, basliklar), String.class);
+    }
 }

@@ -159,4 +159,82 @@ class OgretmenControllerTest {
                 .andExpect(jsonPath("$.aiAktif").value(true))
                 .andExpect(jsonPath("$.toplamCagri").value(3));
     }
+
+    // ---- AI sağlayıcı hataları: kategori → HTTP + Türkçe detay (ham gövde/anahtar YOK) ----
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(tr.velzon.aiogretmen.types.AiSaglayiciException.Neden.class)
+    void aiSaglayiciHatasiKategoriyeGoreTurkceDoner(tr.velzon.aiogretmen.types.AiSaglayiciException.Neden neden)
+            throws Exception {
+        when(sohbetService.mesajGonder(anyInt(), any(), anyString())).thenThrow(
+                new tr.velzon.aiogretmen.types.AiSaglayiciException(neden, 401,
+                        new RuntimeException("401 - {\"error\":\"sk-or-v1-GIZLI\"}")));
+
+        int beklenenKod = neden == tr.velzon.aiogretmen.types.AiSaglayiciException.Neden.ISTEK_REDDEDILDI ? 502 : 503;
+        mvc.perform(post("/api/sohbet")
+                        .contentType("application/json")
+                        .content("{\"hafta\":1,\"mesaj\":\"selam\"}"))
+                .andExpect(status().is(beklenenKod))
+                .andExpect(jsonPath("$.hata").value("AI servisi kullanılamıyor"))
+                .andExpect(jsonPath("$.detay").value(neden.mesaj()))
+                .andExpect(jsonPath("$.neden").value(neden.name()))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content()
+                        .string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("sk-or"))));
+    }
+
+    @Test
+    void aiSaglayiciMesajlariKullanicininIstedigiMetinler() {
+        var N = tr.velzon.aiogretmen.types.AiSaglayiciException.Neden.class;
+        org.assertj.core.api.Assertions.assertThat(java.util.Arrays.stream(N.getEnumConstants())
+                        .map(tr.velzon.aiogretmen.types.AiSaglayiciException.Neden::mesaj))
+                .contains("AI anahtarı geçersiz — site sorumlusuna haber ver.",
+                        "AI kredisi bitti — site sorumlusuna haber ver.",
+                        "AI şu an yoğun ya da aylık kullanım sınırına ulaşıldı — biraz sonra tekrar dene.",
+                        "AI şu an yanıt vermiyor — biraz sonra tekrar dene.");
+    }
+
+    // ---- Genel hata işleyici: istisna mesajı (sunucu yolu vb.) istemciye SIZMAZ ----
+
+    @Test
+    void beklenmeyenHataIcDetayiSizdirmaz() throws Exception {
+        when(sohbetService.mesajGonder(anyInt(), any(), anyString()))
+                .thenThrow(new java.io.UncheckedIOException("dosya okunamadı: /srv/gizli/content/hafta-00/hafta.md",
+                        new java.io.IOException("x")));
+
+        mvc.perform(post("/api/sohbet")
+                        .contentType("application/json")
+                        .content("{\"hafta\":1,\"mesaj\":\"selam\"}"))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.hata").value("Beklenmeyen bir hata oluştu"))
+                .andExpect(jsonPath("$.detay").value(org.hamcrest.Matchers.startsWith(HataYonetimi.BEKLENMEYEN_DETAY)))
+                .andExpect(jsonPath("$.referans").value(org.hamcrest.Matchers.matchesPattern("[0-9a-f]{8}")))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content()
+                        .string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("/srv/gizli"))));
+    }
+
+    @Test
+    void sohbetteHaftaEksikse400() throws Exception {
+        mvc.perform(post("/api/sohbet")
+                        .contentType("application/json")
+                        .content("{\"hafta\":null,\"gun\":null,\"mesaj\":\"selam\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detay").value("hafta alanı eksik — önce bir hafta seç."));
+    }
+
+    @Test
+    void haftaYoluSayiDegilse400() throws Exception {
+        mvc.perform(get("/api/sohbet/abc"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.hata").value("Geçersiz istek"));
+    }
+
+    @Test
+    void bozukJsonJacksonAyrintisiSizdirmaz() throws Exception {
+        mvc.perform(post("/api/sohbet")
+                        .contentType("application/json")
+                        .content("{\"hafta\":\"bir\",\"mesaj\":\"selam\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content()
+                        .string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("java."))));
+    }
 }

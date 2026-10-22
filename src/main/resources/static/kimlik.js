@@ -200,5 +200,21 @@ const sayfalar = {
   },
 };
 
+/** Göz düğmesi: yanındaki gizli alanı (ör. ekip kodu) göster/gizle — kullanıcı doğru yazdığını görsün. */
+document.querySelectorAll(".goz-btn").forEach((btn) => {
+  const alan = btn.parentElement.querySelector("input");
+  btn.addEventListener("click", () => {
+    const goster = alan.type === "password";
+    alan.type = goster ? "text" : "password";
+    btn.setAttribute("aria-pressed", String(goster));
+    const etiket = goster ? "Kodu gizle" : "Kodu göster";
+    btn.setAttribute("aria-label", etiket);
+    btn.title = etiket;
+    btn.querySelector(".goz-acik").toggleAttribute("hidden", goster);   // SVG'de .hidden özelliği yok
+    btn.querySelector(".goz-kapali").toggleAttribute("hidden", !goster);
+    alan.focus();
+  });
+});
+
 const sayfa = sayfalar[document.body.dataset.sayfa];
 if (sayfa) sayfa();

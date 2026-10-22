@@ -19,7 +19,20 @@ import tr.velzon.aiogretmen.types.AiDevreDisiException;
 import tr.velzon.aiogretmen.types.BenzerNot;
 import tr.velzon.aiogretmen.types.NotParcasi;
 
+import org.springframework.ai.retry.TransientAiException;
+import org.springframework.retry.RetryCallback;
+import org.springframework.retry.RetryContext;
+import org.springframework.retry.RetryListener;
+import org.springframework.retry.RetryPolicy;
+import org.springframework.retry.backoff.ExponentialBackOffPolicy;
+import org.springframework.retry.policy.CompositeRetryPolicy;
+import org.springframework.retry.policy.SimpleRetryPolicy;
+import org.springframework.retry.policy.TimeoutRetryPolicy;
+import org.springframework.retry.support.RetryTemplate;
+
 import java.io.File;
+import java.time.Duration;
+import java.util.Map;
 import java.util.List;
 import java.nio.file.Path;
 
@@ -66,9 +79,10 @@ public class AiYapilandirma {
                 .restClientBuilder(org.springframework.web.client.RestClient.builder()
                         .requestFactory(zamanAsimliFabrika()))
                 .build();
-        OpenAiChatModel chatModel = OpenAiChatModel.builder().openAiApi(api).build();
-        log.info("AI öğretmen aktif — sağlayıcı={} guclu={} hizli={}",
-                baseUrl, props.ai().model().guclu(), props.ai().model().hizli());
+        int deneme = denemeSayisi(props);
+        OpenAiChatModel chatModel = sohbetModeli(api, yenidenDenemeSablonu(deneme, YENIDEN_DENEME_PENCERESI, ILK_BEKLEME));
+        log.info("AI öğretmen aktif — sağlayıcı={} guclu={} hizli={} deneme={} okumaZamanAsimi={}sn",
+                baseUrl, props.ai().model().guclu(), props.ai().model().hizli(), deneme, OKUMA_ZAMAN_ASIMI.toSeconds());
         return new SpringAiOgretmenClient(chatModel, props, kullanimRepo, kullaniciBaglami);
     }
 
@@ -104,8 +118,10 @@ public class AiYapilandirma {
                 .restClientBuilder(org.springframework.web.client.RestClient.builder()
                         .requestFactory(zamanAsimliFabrika()))
                 .build();
+        // Varsayılan (10 deneme, 3dk'ya kadar bekleme) sohbet isteğini asılı bırakırdı: aynı kısa politika
         OpenAiEmbeddingModel embeddingModel = new OpenAiEmbeddingModel(embApi, MetadataMode.EMBED,
-                OpenAiEmbeddingOptions.builder().model(embModel).build());
+                OpenAiEmbeddingOptions.builder().model(embModel).build(),
+                yenidenDenemeSablonu(denemeSayisi(props), YENIDEN_DENEME_PENCERESI, ILK_BEKLEME));
 
         SimpleVectorStore vektorDepo = SimpleVectorStore.builder(embeddingModel).build();
 
@@ -127,14 +143,63 @@ public class AiYapilandirma {
         };
     }
 
+    // ---- Zaman bütçesi: frontend AI isteğini 180sn'de keser; en kötü durum ~157sn kalmalı ----
+    // Yeni deneme YALNIZ ilk denemenin başından itibaren 30sn içinde başlar (hızlı 5xx/bağlantı hataları
+    // için); okuma zaman aşımı (120sn) pencereyi zaten aştığından YENİDEN DENENMEZ → kullanıcı YANIT_YOK
+    // mesajını görür. En kötü: 30sn (pencere) + 2sn (bekleme) + 5sn (bağlantı) + 120sn (okuma) = 157sn.
+    // Okuma 120sn: 3000-4000 token'lık rapor/quiz/görsel üretimi (~60-80sn) kesilmesin diye pay bırakıldı.
+    static final Duration BAGLANTI_ZAMAN_ASIMI = Duration.ofSeconds(5);
+    static final Duration OKUMA_ZAMAN_ASIMI = Duration.ofSeconds(120);
+    static final Duration YENIDEN_DENEME_PENCERESI = Duration.ofSeconds(30);
+    static final Duration ILK_BEKLEME = Duration.ofSeconds(1);
+    static final Duration EN_UZUN_BEKLEME = Duration.ofSeconds(4);
+
     /**
-     * Ortak zaman aşımlı HTTP istek fabrikası — hem chat hem embedding istemcisi kullanır.
-     * Timeout'suz istemci asılı kalabiliyor (bağlantı 10sn, okuma 150sn; frontend 180sn'de keser).
+     * Spring AI'nin varsayılan RetryTemplate'i (RetryUtils.DEFAULT_RETRY_TEMPLATE: 10 deneme, 2sn×5 üstel,
+     * 180sn'ye kadar bekleme) yerine kısa politika. {@code spring.ai.retry.*} ayarları burada ETKİSİZDİR:
+     * model elle (builder) kurulduğu için oto-yapılandırmanın RetryTemplate bean'i kullanılmaz.
+     * Yalnız geçici hatalar denenir (TransientAiException = 5xx, ResourceAccessException = bağlantı/zaman
+     * aşımı); 4xx (NonTransientAiException: 401/402/429…) hemen düşer. Bekleme: ilk, ×2, en çok 4sn.
      */
+    static RetryTemplate yenidenDenemeSablonu(int denemeSayisi, Duration pencere, Duration ilkBekleme) {
+        SimpleRetryPolicy deneme = new SimpleRetryPolicy(denemeSayisi, Map.of(
+                TransientAiException.class, true,
+                org.springframework.web.client.ResourceAccessException.class, true), false);
+        CompositeRetryPolicy politika = new CompositeRetryPolicy(); // iyimser DEĞİL: ikisi de izin vermeli
+        politika.setPolicies(new RetryPolicy[] {deneme, new TimeoutRetryPolicy(pencere.toMillis())});
+
+        ExponentialBackOffPolicy bekleme = new ExponentialBackOffPolicy();
+        bekleme.setInitialInterval(ilkBekleme.toMillis());
+        bekleme.setMultiplier(2.0);
+        bekleme.setMaxInterval(Math.max(ilkBekleme.toMillis(), EN_UZUN_BEKLEME.toMillis()));
+
+        RetryTemplate sablon = new RetryTemplate();
+        sablon.setRetryPolicy(politika);
+        sablon.setBackOffPolicy(bekleme);
+        sablon.registerListener(new RetryListener() {
+            @Override
+            public <T, E extends Throwable> void onError(RetryContext ctx, RetryCallback<T, E> cb, Throwable hata) {
+                log.warn("AI çağrısı geçici hata — deneme {}/{}: {}", ctx.getRetryCount(), denemeSayisi,
+                        hata.getClass().getSimpleName()); // gövde/anahtar loglanmaz
+            }
+        });
+        return sablon;
+    }
+
+    /** Sohbet modeli — test, gerçek modelin bu şablonla yeniden denediğini buradan doğrular. */
+    static OpenAiChatModel sohbetModeli(OpenAiApi api, RetryTemplate sablon) {
+        return OpenAiChatModel.builder().openAiApi(api).retryTemplate(sablon).build();
+    }
+
+    private static int denemeSayisi(AppProperties props) {
+        return props.ai() == null ? AppProperties.Ai.VARSAYILAN_DENEME : props.ai().denemeSayisi();
+    }
+
+    /** Ortak zaman aşımlı HTTP istek fabrikası — hem chat hem embedding istemcisi kullanır. */
     private static org.springframework.http.client.SimpleClientHttpRequestFactory zamanAsimliFabrika() {
         var f = new org.springframework.http.client.SimpleClientHttpRequestFactory();
-        f.setConnectTimeout(java.time.Duration.ofSeconds(10));
-        f.setReadTimeout(java.time.Duration.ofSeconds(150));
+        f.setConnectTimeout(BAGLANTI_ZAMAN_ASIMI);
+        f.setReadTimeout(OKUMA_ZAMAN_ASIMI);
         return f;
     }
 }

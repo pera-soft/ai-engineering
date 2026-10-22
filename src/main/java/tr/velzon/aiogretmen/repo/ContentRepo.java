@@ -1,5 +1,6 @@
 package tr.velzon.aiogretmen.repo;
 
+import tr.velzon.aiogretmen.types.BulunamadiException;
 import tr.velzon.aiogretmen.types.Gun;
 import tr.velzon.aiogretmen.types.Hafta;
 import tr.velzon.aiogretmen.types.QuizSorusu;
@@ -49,13 +50,25 @@ public class ContentRepo {
         this.haftalar = yukle(contentDir);
     }
 
-    /** Ham hafta.md içeriği — AI sistem bağlamına enjeksiyon için (brief 7.1). */
+    /**
+     * Ham hafta.md içeriği — AI sistem bağlamına enjeksiyon için (brief 7.1).
+     *
+     * @throws BulunamadiException hafta yüklü müfredatta yoksa (0, negatif, son haftadan büyük) — API'de
+     *                             404 olur; eskiden UncheckedIOException → sunucu yolunu sızdıran 500'dü
+     */
     public String hamHafta(int no) {
-        return hamOku(haftaDizini(no).resolve("hafta.md"));
+        Path dosya = haftaDizini(no).resolve("hafta.md");
+        if (hafta(no).isEmpty() || !Files.isRegularFile(dosya)) {
+            throw new BulunamadiException("Hafta bulunamadı: " + no);
+        }
+        return hamOku(dosya);
     }
 
-    /** Ham gun-N.md içeriği; gün yoksa boş string. */
+    /** Ham gun-N.md içeriği; gün yoksa boş string. Hafta yoksa {@link BulunamadiException}. */
     public String hamGun(int hafta, int gun) {
+        if (hafta(hafta).isEmpty()) {
+            throw new BulunamadiException("Hafta bulunamadı: " + hafta);
+        }
         Path dosya = haftaDizini(hafta).resolve("gun-" + gun + ".md");
         return Files.isRegularFile(dosya) ? hamOku(dosya) : "";
     }

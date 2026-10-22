@@ -397,7 +397,7 @@ function mulakatAiNedenBtn(soruId, secilenIndex) {
       kutu.appendChild(el("p", "calisma-ornek-metin", y.aciklama)); // textContent
     } catch (h) {
       kutu.innerHTML = "";
-      const msg = h.status === 503 ? "AI öğretmen devre dışı" : "Açıklama alınamadı: " + h.message;
+      const msg = h.status === 503 ? (h.message || "AI öğretmen devre dışı") : "Açıklama alınamadı: " + h.message; // 503: sunucunun Türkçe AI mesajı
       kutu.appendChild(el("p", "ipucu", msg));
     } finally {
       btn.disabled = false;

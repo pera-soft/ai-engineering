@@ -275,7 +275,7 @@ aside { position: sticky; top: 96px; align-self: start; }
 .dk .dk-adim { border-left: 3px solid var(--cyan); padding: 4px 10px; margin-top: 10px; background: rgba(24,99,153,.05); }
 
 /* Kullanım kılavuzu */
-#kilavuz{border:none;border-radius:14px;box-shadow:0 20px 60px rgba(15,30,60,.25);
+#kilavuz{margin:auto;border:none;border-radius:14px;box-shadow:0 20px 60px rgba(15,30,60,.25);
   max-width:560px;width:92%;padding:0}
 #kilavuz::backdrop{background:rgba(15,30,60,.45)}
 .kilavuz-icerik{padding:28px 30px;max-height:80vh;overflow-y:auto}
@@ -563,12 +563,23 @@ details.mulakat-soru > .q { padding: 14px 16px 8px; margin-bottom: 0; }
   border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; }
 .kimlik-form input:focus { outline: none; border-color: var(--primary); box-shadow: var(--focus); }
 .kimlik-form .ipucu { font-size: 12px; font-weight: 400; color: var(--muted); }
+/* Göz düğmeli alan (ekip kodu): düğme input'un sağ içinde; input sağda düğmeye yer bırakır */
+.goz-kutusu { position: relative; display: flex; }
+.goz-kutusu input { flex: 1; min-width: 0; padding-right: 42px; }
+.goz-btn { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); display: flex; align-items: center;
+  justify-content: center; width: 34px; height: 34px; border: 0; border-radius: var(--radius-sm); background: transparent;
+  color: var(--muted); cursor: pointer; }
+.goz-btn:hover { color: var(--paper); }
+.goz-btn:focus-visible { outline: none; box-shadow: var(--focus); color: var(--paper); }
+.goz-btn [hidden] { display: none; }
 .kimlik-form .btn { margin-top: 4px; }
 .kimlik-mesaj { font-size: 13.5px; border-radius: var(--radius-sm); padding: 10px 12px; margin-bottom: 14px; }
 .kimlik-mesaj.hata { color: var(--red); background: rgba(190,68,51,.07); border: 1px solid rgba(190,68,51,.3); }
 .kimlik-mesaj.bilgi { color: var(--green); background: rgba(37,128,76,.07); border: 1px solid rgba(37,128,76,.3); }
 .kimlik-alt { font-size: 13px; color: var(--muted); margin-top: 18px; text-align: center; }
 .kimlik-alt a { color: var(--cyan); }
+/* Hata sayfaları (static/error/*.html): bağlantı görünümlü tam genişlik düğme */
+.btn-blok { display: block; text-align: center; text-decoration: none; margin-top: 6px; }
 .kimlik-kvkk { font-size: 11.5px; color: var(--muted); border-top: 1px solid var(--line-soft); padding-top: 12px; margin-top: 18px; line-height: 1.5; }
 /* Ana uygulama üst barı: oturumdaki kullanıcı + Çıkış (yalnız site modunda görünür) */
 .oturum { display: flex; align-items: center; gap: 10px; }

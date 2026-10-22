@@ -74,4 +74,18 @@ class ContentRepoTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("content");
     }
+
+    /** Ana sayfada sohbet hafta=null → 0 gönderiyordu: 500 + sunucu yolu yerine BulunamadiException (→ 404). */
+    @Test
+    void olmayanHaftaninHamIcerigiBulunamadiFirlatir() {
+        for (int no : new int[] {0, -1, 13}) {
+            assertThatThrownBy(() -> repo.hamHafta(no))
+                    .isInstanceOf(tr.velzon.aiogretmen.types.BulunamadiException.class)
+                    .hasMessage("Hafta bulunamadı: " + no);
+            assertThatThrownBy(() -> repo.hamGun(no, 1))
+                    .isInstanceOf(tr.velzon.aiogretmen.types.BulunamadiException.class);
+        }
+        assertThat(repo.hamHafta(1)).contains("hafta:");
+        assertThat(repo.hamGun(1, 99)).isEmpty(); // var olan haftada olmayan gün: eski davranış (boş)
+    }
 }

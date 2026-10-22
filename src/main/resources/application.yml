@@ -54,6 +54,7 @@ app:
   mulakat:
     etkin: false   # Mülakat modülü KAPALI (ADR-0011): bean/uç/arayüz yok; kod repoda durur. Açmak: APP_MULAKAT_ETKIN=true
   ai:
+    yeniden-deneme-sayisi: 3   # geçici hata (5xx/zaman aşımı) için TOPLAM deneme; bekleme 1sn→2sn, yalnız ilk 30sn içinde (AiYapilandirma)
     model:
       guclu: anthropic/claude-sonnet-4.6   # değerlendirme, sohbet, rapor (OpenRouter kimliği; ADR-0003/0004)
       hizli: anthropic/claude-haiku-4.5    # quiz üretimi, hafıza, kısa yardımcı işler

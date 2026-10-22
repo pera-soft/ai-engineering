@@ -54,24 +54,35 @@ public class OgretmenController {
         return deger;
     }
 
+    /**
+     * Hafta alanı zorunlu: eksik/null gelirse primitive int sessizce 0 olurdu (ana sayfadan sohbet hatası).
+     * Var olmayan hafta numarası (0, 13…) servis katmanında BulunamadiException → 404 olur.
+     */
+    private static int haftaGerekli(Integer hafta) {
+        if (hafta == null) {
+            throw new IllegalArgumentException("hafta alanı eksik — önce bir hafta seç.");
+        }
+        return hafta;
+    }
+
     /** gorevMetni opsiyoneldir (geriye-uyumlu): gelmezse null olur, eski davranış korunur. */
-    public record DegerlendirIstek(int hafta, Integer gun, String tur, String icerik, String gorevMetni) {
+    public record DegerlendirIstek(Integer hafta, Integer gun, String tur, String icerik, String gorevMetni) {
     }
 
     @PostMapping("/degerlendir")
     public Map<String, Object> degerlendir(@RequestBody DegerlendirIstek istek) {
         String tur = istek.tur() == null || istek.tur().isBlank() ? "OZET" : istek.tur();
-        var sonuc = degerlendirmeService.degerlendir(istek.hafta(), istek.gun(), tur,
+        var sonuc = degerlendirmeService.degerlendir(haftaGerekli(istek.hafta()), istek.gun(), tur,
                 sinirla("icerik", istek.icerik()), istek.gorevMetni());
         return Map.of("gonderimId", sonuc.gonderimId(), "degerlendirme", sonuc.degerlendirme());
     }
 
-    public record SohbetIstek(int hafta, Integer gun, String mesaj) {
+    public record SohbetIstek(Integer hafta, Integer gun, String mesaj) {
     }
 
     @PostMapping("/sohbet")
     public SohbetMesaji sohbet(@RequestBody SohbetIstek istek) {
-        return sohbetService.mesajGonder(istek.hafta(), istek.gun(), sinirla("mesaj", istek.mesaj()));
+        return sohbetService.mesajGonder(haftaGerekli(istek.hafta()), istek.gun(), sinirla("mesaj", istek.mesaj()));
     }
 
     @GetMapping("/sohbet/{hafta}")
@@ -79,20 +90,20 @@ public class OgretmenController {
         return sohbetService.gecmis(hafta);
     }
 
-    public record OrnekIstek(int hafta, Integer gun, String gorevMetni) {
+    public record OrnekIstek(Integer hafta, Integer gun, String gorevMetni) {
     }
 
     /** "Örnek göster": Sokratik sohbetten AYRI — reddetmez, görev için somut örnek taslak verir. */
     @PostMapping("/ornek")
     public Map<String, Object> ornek(@RequestBody OrnekIstek istek) {
-        return Map.of("ornek", ornekService.ornekUret(istek.hafta(), istek.gun(),
+        return Map.of("ornek", ornekService.ornekUret(haftaGerekli(istek.hafta()), istek.gun(),
                 sinirla("gorevMetni", istek.gorevMetni())));
     }
 
     /** "Soruyu aç": görevi sade Türkçeyle açar + terimleri tanımlar (CEVAP/ÖRNEK vermez). */
     @PostMapping("/aciklama")
     public Map<String, Object> aciklama(@RequestBody OrnekIstek istek) {
-        return Map.of("aciklama", ornekService.aciklaUret(istek.hafta(), istek.gun(),
+        return Map.of("aciklama", ornekService.aciklaUret(haftaGerekli(istek.hafta()), istek.gun(),
                 sinirla("gorevMetni", istek.gorevMetni())));
     }
 
@@ -101,12 +112,12 @@ public class OgretmenController {
         return kullanimService.istatistik();
     }
 
-    public record QuizUretIstek(int hafta, Integer adet) {
+    public record QuizUretIstek(Integer hafta, Integer adet) {
     }
 
     @PostMapping("/quiz/uret")
     public tr.velzon.aiogretmen.types.UretilenQuiz quizUret(@RequestBody QuizUretIstek istek) {
-        return quizUretimService.uret(istek.hafta(), istek.adet());
+        return quizUretimService.uret(haftaGerekli(istek.hafta()), istek.adet());
     }
 
     /** GET yalnızca okur/ilk üretir; YENİLEME yan etkili olduğu için POST (inceleme bulgusu #3). */

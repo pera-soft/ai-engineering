@@ -1,24 +1,51 @@
 package tr.velzon.aiogretmen.web;
 
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.env.Environment;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import tr.velzon.aiogretmen.types.AiCiktisiBozukException;
 import tr.velzon.aiogretmen.types.AiDevreDisiException;
+import tr.velzon.aiogretmen.types.AiSaglayiciException;
 import tr.velzon.aiogretmen.types.BulunamadiException;
 
+import java.io.IOException;
+import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.UUID;
 
 /**
- * API hata sözleşmesi (brief §8): tüm hatalar {hata, detay} JSON'u ile doğru HTTP koduyla döner.
+ * API hata sözleşmesi (brief §8): tüm hatalar {hata, detay} JSON'u ile doğru HTTP koduyla döner;
+ * arayüz {@code detay}'ı (yoksa {@code hata}'yı) kullanıcıya gösterir. {@code detay} kullanıcıya
+ * yöneliktir — sunucu yolu, istisna mesajı, sağlayıcı gövdesi ya da anahtar TAŞIMAZ; teşhis logdadır.
+ *
+ * <p>Tarayıcı sayfa istekleri ({@code /api/} dışı + {@code Accept: text/html}) JSON almaz: hata
+ * {@code sendError} ile Spring Boot'un {@code /error} akışına devredilir → {@code static/error/*.html}.
  */
 @RestControllerAdvice
 public class HataYonetimi {
 
     private static final Logger log = LoggerFactory.getLogger(HataYonetimi.class);
+
+    static final String BEKLENMEYEN_DETAY = "Beklenmeyen bir hata oluştu. Tekrar dene; sürerse site sorumlusuna bildir.";
+    static final String AI_KAPALI_SITE = "AI öğretmen henüz açılmadı (OpenRouter anahtarı bekleniyor). "
+            + "Dersleri okuyup görevlerini işaretleyebilirsin; AI açılınca burada çalışacak.";
+
+    private final boolean site;
+
+    public HataYonetimi(Environment ortam) {
+        this.site = ortam.matchesProfiles("site");
+    }
 
     @ExceptionHandler(BulunamadiException.class)
     @ResponseStatus(HttpStatus.NOT_FOUND)
@@ -26,43 +53,48 @@ public class HataYonetimi {
         return Map.of("hata", "Kayıt bulunamadı", "detay", e.getMessage());
     }
 
+    /** Jackson'ın ham mesajı Java sınıf adları taşır — kullanıcıya sabit Türkçe metin, ayrıntı logda. */
     @ExceptionHandler(HttpMessageNotReadableException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public Map<String, String> bozukIstek(HttpMessageNotReadableException e) {
-        return Map.of("hata", "İstek gövdesi okunamadı", "detay", String.valueOf(e.getMessage()));
+        log.debug("Okunamayan istek gövdesi: {}", e.getMessage());
+        return Map.of("hata", "İstek gövdesi okunamadı",
+                "detay", "İstek gövdesi geçersiz JSON ya da alan türleri hatalı.");
     }
 
+    /** /api/hafta/abc gibi: yol/parametre türü uymuyor → 400 (eskiden genel 500'e düşüyordu). */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public Map<String, String> turUyusmazligi(MethodArgumentTypeMismatchException e) {
+        return Map.of("hata", "Geçersiz istek", "detay", "'" + e.getName() + "' değeri geçersiz.");
+    }
+
+    /** Anahtarsız açılış. Sitede geliştirici yönergesi (ortam değişkeni) yerine kullanıcı dili. */
     @ExceptionHandler(AiDevreDisiException.class)
     @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
     public Map<String, String> aiDevreDisi(AiDevreDisiException e) {
-        return Map.of("hata", "AI özellikleri devre dışı", "detay", e.getMessage());
+        return Map.of("hata", "AI özellikleri devre dışı", "detay", site ? AI_KAPALI_SITE : e.getMessage());
     }
 
-    /** OpenRouter/HTTP hataları anlamlı mesaja çevrilir (402 kredi, 429 limit — inceleme 2. tur). */
-    @ExceptionHandler(org.springframework.web.client.RestClientResponseException.class)
+    /**
+     * Sağlayıcı (OpenRouter) hatası — ai/ katmanında kategoriye çevrildi (AiHataCevirici; log orada).
+     * Hepsi 503 (servis şu an kullanılamıyor); yalnız sağlayıcının reddettiği istek 502.
+     * Gövde: {@code {"hata": "AI servisi kullanılamıyor", "detay": <Türkçe mesaj>, "neden": <kategori>}}.
+     */
+    @ExceptionHandler(AiSaglayiciException.class)
+    public ResponseEntity<Map<String, String>> aiSaglayiciHatasi(AiSaglayiciException e) {
+        HttpStatus durum = e.neden() == AiSaglayiciException.Neden.ISTEK_REDDEDILDI
+                ? HttpStatus.BAD_GATEWAY : HttpStatus.SERVICE_UNAVAILABLE;
+        Map<String, String> govde = new LinkedHashMap<>();
+        govde.put("hata", "AI servisi kullanılamıyor");
+        govde.put("detay", e.neden().mesaj());
+        govde.put("neden", e.neden().name());
+        return ResponseEntity.status(durum).body(govde);
+    }
+
+    @ExceptionHandler(AiCiktisiBozukException.class)
     @ResponseStatus(HttpStatus.BAD_GATEWAY)
-    public Map<String, String> aiSaglayiciHatasi(org.springframework.web.client.RestClientResponseException e) {
-        int kod = e.getStatusCode().value();
-        String detay = switch (kod) {
-            case 401, 403 -> "API anahtarı geçersiz veya yetkisiz — OPENROUTER_API_KEY'i kontrol et.";
-            case 402 -> "OpenRouter kredisi tükenmiş görünüyor — panelden bakiye kontrol et.";
-            case 429 -> "AI servisi istek sınırında (rate limit) — biraz bekleyip tekrar dene.";
-            default -> "AI sağlayıcısı " + kod + " döndürdü — birazdan tekrar dene.";
-        };
-        log.warn("AI sağlayıcı hatası: HTTP {} — {}", kod, e.getMessage());
-        return Map.of("hata", "AI servisi hatası", "detay", detay);
-    }
-
-    @ExceptionHandler(org.springframework.web.client.ResourceAccessException.class)
-    @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
-    public Map<String, String> aiUlasilamiyor(org.springframework.web.client.ResourceAccessException e) {
-        return Map.of("hata", "AI servisine ulaşılamadı",
-                "detay", "Ağ hatası veya zaman aşımı — bağlantını kontrol edip tekrar dene.");
-    }
-
-    @ExceptionHandler(tr.velzon.aiogretmen.types.AiCiktisiBozukException.class)
-    @ResponseStatus(HttpStatus.BAD_GATEWAY)
-    public Map<String, String> aiCiktisiBozuk(tr.velzon.aiogretmen.types.AiCiktisiBozukException e) {
+    public Map<String, String> aiCiktisiBozuk(AiCiktisiBozukException e) {
         return Map.of("hata", "AI beklenen çıktıyı üretemedi", "detay", e.getMessage());
     }
 
@@ -79,15 +111,53 @@ public class HataYonetimi {
     }
 
     @ExceptionHandler(org.springframework.web.servlet.resource.NoResourceFoundException.class)
-    @ResponseStatus(HttpStatus.NOT_FOUND)
-    public Map<String, String> kaynakYok(org.springframework.web.servlet.resource.NoResourceFoundException e) {
-        return Map.of("hata", "Kaynak bulunamadı", "detay", e.getResourcePath());
+    public ResponseEntity<Map<String, String>> kaynakYok(org.springframework.web.servlet.resource.NoResourceFoundException e,
+                                                         HttpServletRequest istek, HttpServletResponse yanit)
+            throws IOException {
+        if (sayfaIstegi(istek)) {
+            yanit.sendError(HttpStatus.NOT_FOUND.value()); // → /error → static/error/404.html
+            return null;
+        }
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(Map.of("hata", "Kaynak bulunamadı", "detay", e.getResourcePath()));
     }
 
+    /**
+     * Son çare. Spring'in kendi durum kodlu istisnaları (405, 415, eksik parametre…) kodunu korur;
+     * gerisi 500. İstemciye istisna mesajı GİTMEZ (sunucu yolu/sağlayıcı gövdesi sızıyordu) — yalnız
+     * sabit Türkçe metin + kısa referans; aynı referans log satırında, operatör eşleştirebilsin.
+     */
     @ExceptionHandler(Exception.class)
-    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
-    public Map<String, String> beklenmeyen(Exception e) {
-        log.error("Beklenmeyen hata", e);
-        return Map.of("hata", "Beklenmeyen bir hata oluştu", "detay", String.valueOf(e.getMessage()));
+    public ResponseEntity<Map<String, String>> beklenmeyen(Exception e, HttpServletRequest istek,
+                                                           HttpServletResponse yanit) throws IOException {
+        HttpStatusCode durum = e instanceof ErrorResponse er ? er.getStatusCode() : HttpStatus.INTERNAL_SERVER_ERROR;
+        String referans = UUID.randomUUID().toString().substring(0, 8);
+        Map<String, String> govde = new LinkedHashMap<>();
+        if (durum.is5xxServerError()) {
+            log.error("Beklenmeyen hata [ref={}] {} {}", referans, istek.getMethod(), istek.getRequestURI(), e);
+            govde.put("hata", "Beklenmeyen bir hata oluştu");
+            govde.put("detay", BEKLENMEYEN_DETAY + " (Referans: " + referans + ")");
+            govde.put("referans", referans);
+        } else {
+            log.debug("İstemci hatası [{}] {} {}: {}", durum.value(), istek.getMethod(), istek.getRequestURI(),
+                    e.toString());
+            govde.put("hata", "Geçersiz istek");
+            govde.put("detay", "İstek işlenemedi (HTTP " + durum.value() + ") — sayfayı yenileyip tekrar dene.");
+        }
+        if (sayfaIstegi(istek)) {
+            yanit.sendError(durum.value()); // tarayıcı: Türkçe hata sayfası (static/error/*.html)
+            return null;
+        }
+        return ResponseEntity.status(durum).body(govde);
+    }
+
+    /** Tarayıcı sayfa isteği mi? API (/api/**) her zaman JSON alır; diğerlerinde Accept: text/html belirleyici. */
+    private static boolean sayfaIstegi(HttpServletRequest istek) {
+        String yol = istek.getRequestURI().substring(istek.getContextPath().length());
+        if (yol.startsWith("/api/")) {
+            return false;
+        }
+        String kabul = istek.getHeader("Accept");
+        return kabul != null && kabul.contains("text/html");
     }
 }

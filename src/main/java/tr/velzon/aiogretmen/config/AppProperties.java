@@ -7,7 +7,26 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 public record AppProperties(String contentDir, String promptDir, String hafizaDir, String raporDir,
                             String vektorDosyasi, Ai ai, @DefaultValue Mulakat mulakat) {
 
-    public record Ai(Model model) {
+    /**
+     * @param yenidenDenemeSayisi geçici AI hatasında (5xx, bağlantı/zaman aşımı) TOPLAM deneme sayısı —
+     *                            {@code app.ai.yeniden-deneme-sayisi}; verilmezse/geçersizse 3 (AiYapilandirma)
+     */
+    public record Ai(Model model, Integer yenidenDenemeSayisi) {
+
+        public static final int VARSAYILAN_DENEME = 3;
+
+        @org.springframework.boot.context.properties.bind.ConstructorBinding
+        public Ai {
+        }
+
+        /** Elle kurulan (test) örnekler için: varsayılan deneme sayısı. */
+        public Ai(Model model) {
+            this(model, null);
+        }
+
+        public int denemeSayisi() {
+            return yenidenDenemeSayisi == null || yenidenDenemeSayisi < 1 ? VARSAYILAN_DENEME : yenidenDenemeSayisi;
+        }
     }
 
     /** guclu/hizli: sohbet modelleri; embedding: anlam-eşleşmeli bağlam için (ADR-0005). */

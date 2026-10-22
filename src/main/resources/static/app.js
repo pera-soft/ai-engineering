@@ -23,7 +23,11 @@ const durum = {
   atolye: null,     // GET /api/atolye (bir kez yüklenir, cache)
   atolyeKat: 0,     // seçili atölye kategorisi (sekme) indeksi
   mulakatEtkin: false, // GET /api/ozellikler → mulakat (ADR-0011; varsayılan KAPALI — bölüm/kart gizli)
+  site: false,      // GET /api/ozellikler → site (ADR-0012): çok kullanıcılı sitede AI-kapalı metni öğrenciye göre
 };
+
+/** AI kapalıyken görev düğmeleri: kutucuk elle işaretlenebildiği için "AI gerekir" DEMEZ. */
+const AI_KAPALI_GOREV = "AI öğretmen şu an kapalı — görevi kendin yapıp kutucuğu işaretleyebilirsin.";
 
 // ---------- görev tipi türetici (saf frontend; veriyi değiştirmez) ----------
 const GOREV_TIPLERI = {
@@ -357,7 +361,7 @@ async function okudumTamamla() {
   }
   // AI açık: görevi HENÜZ tamamlama — öğretmen bir yansıtma sorusu sorup samimi cevapla geçirecek.
   // hafta = AI çalışma haftası (kilitli önizleme aktifHafta'yı kaydırsa bile yanlış haftaya toggle GİTMESİN).
-  durum.gorevBekleyen = { hafta: durum.sohbetHafta ?? durum.aktifHafta, gun, index: gv.t.index, tip: "oku" };
+  durum.gorevBekleyen = { hafta: sohbetHaftasi(), gun, index: gv.t.index, tip: "oku" };
   gorevBariGuncelle(); // bar artık "okudun, öğretmenin sorusunu cevapla" durumunu bilsin
   await okuSonrasiSohbet(baslik, gun);
 }
@@ -520,7 +524,7 @@ async function gorevToggle(gun, gorevIndex, satir, kutu, stat, g) {
       headers: { "Content-Type": "application/json" },
       // Görev tamamlama AI ÇALIŞMA haftasına ait (okuma-kapısı/görev barı) — kilitli önizleme
       // durum.aktifHafta'yı kaydırsa bile YANLIŞ haftaya toggle GİTMESİN (inceleme KRİTİK bulgusu).
-      body: JSON.stringify({ hafta: durum.sohbetHafta ?? durum.aktifHafta, gun, gorevIndex }),
+      body: JSON.stringify({ hafta: sohbetHaftasi(), gun, gorevIndex }),
     });
     kutu.checked = yanit.tamamlandi;
     satir.classList.toggle("checked", yanit.tamamlandi);
@@ -546,7 +550,7 @@ async function gorevToggle(gun, gorevIndex, satir, kutu, stat, g) {
  *  Görev bittiyse true, hata olursa false döner. */
 const gorevIslemde = new Set(); // uçuşan toggle anahtarları — backend flip yaptığı için eşzamanlı çift-çağrı geri-almayı önler
 async function gorevTamamla(gun, gorevIndex) {
-  const hafta = durum.sohbetHafta ?? durum.aktifHafta;
+  const hafta = sohbetHaftasi();
   const anahtar = `${hafta}:${gun}:${gorevIndex}`;
   // Çalışma haftasının in-memory modelini seç (kilitli önizleme durum.detay'ı kaydırsa bile sohbetDetay doğru).
   const d = (durum.sohbetDetay && durum.sohbetDetay.no === hafta) ? durum.sohbetDetay
@@ -590,7 +594,7 @@ function gorevBariGuncelle() {
   bar.hidden = true;
   bar.classList.remove("onizleme", "suruyor", "bitti"); // her çizimde modifikatörleri sıfırla
 
-  const hafta = durum.sohbetHafta ?? durum.aktifHafta;
+  const hafta = sohbetHaftasi();
   if (hafta == null || !haftaAcikMi(hafta)) return; // kilitli/önizleme hafta → bar GÖRÜNMEZ
   // Başka bir haftayı ÖNİZLİYORSAN (görüntülenen hafta çalışma haftandan farklı): görev butonu
   // yerine AÇIKLAYICI NOT göster — kullanıcı "AI neden Hafta X'te takıldı?" diye şaşırmasın.
@@ -684,7 +688,7 @@ function gorevBariGuncelle() {
   btn.type = "button";
   btn.addEventListener("click", () => {
     if (tip === "yaz") {
-      if (!durum.aiAktif) { alert("AI öğretmen devre dışı — yazma değerlendirmesi için AI gerekir."); return; }
+      if (!durum.aiAktif) { alert(AI_KAPALI_GOREV); return; }
       // DOM-bağımsız aktif görev bağlamı kur; orta kolonda çalışma kartını aç. Görev, yazılıp
       // /api/degerlendir başarıyla dönünce tamamlanır (calismaDegerlendir).
       durum.aktifGorev = { gun: g.gun, index: t.index, metin: t.metin, tip: "yaz", g, kutu: null, satir: null, stat: null };
@@ -696,7 +700,7 @@ function gorevBariGuncelle() {
       return;
     }
     // tartis: sohbete odaklan + tartış görevini öğretmen kapısına bağla (açılış sorusu + gorevBekleyen)
-    if (!durum.aiAktif) { alert("AI öğretmen devre dışı — tartışma için AI gerekir."); return; }
+    if (!durum.aiAktif) { alert(AI_KAPALI_GOREV); return; }
     durum.aktifGorev = { gun: g.gun, index: t.index, metin: t.metin, tip: "tartis", g, kutu: null, satir: null, stat: null };
     aktifGorevKartiCiz();
     tartisBaslat(g, t);
@@ -728,7 +732,7 @@ function quizeGit() {
 /** Tartış görevini öğretmen-kapısına bağlar: açılış sorusu bas + gorevBekleyen kur.
  *  Yumuşak kapı: kullanıcı samimi bir görüş yazınca gonder() görevi geçirir. */
 function tartisBaslat(g, t) {
-  durum.gorevBekleyen = { hafta: durum.sohbetHafta ?? durum.aktifHafta, gun: g.gun, index: t.index, tip: "tartis" };
+  durum.gorevBekleyen = { hafta: sohbetHaftasi(), gun: g.gun, index: t.index, tip: "tartis" };
   // t.metin kullanıcı/görev metni → mesajEkle el()/textContent ile basar (XSS-güvenli).
   mesajEkle("asistan", `💬 "${t.metin}" — bu konuda ne düşünüyorsun? Kendi görüşünü birkaç cümleyle yaz; birlikte üstünden geçip görevi geçelim.`);
   gorevBariGuncelle(); // bar artık "tartışma SÜRÜYOR" durumunu bilsin (→ "tartışıyorsun")
@@ -740,7 +744,7 @@ function gorevAksiyon(tip, g, t, kutu, satir, stat) {
 
   // yaz / tartis: AI paneliyle entegre
   if (!durum.aiAktif) {
-    alert("AI öğretmen devre dışı — bu görevi elle yapıp kutucuğu işaretleyebilirsin.");
+    alert(AI_KAPALI_GOREV);
     return;
   }
   durum.aktifGorev = { gun: g.gun, index: t.index, metin: t.metin, tip, kutu, satir, stat, g };
@@ -789,7 +793,7 @@ function calismaGorunumuAc() {
   panel.appendChild(geri);
 
   const kart = el("div", "calisma-kart");
-  kart.appendChild(el("div", "calisma-ust mono", `HAFTA ${durum.sohbetHafta ?? durum.aktifHafta} · GÜN ${gv.gun}`));
+  kart.appendChild(el("div", "calisma-ust mono", `HAFTA ${sohbetHaftasi()} · GÜN ${gv.gun}`));
 
   const bas = el("div", "calisma-baslik");
   bas.append(el("span", "tip-rozet tip-yaz", "✍️"), el("span", "calisma-etiket", "Görev"));
@@ -877,7 +881,7 @@ async function soruyuAc(kutu, btn) {
   try {
     const yanit = await api("/api/aciklama", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ hafta: durum.sohbetHafta ?? durum.aktifHafta, gun: gv.gun, gorevMetni: gv.metin }),
+      body: JSON.stringify({ hafta: sohbetHaftasi(), gun: gv.gun, gorevMetni: gv.metin }),
     });
     kutu.innerHTML = "";
     kutu.appendChild(el("div", "calisma-ornek-baslik mono", "🔍 Soru açıklaması"));
@@ -901,7 +905,7 @@ async function calismaOrnek(kutu, btn) {
     // AYRI uç: Sokratik sohbet değil — reddetmez, doğrudan örnek verir (prompts/ornek.st).
     const yanit = await api("/api/ornek", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ hafta: durum.sohbetHafta ?? durum.aktifHafta, gun: gv.gun, gorevMetni: gv.metin }),
+      body: JSON.stringify({ hafta: sohbetHaftasi(), gun: gv.gun, gorevMetni: gv.metin }),
     });
     kutu.innerHTML = "";
     kutu.appendChild(el("div", "calisma-ornek-baslik mono", "💡 Bu göreve örnek cevap (kendi cümlelerinle yeniden yaz)"));
@@ -926,7 +930,7 @@ async function calismaDegerlendir(ta, btn, sonuc) {
     const yanit = await api("/api/degerlendir", {
       method: "POST", headers: { "Content-Type": "application/json" },
       // YANLIŞ haftaya gitmesin: çalışma bağlamı sohbetHafta'ya ait (kilitli önizleme aktifHafta'yı kaydırsa bile).
-      body: JSON.stringify({ hafta: durum.sohbetHafta ?? durum.aktifHafta, gun: gv.gun, tur: "OZET", icerik: metin, gorevMetni: gv.metin }),
+      body: JSON.stringify({ hafta: sohbetHaftasi(), gun: gv.gun, tur: "OZET", icerik: metin, gorevMetni: gv.metin }),
     });
     sonuc.innerHTML = "";
     const kart = degerlendirmeKart(yanit.degerlendirme);
@@ -1022,7 +1026,7 @@ async function ornekIste() {
     const yanit = await api("/api/ornek", {
       method: "POST", headers: { "Content-Type": "application/json" },
       // görev barı AI çalışma haftasına ait → sohbetHafta (kilitli önizlemede aktifHafta kayar)
-      body: JSON.stringify({ hafta: durum.sohbetHafta ?? durum.aktifHafta, gun: gv.gun, gorevMetni: gv.metin }),
+      body: JSON.stringify({ hafta: sohbetHaftasi(), gun: gv.gun, gorevMetni: gv.metin }),
     });
     bekleyen.remove();
     mesajEkle("asistan", yanit.ornek);
@@ -1318,10 +1322,18 @@ const chatMesajlar = () => document.getElementById("chat-mesajlar");
 const chatGirdi = () => document.getElementById("chat-girdi");
 const chatGonderBtn = () => document.getElementById("chat-gonder");
 
+/** AI çalışma haftası — panel başlığı, sohbet geçmişi, gönderim ve görev istekleri HEP bunu kullanır
+ *  (eskiden ana sayfada gönderim hafta=null → 500). Açık bir hafta seçildiyse sohbetHafta; henüz
+ *  seçilmediyse (ana sayfa) görüntülenen hafta açıksa o, kilitli önizlemeyse Hafta 1 (her zaman açık). */
+function sohbetHaftasi() {
+  if (durum.sohbetHafta != null) return durum.sohbetHafta;
+  return haftaAcikMi(durum.aktifHafta) ? durum.aktifHafta : 1;
+}
+
 function chatDurumYaz() {
   const gunEki = durum.sohbetGun ? ` · GÜN ${durum.sohbetGun}` : "";
   document.getElementById("chat-durum").textContent =
-      `HAFTA ${durum.sohbetHafta ?? durum.aktifHafta}${gunEki}` + (durum.aiAktif ? "" : " · AI KAPALI");
+      `HAFTA ${sohbetHaftasi()}${gunEki}` + (durum.aiAktif ? "" : " · AI KAPALI");
   if (durum.aiAktif) panelOdakGuncelle();
 }
 
@@ -1354,9 +1366,15 @@ function aiPaneliKur() {
 
   if (!durum.aiAktif) {
     const bilgi = el("div", "chat-bilgi");
-    bilgi.innerHTML = "<b>AI öğretmen şu an kapalı.</b><br>Uygulamayı <span class='mono'>OPENROUTER_API_KEY</span> ortam değişkeniyle başlatınca sohbet burada aktifleşir.";
+    if (durum.site) { // çok kullanıcılı site: öğrenciye yönelik dil (ortam değişkeni anlatılmaz)
+      bilgi.textContent = "AI öğretmen henüz açılmadı (OpenRouter anahtarı bekleniyor). Dersleri okuyup "
+          + "görevlerini işaretleyebilirsin; AI açılınca sohbet burada çalışacak.";
+      chatGirdi().placeholder = "AI henüz açılmadı";
+    } else { // yerel mod: geliştirici yönergesi
+      bilgi.innerHTML = "<b>AI öğretmen şu an kapalı.</b><br>Uygulamayı <span class='mono'>OPENROUTER_API_KEY</span> ortam değişkeniyle başlatınca sohbet burada aktifleşir.";
+      chatGirdi().placeholder = "AI şu an kapalı";
+    }
     chatMesajlar().appendChild(bilgi);
-    chatGirdi().placeholder = "AI şu an kapalı";
     return;
   }
 
@@ -1372,13 +1390,14 @@ function aiPaneliKur() {
 }
 
 async function sohbetGecmisiYukle(nesil = haftaSecNesli) {
-  if (!durum.sohbetHafta) return; // çalışma haftası henüz belli değil (init'te haftaSec ayarlar)
+  const hafta = sohbetHaftasi(); // ana sayfada da başlıktaki hafta (sohbetHafta henüz null olabilir)
+  if (!hafta) return;
   chatMesajlar().innerHTML = "";
   try {
-    const gecmis = await api("/api/sohbet/" + durum.sohbetHafta);
+    const gecmis = await api("/api/sohbet/" + hafta);
     if (nesil !== haftaSecNesli) return; // hafta değişti — bayat geçmişi basma
     if (gecmis.length === 0) {
-      mesajEkle("asistan", `Hafta ${durum.sohbetHafta} üzerinde çalışıyorsun. Takıldığın yerde sor; bir görevi bitirince "şunu yaptım" diye anlat — seni takip ediyorum.`);
+      mesajEkle("asistan", `Hafta ${hafta} üzerinde çalışıyorsun. Takıldığın yerde sor; bir görevi bitirince "şunu yaptım" diye anlat — seni takip ediyorum.`);
     } else {
       chatMesajlar().appendChild(el("div", "chat-ayrac", "— bu hafta önceki konuşmalar —"));
       gecmis.forEach((m) => mesajEkle(m.rol === "USER" ? "user" : "asistan", m.icerik));
@@ -1411,7 +1430,7 @@ async function gonder() {
   try {
     const yanit = await api("/api/sohbet", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ hafta: durum.sohbetHafta, gun: durum.sohbetGun, mesaj: metin }),
+      body: JSON.stringify({ hafta: sohbetHaftasi(), gun: durum.sohbetGun, mesaj: metin }),
     });
     if (nesil !== haftaSecNesli) { bekleyen.remove(); return; } // hafta değişti — bayat yanıtı basma (#race)
     bekleyen.remove();
@@ -1421,7 +1440,7 @@ async function gonder() {
     // "biraz daha aç" diye yönlendirir (ekstra sabit nudge basma — çift olmasın).
     if (durum.gorevBekleyen && nesil === haftaSecNesli) { // hafta değiştiyse tamamlama YAPMA (#race)
       const bek = durum.gorevBekleyen;
-      const suanHafta = durum.sohbetHafta ?? durum.aktifHafta;
+      const suanHafta = sohbetHaftasi();
       if (bek.hafta !== suanHafta) {
         durum.gorevBekleyen = null; // başka haftaya geçilmiş — bayat kapıyı temizle (yanlış-hafta toggle YOK)
       } else {
@@ -1570,6 +1589,7 @@ function oturumAlaniKur(oz) {
   try {
     const oz = await ozellikler;
     durum.mulakatEtkin = !!oz.mulakat;
+    durum.site = !!oz.site;
     oturumAlaniKur(oz);
     const kullanim = await api("/api/kullanim").catch(() => ({ aiAktif: false }));
     durum.aiAktif = !!kullanim.aiAktif;

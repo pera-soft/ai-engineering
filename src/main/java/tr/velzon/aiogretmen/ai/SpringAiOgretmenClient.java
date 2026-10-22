@@ -81,7 +81,13 @@ public class SpringAiOgretmenClient implements OgretmenAiClient {
                 .maxTokens(maxTokens)
                 .build();
 
-        ChatResponse yanit = chatModel.call(new Prompt(mesajlar, secenekler));
+        ChatResponse yanit;
+        try {
+            yanit = chatModel.call(new Prompt(mesajlar, secenekler));
+        } catch (RuntimeException e) {
+            // 401/402/429/5xx/zaman aşımı → AiSaglayiciException (Türkçe, ham gövdesiz); tüm AI uçları buradan geçer
+            throw AiHataCevirici.cevir(e, islem.name());
+        }
 
         // İnceleme 2. tur: content-filter/boş completion durumlarında result/output null
         // olabilir — NPE yerine anlamlı 502 (AiCiktisiBozuk) fırlatılır.
