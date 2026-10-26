@@ -22,6 +22,8 @@ import java.util.function.BiFunction;
 
 import static tr.velzon.aiogretmen.mcp.McpAdaptorDestek.hata;
 import static tr.velzon.aiogretmen.mcp.McpAdaptorDestek.json;
+import static tr.velzon.aiogretmen.mcp.McpAdaptorDestek.mantiksalAlan;
+import static tr.velzon.aiogretmen.mcp.McpAdaptorDestek.mantiksalVarsayilan;
 import static tr.velzon.aiogretmen.mcp.McpAdaptorDestek.metinAlan;
 import static tr.velzon.aiogretmen.mcp.McpAdaptorDestek.metinVarsayilan;
 import static tr.velzon.aiogretmen.mcp.McpAdaptorDestek.sema;
@@ -98,18 +100,23 @@ public class OgretmenMcpAraclari {
                         (ex, req) -> json(om, atolyeKatalogService.kategoriler())),
 
                 arac("gorev_isaretle",
-                        "Bir günlük görevin tamamlanma durumunu tersine çevirir (toggle) ve yeni durumu "
-                                + "döndürür. 'hafta', 'gun', 'gorev_index' (0'dan başlar).",
+                        "Bir günlük görevi istenen duruma ayarlar ve yeni durumu döndürür. Araç idempotent: "
+                                + "aynı çağrıyı tekrarlamak (ör. zaman aşımı sonrası) sonucu değiştirmez, "
+                                + "işareti geri almaz. 'hafta', 'gun', 'gorev_index' (0'dan başlar); "
+                                + "'hedef_durum' opsiyonel — verilmezse true (tamamlandı), false geri alır.",
                         sema(Map.of(
                                         "hafta", tamsayiAlan("Hafta numarası"),
                                         "gun", tamsayiAlan("Gün numarası"),
-                                        "gorev_index", tamsayiAlan("Görev sırası (0'dan başlar)")),
+                                        "gorev_index", tamsayiAlan("Görev sırası (0'dan başlar)"),
+                                        "hedef_durum", mantiksalAlan(
+                                                "İstenen durum: true = tamamlandı (varsayılan), false = tamamlanmadı")),
                                 List.of("hafta", "gun", "gorev_index")),
                         (ex, req) -> {
                             Map<String, Object> a = req.arguments();
-                            boolean tamam = ilerlemeService.gorevToggle(
+                            boolean tamam = ilerlemeService.gorevDurumuAyarla(
                                     McpKullaniciKimligi.kullaniciKimligiVeyaYerel(),
-                                    tamsayi(a, "hafta"), tamsayi(a, "gun"), tamsayi(a, "gorev_index"));
+                                    tamsayi(a, "hafta"), tamsayi(a, "gun"), tamsayi(a, "gorev_index"),
+                                    mantiksalVarsayilan(a, "hedef_durum", true));
                             return json(om, Map.of("tamamlandi", tamam));
                         }),
 

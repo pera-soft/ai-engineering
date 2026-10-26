@@ -87,10 +87,15 @@ CREATE TABLE IF NOT EXISTS ai_kullanim (           -- token/maliyet takibi (brie
   model VARCHAR(50) NOT NULL,
   input_tokens INT NOT NULL DEFAULT 0,
   output_tokens INT NOT NULL DEFAULT 0,
+  sure_ms INT,                                    -- çağrının duvar saati süresi (yeniden denemeler dahil)
+  yanit_model VARCHAR(100),                       -- sağlayıcının cevapta bildirdiği model (yedeğe geçiş görünür)
   tarih TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 -- Faz 9b: mevcut DB migrasyonu (yeni kurulumda no-op). H2 + PostgreSQL ikisi de ADD COLUMN IF NOT EXISTS destekler.
 ALTER TABLE ai_kullanim ADD COLUMN IF NOT EXISTS kullanici_id VARCHAR(255) NOT NULL DEFAULT 'yerel';
+-- ADR-0016 (2026-10-26): gecikme + cevaptaki model; nullable — eski satırlar boş kalır.
+ALTER TABLE ai_kullanim ADD COLUMN IF NOT EXISTS sure_ms INT;
+ALTER TABLE ai_kullanim ADD COLUMN IF NOT EXISTS yanit_model VARCHAR(100);
 CREATE INDEX IF NOT EXISTS ix_ai_kullanim_kullanici ON ai_kullanim (kullanici_id, islem);
 
 -- Faz 9a — KİMLİK (ADR-0012): yalnız `site` profilinde kullanılır; yerel modda tablolar boş durur.

@@ -587,11 +587,15 @@ ve tek HTTP isteğinde bitiyor (§4'teki istek–yanıt şekli).
 çağırmamasını zorluyor. §2.1'in sözleşmesinin bir kısmı zaten var: `McpAdaptorDestek.tamsayi`
 belirsiz olmayan `"5"`'i sayıya çeviriyor, eksik alanı reddediyor; `OgretmenMcpAraclari.arac`
 sarmalayıcısı hatayı çökme yerine `isError` sonucu olarak, yani **gözlem olarak** döndürüyor. Ama §3
-açısından öğretici bir boşluk var: iki **yazma aracı** ajanın serbest döngüsüne açık.
-`gorev_isaretle` görev durumunu **tersine çeviriyor** (toggle); istemci çağrıyı yeniden denerse görev
-geri açılır. `statik_quiz_kaydet` her çağrıda **yeni satır** ekliyor ve idempotency anahtarı yok;
-yeniden deneme çift kayıt üretir. İdempotent biçim, "çevir" yerine "şu değere ayarla"
-(`tamamlandi=true`) demek ve kayda bir istek kimliği eklemek olurdu.
+açısından öğretici bir boşluk vardı: iki **yazma aracı** ajanın serbest döngüsüne açık.
+`gorev_isaretle` 2026-10-26'ya kadar görev durumunu **tersine çeviriyordu** (toggle); istemci çağrıyı
+yeniden denerse görev geri açılıyordu. ADR-0016 bunu düzeltti: araç artık "çevir" değil "şu değere
+ayarla" diyor (opsiyonel `hedef_durum`, varsayılan `true`; servis `IlerlemeService.gorevDurumuAyarla`),
+yani idempotent — tekrar denenen çağrı işareti geri almaz. `statik_quiz_kaydet` ise hâlâ her çağrıda
+**yeni satır** ekliyor ve idempotency anahtarı yok; yeniden deneme çift kayıt üretir. ADR-0016 karar 2
+bunu **kabul edilen risk** olarak yazdı (yalnız-ekle deneme günlüğü, MCP sunucuları kapalı, etkisi bir
+fazla deneme) ve yeniden açma koşulunu koydu: MCP sunucusu yeniden uzakta çalışırsa ya da quiz denemesi
+bir değerlendirmeye girerse. Ayrıntı: [Araç çağrısı güvenilirliği](arac-cagrisi-guvenilirligi.md) §8.
 
 ## Öz-sınav (kendini test et)
 1. "İş akışı" ile "ajan" arasındaki farkı **tek bir soruyla** ifade et. Orkestratör–işçi deseni neden
@@ -656,8 +660,9 @@ yeniden deneme çift kayıt üretir. İdempotent biçim, "çevir" yerine "şu de
 12. Kanıtlar: `AiIstek`'te araç listesi yok; `src/main`'de `@Tool`/`ToolCallback` kullanımı yok; çağrı
     sayısı sabit (bir çağrı + en fazla bir düzeltme, döngü yok); bağlamı `BaglamServisi` kodla koyuyor;
     model seçimini ADR-0003 belirliyor. Desen, kod kapılı zincirleme. Ajan döngüsü MCP istemcisinde
-    (ADR-0007/0009). Sorunlu araçlar `gorev_isaretle` (toggle; yeniden deneme durumu geri çevirir) ve
-    `statik_quiz_kaydet` (idempotency anahtarı yok; çift kayıt).
+    (ADR-0007/0009). Yazma araçlarından `gorev_isaretle` eskiden toggle'dı (yeniden deneme durumu geri
+    çevirirdi); 2026-10-26'da ADR-0016 ile idempotent "ayarla"ya çevrildi. `statik_quiz_kaydet`
+    (idempotency anahtarı yok; çift kayıt) yeniden açma koşulu yazılı, kabul edilen risk olarak kaldı.
 
 ## Kaynak ve lisans
 Bu metin bir çeviri değil, bir **sentezdir**: dersler okunup bu programın kitlesine (modeli eğiten

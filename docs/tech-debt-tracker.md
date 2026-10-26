@@ -17,10 +17,10 @@ Küçük, sürekli ödemeler ilkesi: borç birikmeden hafta kapanışlarında 1 
 |---|---|---|
 | 5 | KitapService/KaynakService'te kopya, blok ortasından kesen bağlam kırpma | Ortak `service/BaglamKirpici` (per-parça + toplam sınır, blok sınırında kesme); iki servis de onu kullanır — `39db3d9`. İki sınıftaki `BAGLAM_KARAKTER_SINIRI` artık bilinçli olarak farklı bütçelerdir (kitap 6000, kaynak 14000), kopya mantık değil. |
 | 8 | `SpringAiAnlamArama` SimpleVectorStore'un iç `store` alanına reflection ile erişiyordu | Kendi id kümesi + `.idler` yan dosyası; reflection kaldırıldı — `c984271` |
+| 9 | `gorev_isaretle` / `POST /api/gorev/toggle` toggle semantiği: zaman aşımı + retry işareti geri alıyor, eşzamanlı çağrıda güncelleme kayboluyordu | İdempotent hedef-durum: `IlerlemeService.gorevDurumuAyarla`, `POST /api/gorev/durum` (`tamamlandi` zorunlu), MCP `hedef_durum` (varsayılan `true`); toggle kaldırıldı. Yan bulgu: Spring Data JDBC tekil indeks çakışmasını `DbActionExecutionException`'a sardığı için eski "yakala, yeniden oku" gerçek DB'de hiç tetiklenmiyordu — neden zinciri taranıyor (`IlerlemeServiceEszamanliTest`) — 2026-10-26 |
 
 ## MCP araç hata sözleşmesi — kategorili yapıya yükseltme (2026-07-19)
 - **Durum:** Araçlar zaten zarif `isError:true` dönüyor (çıplak istisna sızmıyor) — sözleşmenin
   çekirdeği yerinde. Borç: mesajlar düz metin; `error_category`/`retryable`/kurtarma-yolu alanlı
-  yapıya yükseltilebilir (bkz. `mcp-adapter.md` §7). Ayrıca `gorev_isaretle` toggle semantiği,
-  zaman aşımı + istemci retry senaryosunda işareti geri alabilir — açık `hedef_durum` parametresi
-  (idempotent set) değerlendirilebilir. İkisi de davranış değişikliği → test + ADR notuyla.
+  yapıya yükseltilebilir (bkz. `mcp-adapter.md` §7). Davranış değişikliği → test + ADR notuyla.
+  (Aynı bölümdeki `gorev_isaretle` toggle notu kapandı — bkz. "Kapanan borçlar" #9.)

@@ -64,13 +64,18 @@ public class ProgramController {
         return Map.of("durum", "sifirlandi");
     }
 
-    public record GorevToggleIstek(int hafta, int gun, int gorevIndex) {
+    /** {@code tamamlandi} kutulu (Boolean): eksikse sessizce false'a düşmesin — 400 dönsün. */
+    public record GorevDurumIstek(int hafta, int gun, int gorevIndex, Boolean tamamlandi) {
     }
 
-    @PostMapping("/gorev/toggle")
-    public Map<String, Object> gorevToggle(@RequestBody GorevToggleIstek istek) {
-        boolean tamamlandi = ilerlemeService.gorevToggle(
-                kullaniciBaglami.aktifKullanici(), istek.hafta(), istek.gun(), istek.gorevIndex());
+    /** İdempotent: görevi istenen duruma ayarlar (tekrar denenen istek işareti geri almaz). */
+    @PostMapping("/gorev/durum")
+    public Map<String, Object> gorevDurumu(@RequestBody GorevDurumIstek istek) {
+        if (istek.tamamlandi() == null) {
+            throw new IllegalArgumentException("tamamlandi alanı zorunludur (true/false)");
+        }
+        boolean tamamlandi = ilerlemeService.gorevDurumuAyarla(kullaniciBaglami.aktifKullanici(),
+                istek.hafta(), istek.gun(), istek.gorevIndex(), istek.tamamlandi());
         return Map.of("tamamlandi", tamamlandi);
     }
 

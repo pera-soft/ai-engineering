@@ -22,6 +22,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -96,13 +97,44 @@ class OgretmenMcpAraclariTest {
     }
 
     @Test
-    void gorevIsaretleYeniDurumuDondurur() {
-        when(ilerleme.gorevToggle("yerel", 1, 2, 0)).thenReturn(true);
+    void gorevIsaretleHedefDurumVerilmezseTamamlar() {
+        when(ilerleme.gorevDurumuAyarla("yerel", 1, 2, 0, true)).thenReturn(true);
 
         String json = metin(cagir("gorev_isaretle",
                 Map.of("hafta", 1, "gun", 2, "gorev_index", 0)));
 
-        assertThat(json).contains("tamamlandi").contains("true");
+        assertThat(json).contains("\"tamamlandi\":true");
+        verify(ilerleme).gorevDurumuAyarla("yerel", 1, 2, 0, true);
+    }
+
+    @Test
+    void gorevIsaretleHedefDurumFalseIleGeriAlir() {
+        when(ilerleme.gorevDurumuAyarla("yerel", 1, 2, 0, false)).thenReturn(false);
+
+        String json = metin(cagir("gorev_isaretle",
+                Map.of("hafta", 1, "gun", 2, "gorev_index", 0, "hedef_durum", false)));
+
+        assertThat(json).contains("\"tamamlandi\":false");
+        verify(ilerleme).gorevDurumuAyarla("yerel", 1, 2, 0, false);
+    }
+
+    @Test
+    void gorevIsaretleGecersizHedefDurumZarifHata() {
+        CallToolResult r = cagir("gorev_isaretle",
+                Map.of("hafta", 1, "gun", 2, "gorev_index", 0, "hedef_durum", "belki"));
+
+        assertThat(r.isError()).isTrue();
+        assertThat(metin(r)).contains("hedef_durum");
+        verifyNoInteractions(ilerleme);
+    }
+
+    @Test
+    void gorevIsaretleSemasiHedefDurumuOpsiyonelBoolSunar() {
+        var arac = arac("gorev_isaretle");
+
+        assertThat(arac.tool().inputSchema().properties()).containsKey("hedef_durum");
+        assertThat(arac.tool().inputSchema().required()).doesNotContain("hedef_durum");
+        assertThat(arac.tool().description()).containsIgnoringCase("idempotent");
     }
 
     @Test

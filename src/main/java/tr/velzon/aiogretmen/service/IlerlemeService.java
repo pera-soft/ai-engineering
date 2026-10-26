@@ -18,27 +18,51 @@ public class IlerlemeService {
     }
 
     /**
-     * Görev durumunu tersine çevirir; kayıt yoksa "tamamlandı" olarak oluşturur.
-     * Eşzamanlı ilk-toggle (çift tık) UNIQUE(kullanici_id,hafta,gun,gorev_index) çakışması üretebilir;
-     * bu durumda bir kez yeniden okunup çevrilir — en yaygın çakışma senaryosu (çift tık)
-     * 500 üretmez. (Üç+ eşzamanlı istek gibi uç durumda ikinci deneme de çakışırsa
-     * istisna yukarı taşar; tek kullanıcılı araçta kabul edilen artık risk.)
+     * Görevi istenen duruma AYARLAR (idempotent "hedef durum"; eskiden toggle'dı): kayıt yoksa o
+     * durumda oluşturur, varsa durumu yazar. Aynı çağrı N kez = aynı sonuç — zaman aşımı sonrası
+     * tekrar denenen istek (MCP istemcisi, çift tık) işareti geri ALMAZ. Kayıt zaten hedef
+     * durumdaysa yazma yapılmaz (tamamlanma zamanı {@code tarih} tekrarla ezilmez).
+     * Eşzamanlı ilk ayarlama UNIQUE(kullanici_id,hafta,gun,gorev_index) çakışması üretebilir; bu
+     * durumda bir kez yeniden okunup ayarlanır. İkinci deneme artık mevcut satırı bulur ve en fazla
+     * UPDATE yapar (tekil indeks yalnız INSERT'te çakışır); set semantiğinde rakibin yazdığı değer
+     * ne olursa olsun sonuç hedeftir — yeniden deneme güvenlidir.
      *
-     * @return görevin yeni durumu
+     * @return görevin yeni (= istenen) durumu
      */
-    public boolean gorevToggle(String kullaniciId, int hafta, int gun, int gorevIndex) {
+    public boolean gorevDurumuAyarla(String kullaniciId, int hafta, int gun, int gorevIndex, boolean tamamlandi) {
         try {
-            return okuVeCevir(kullaniciId, hafta, gun, gorevIndex);
-        } catch (org.springframework.dao.DataIntegrityViolationException yarisCakismasi) {
-            return okuVeCevir(kullaniciId, hafta, gun, gorevIndex);
+            return okuVeAyarla(kullaniciId, hafta, gun, gorevIndex, tamamlandi);
+        } catch (RuntimeException e) {
+            if (!yarisCakismasi(e)) {
+                throw e;
+            }
+            return okuVeAyarla(kullaniciId, hafta, gun, gorevIndex, tamamlandi);
         }
     }
 
-    private boolean okuVeCevir(String kullaniciId, int hafta, int gun, int gorevIndex) {
-        GorevIlerlemeKaydi kayit = ilerlemeRepo
-                .findByKullaniciIdAndHaftaAndGunAndGorevIndex(kullaniciId, hafta, gun, gorevIndex)
-                .map(mevcut -> mevcut.durumla(!mevcut.tamamlandi()))
-                .orElseGet(() -> GorevIlerlemeKaydi.yeni(kullaniciId, hafta, gun, gorevIndex, true));
+    /**
+     * Tekil indeks çakışması mı? Spring Data JDBC {@code save()} çakışmayı
+     * {@code DbActionExecutionException}'a (düz RuntimeException) sarar — doğrudan
+     * {@code DataIntegrityViolationException} yakalamak gerçek DB'de hiç tetiklenmiyordu
+     * (IlerlemeServiceEszamanliTest yakaladı). Neden zinciri taranır.
+     */
+    private static boolean yarisCakismasi(Throwable e) {
+        for (Throwable t = e; t != null; t = t.getCause()) {
+            if (t instanceof org.springframework.dao.DataIntegrityViolationException) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean okuVeAyarla(String kullaniciId, int hafta, int gun, int gorevIndex, boolean tamamlandi) {
+        var mevcut = ilerlemeRepo.findByKullaniciIdAndHaftaAndGunAndGorevIndex(kullaniciId, hafta, gun, gorevIndex);
+        if (mevcut.isPresent() && mevcut.get().tamamlandi() == tamamlandi) {
+            return tamamlandi; // zaten hedefte — yazma yok
+        }
+        GorevIlerlemeKaydi kayit = mevcut
+                .map(k -> k.durumla(tamamlandi))
+                .orElseGet(() -> GorevIlerlemeKaydi.yeni(kullaniciId, hafta, gun, gorevIndex, tamamlandi));
         return ilerlemeRepo.save(kayit).tamamlandi();
     }
 

@@ -230,8 +230,11 @@ koruma tamamen **guide** tarafında, yani olasılıksal. Hafta 4 sorusu buraya d
 Bu deponun MCP yüzeyi de aynı ayrımı gösterir. `OgretmenMcpAraclari` altı okuma aracı
 (`program_ozeti`, `hafta_detay`, `kaynaklar`, `kaynak`, `atolye_kategorileri`,
 `kullanim_istatistik`) ve iki yazma aracı (`gorev_isaretle`, `statik_quiz_kaydet`) açar. Merdivenin
-"salt-oku" basamağı burada bir araç alt kümesi olarak tanımlanabilir. `gorev_isaretle` bir
-**toggle**'dır: aynı çağrıyı tekrarlamak işlemi geri alır. Bunun yeniden deneme açısından anlamı
+"salt-oku" basamağı burada bir araç alt kümesi olarak tanımlanabilir. `gorev_isaretle`
+2026-10-26'ya kadar bir **toggle**'dı (aynı çağrıyı tekrarlamak işlemi geri alıyordu); ADR-0016 ile
+**idempotent** "hedef durumu ayarla"ya çevrildi (opsiyonel `hedef_durum`, varsayılan `true`): aynı
+çağrıyı tekrarlamak artık sonucu değiştirmez. `statik_quiz_kaydet` ise hâlâ her çağrıda yeni satır
+ekler (ADR-0016'da kabul edilen risk). Bunun yeniden deneme açısından anlamı
 [`arac-cagrisi-guvenilirligi.md`](arac-cagrisi-guvenilirligi.md)'nin konusudur.
 
 ## 4. Harcama kontrolü — tavanlar zaman ölçeğine göre yığılır

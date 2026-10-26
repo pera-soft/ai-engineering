@@ -41,9 +41,9 @@ class KullaniciIzolasyonTest {
 
     @Test
     void kullaniciAninGoreviBdeGorunmez() {
-        service.gorevToggle("ali@example.com", 1, 1, 0);
-        service.gorevToggle("veli@example.com", 1, 1, 0);
-        service.gorevToggle("veli@example.com", 1, 1, 1); // veli fazladan bir görev daha
+        service.gorevDurumuAyarla("ali@example.com", 1, 1, 0, true);
+        service.gorevDurumuAyarla("veli@example.com", 1, 1, 0, true);
+        service.gorevDurumuAyarla("veli@example.com", 1, 1, 1, true); // veli fazladan bir görev daha
 
         assertThat(ilerlemeRepo.findByKullaniciIdAndHafta("ali@example.com", 1)).hasSize(1);
         assertThat(ilerlemeRepo.findByKullaniciIdAndHafta("veli@example.com", 1)).hasSize(2);
@@ -53,7 +53,7 @@ class KullaniciIzolasyonTest {
         assertThat(ilerlemeRepo.findByKullaniciIdAndHaftaAndGunAndGorevIndex("veli@example.com", 1, 1, 0)).isPresent();
 
         // Ali kendi görevini geri alır; Veli etkilenmez (izolasyon)
-        boolean aliDurum = service.gorevToggle("ali@example.com", 1, 1, 0);
+        boolean aliDurum = service.gorevDurumuAyarla("ali@example.com", 1, 1, 0, false);
         assertThat(aliDurum).isFalse();
         assertThat(ilerlemeRepo.findByKullaniciIdAndHaftaAndGunAndGorevIndex("veli@example.com", 1, 1, 0))
                 .hasValueSatisfying(k -> assertThat(k.tamamlandi()).isTrue());

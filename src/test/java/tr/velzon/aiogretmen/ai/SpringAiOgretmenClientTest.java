@@ -49,6 +49,43 @@ class SpringAiOgretmenClientTest {
     }
 
     @Test
+    void kullanimKaydiSureyiVeCevaptakiModeliTasir() {
+        // OpenRouter yedeğe geçtiyse cevabın bildirdiği model istenenden farklıdır — ikisi ayrı saklanır
+        when(chatModel.call(any(Prompt.class))).thenAnswer(inv -> {
+            Thread.sleep(20); // ölçülen süre bu gecikmeyi kapsamalı
+            return new ChatResponse(List.of(new Generation(new AssistantMessage("cevap"))),
+                    ChatResponseMetadata.builder().model("anthropic/yedek-model").usage(new DefaultUsage(1, 1)).build());
+        });
+        var client = new SpringAiOgretmenClient(chatModel, props, kullanimRepo, () -> "yerel");
+
+        client.cagir(OgretmenAiClient.AiIstek.tekSeferlik(OgretmenAiClient.Islem.SOHBET,
+                OgretmenAiClient.ModelTuru.GUCLU, "sistem", "mesaj", 100));
+
+        ArgumentCaptor<AiKullanim> kayit = ArgumentCaptor.forClass(AiKullanim.class);
+        verify(kullanimRepo).save(kayit.capture());
+        assertThat(kayit.getValue().model()).isEqualTo("guclu-m");                 // istenen
+        assertThat(kayit.getValue().yanitModel()).isEqualTo("anthropic/yedek-model"); // sağlayıcının bildirdiği
+        assertThat(kayit.getValue().sureMs()).isNotNull().isGreaterThanOrEqualTo(20);
+    }
+
+    @Test
+    void cevaptaModelYoksaYanitModelBosKalir() {
+        // metadata.getModel() varsayılanı boş metin — uydurma değer yazılmaz, NULL kalır
+        when(chatModel.call(any(Prompt.class))).thenReturn(new ChatResponse(
+                List.of(new Generation(new AssistantMessage("cevap"))),
+                ChatResponseMetadata.builder().usage(new DefaultUsage(1, 1)).build()));
+        var client = new SpringAiOgretmenClient(chatModel, props, kullanimRepo, () -> "yerel");
+
+        client.cagir(OgretmenAiClient.AiIstek.tekSeferlik(OgretmenAiClient.Islem.SOHBET,
+                OgretmenAiClient.ModelTuru.HIZLI, "sistem", "mesaj", 100));
+
+        ArgumentCaptor<AiKullanim> kayit = ArgumentCaptor.forClass(AiKullanim.class);
+        verify(kullanimRepo).save(kayit.capture());
+        assertThat(kayit.getValue().yanitModel()).isNull();
+        assertThat(kayit.getValue().sureMs()).isNotNull().isGreaterThanOrEqualTo(0);
+    }
+
+    @Test
     void kimlikYoksaModeleHicGidilmez() {
         var client = new SpringAiOgretmenClient(chatModel, props, kullanimRepo, () -> {
             throw new IllegalStateException("oturum yok");

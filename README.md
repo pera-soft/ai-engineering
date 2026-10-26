@@ -161,6 +161,11 @@ Program 12 haftadan, her hafta 5 günden oluşur: **60 günlük ders**, **60 sta
 - Her YZ çağrısının girdi/çıktı token sayısı, çağıran kullanıcıyla birlikte `ai_kullanim`
   tablosuna yazılır; `/api/kullanim` yalnız o kullanıcının satırlarını toplar. Sitede kişi başı kota
   yoktur; sayaç yalnız görünürlük içindir.
+- Aynı satır çağrının süresini (`sure_ms`, milisaniye; Spring AI'nın yeniden denemeleri dahil toplam
+  bekleme) ve sağlayıcının cevapta bildirdiği modeli (`yanit_model`) de tutar. `model` istenen modeldir;
+  OpenRouter başka bir sağlayıcıya/yedeğe geçtiyse `yanit_model` farklı görünür (ADR-0016). Bu iki sütun
+  yalnız ham kayıttır — `/api/kullanim` bunları özetlemez; eski satırlarda boştur. Başarısız çağrı
+  satır yazmaz.
 - `GET /api/kullanim` toplam çağrı sayısını, toplam girdi/çıktı token'ı ve işlem bazında dağılımı
   (değerlendirme, sohbet, quiz, kitap, hafıza, örnek, açıklama, rapor) döndürür; ayrıca YZ'nin
   etkin olup olmadığını (`aiAktif`) bildirir. Para birimi cinsinden maliyet hesaplanmaz;
@@ -792,7 +797,7 @@ istekler 403 ile reddedilir; yerel modda `curl` gibi araçlar etkilenmez.
 | GET | `/api/hafta/{no}` | Haftanın tüm detayı: günler (HTML), görevler ve durumları, quiz |
 | GET | `/api/kaynaklar` | Çalışma metinlerinin listesi |
 | GET | `/api/kaynak/{slug}` | Bir çalışma metninin HTML'i |
-| POST | `/api/gorev/toggle` | Görev durumunu tersine çevirir — gövde: `{hafta, gun, gorevIndex}` |
+| POST | `/api/gorev/durum` | Görevi istenen duruma ayarlar (idempotent; tekrar denemek sonucu değiştirmez) — gövde: `{hafta, gun, gorevIndex, tamamlandi}`; `tamamlandi` zorunlu, yoksa 400 |
 | POST | `/api/quiz/statik-sonuc` | Quiz sonucunu kaydeder — gövde: `{hafta, puan, detay, tur}` |
 | POST | `/api/sifirla` | Temiz başlangıç (bkz. Özellikler) |
 
@@ -889,7 +894,7 @@ Bu ilke bir niyet değil, testle zorlanan bir kuraldır:
 | `kaynaklar` | — | Türkçe çalışma metinlerinin listesi (başlık, yazar, ilgili haftalar) |
 | `kaynak` | `slug` | Bir çalışma metninin tam Türkçe metni (diyagramlar ayıklanmış) |
 | `atolye_kategorileri` | — | Prompt Atölyesi kategorileri ve alıştırmaları (istemci rubrik olarak kullanır) |
-| `gorev_isaretle` | `hafta`, `gun`, `gorev_index` | Görev durumunu tersine çevirir ve yeni durumu döndürür |
+| `gorev_isaretle` | `hafta`, `gun`, `gorev_index`, `hedef_durum?` | Görevi istenen duruma ayarlar (`hedef_durum` verilmezse `true`) ve yeni durumu döndürür; idempotent — zaman aşımı sonrası tekrar deneme güvenli |
 | `statik_quiz_kaydet` | `hafta`, `puan`, `detay?` | Statik quiz sonucunu kaydeder |
 | `kullanim_istatistik` | — | Sunucudaki YZ token kullanımı (MCP muhakemesi bu sayacı artırmaz) |
 
@@ -1199,6 +1204,7 @@ kayıtlıdır.
 | 0013 | SMTP e-posta gönderimi | `spring-boot-starter-mail`; doğrulama + şifre sıfırlama e-postaları, STARTTLS zorunlu, asenkron kuyruk, saatte 3 e-posta sınırı; SMTP'siz site açılmaz |
 | 0014 | Sitede PostgreSQL | `org.postgresql:postgresql`; tek taşınabilir `schema.sql` (H2 + PostgreSQL), tırnaksız JDBC adları; site veritabanını yalnız ortam değişkeninden alır; PG testi isteğe bağlı (`PG_TEST_URL`) |
 | 0015 | Ekip kodu ile kayıt | Varsayılan kayıt ortak ekip koduyla (`APP_SITE_KAYIT=ekip-kodu`, `APP_SITE_EKIP_KODU` ≥ 12 karakter, yoksa açılmaz); e-posta gönderilmez; şifre sıfırlama bağlantısını işletmen `tools/sifre-baglantisi.sh` ile üretir; e-posta modu (ADR-0013) ayarla korunur |
+| 0016 | Araç idempotency'si ve AI ölçümü | Görev işaretleme idempotent hedef durum (`POST /api/gorev/durum`, MCP `hedef_durum`); `ai_kullanim` süre + cevap modeli; `statik_quiz_kaydet` tekrarı, bağlam bütçesi ve yedek model zinciri yeniden açma koşullu kabul |
 
 ---
 
@@ -1258,8 +1264,7 @@ Kaynak: `docs/tech-debt-tracker.md` ve `docs/exec-plans/` (Faz 9: `active/faz-9-
 - **Hızlı modelin quiz üretim kalitesi** sistematik olarak ölçülmedi.
 - **Kitap notu işleme**de hızlı model bazen etiket/kavram alanlarını boş döndürebiliyor (özet sağlam).
 - **MCP araç hataları** düz metin döner (`isError: true`); kategorili/yeniden denenebilir yapıya
-  yükseltilebilir. `gorev_isaretle` bir aç/kapa (toggle) olduğundan, istemcinin zaman aşımı sonrası
-  tekrar denemesi işareti geri alabilir — açık bir hedef durum parametresi değerlendirilmektedir.
+  yükseltilebilir.
 - **Kitap notları için arayüz yok:** yalnız API üzerinden (yerel modda) eklenir.
 - **Vektör deposu** bellek içi düz kosinüs araması yapar; birkaç yüz not için yeterli ve kesindir,
   çok büyük not tabanlarına ölçeklenmez (o durumda pgvector'a geçiş ADR-0005'i değiştirir).

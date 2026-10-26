@@ -360,7 +360,7 @@ async function okudumTamamla() {
     return;
   }
   // AI açık: görevi HENÜZ tamamlama — öğretmen bir yansıtma sorusu sorup samimi cevapla geçirecek.
-  // hafta = AI çalışma haftası (kilitli önizleme aktifHafta'yı kaydırsa bile yanlış haftaya toggle GİTMESİN).
+  // hafta = AI çalışma haftası (kilitli önizleme aktifHafta'yı kaydırsa bile yanlış haftaya görev isteği GİTMESİN).
   durum.gorevBekleyen = { hafta: sohbetHaftasi(), gun, index: gv.t.index, tip: "oku" };
   gorevBariGuncelle(); // bar artık "okudun, öğretmenin sorusunu cevapla" durumunu bilsin
   await okuSonrasiSohbet(baslik, gun);
@@ -494,7 +494,8 @@ function gunCiz(g, kilitli = false, haftaKilitli = false) {
       kutu.disabled = haftaKilitli || kilitli || durum.aiAktif; // kilitli hafta → tamamlanamaz
       kutu.addEventListener("change", async () => {
         // haftaCiz: yalnız tasklistCiz değil — günün son görevi bitince SONRAKİ GÜN kilidi de kalksın (#r5)
-        if (await gorevToggle(g.gun, t.index, satir, kutu, stat, g)) haftaCiz();
+        // kutu.checked = tıklamadan SONRAKİ (istenen) durum — sunucuya hedef olarak gider (idempotent)
+        if (await gorevDurumuGonder(g.gun, t.index, kutu.checked, satir, kutu, stat, g)) haftaCiz();
       });
       const rozet = el("span", "tip-rozet " + meta.sinif, kilitli ? "🔒" : meta.ikon);
       rozet.title = kilitli ? "Önce sıradaki görevi bitir" : meta.etiket;
@@ -514,17 +515,18 @@ function gunCiz(g, kilitli = false, haftaKilitli = false) {
   return gun;
 }
 
-/** Görevi toggle eder. Başarılıysa true, hata olursa false döner (çağıran akış buna göre karar verir). */
-async function gorevToggle(gun, gorevIndex, satir, kutu, stat, g) {
+/** Görevi istenen duruma (hedef) ayarlar — idempotent uç. Başarılıysa true, hata olursa false döner
+ *  (çağıran akış buna göre karar verir). */
+async function gorevDurumuGonder(gun, gorevIndex, hedef, satir, kutu, stat, g) {
   const oncekiDisabled = kutu.disabled; // AI açıkken salt-durum checkbox'ı yeniden açılmasın (#3)
   kutu.disabled = true;
   try {
-    const yanit = await api("/api/gorev/toggle", {
+    const yanit = await api("/api/gorev/durum", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       // Görev tamamlama AI ÇALIŞMA haftasına ait (okuma-kapısı/görev barı) — kilitli önizleme
-      // durum.aktifHafta'yı kaydırsa bile YANLIŞ haftaya toggle GİTMESİN (inceleme KRİTİK bulgusu).
-      body: JSON.stringify({ hafta: sohbetHaftasi(), gun, gorevIndex }),
+      // durum.aktifHafta'yı kaydırsa bile YANLIŞ haftaya istek GİTMESİN (inceleme KRİTİK bulgusu).
+      body: JSON.stringify({ hafta: sohbetHaftasi(), gun, gorevIndex, tamamlandi: hedef }),
     });
     kutu.checked = yanit.tamamlandi;
     satir.classList.toggle("checked", yanit.tamamlandi);
@@ -545,10 +547,10 @@ async function gorevToggle(gun, gorevIndex, satir, kutu, stat, g) {
 }
 
 /** DOM-BAĞIMSIZ görev tamamlama (bar + okuma kartı kullanır; satir/kutu/stat gerektirmez).
- *  - Doğru haftaya toggle gider: durum.sohbetHafta ?? durum.aktifHafta (kilitli önizleme kaydırsa bile).
- *  - İDEMPOTENT: yalnız BİTMEMİŞ görevi tamamlar; zaten bitmişse hiçbir POST atmaz (geri-alma OLMAZ).
+ *  - Doğru haftaya gider: durum.sohbetHafta ?? durum.aktifHafta (kilitli önizleme kaydırsa bile).
+ *  - İDEMPOTENT: sunucuya hedef (tamamlandi: true) gider; ayrıca zaten bitmişse hiç POST atmaz.
  *  Görev bittiyse true, hata olursa false döner. */
-const gorevIslemde = new Set(); // uçuşan toggle anahtarları — backend flip yaptığı için eşzamanlı çift-çağrı geri-almayı önler
+const gorevIslemde = new Set(); // uçuşan istek anahtarları — sunucu artık idempotent; bu yalnız gereksiz çift POST'u keser
 async function gorevTamamla(gun, gorevIndex) {
   const hafta = sohbetHaftasi();
   const anahtar = `${hafta}:${gun}:${gorevIndex}`;
@@ -557,14 +559,14 @@ async function gorevTamamla(gun, gorevIndex) {
           : (durum.detay && durum.detay.no === hafta) ? durum.detay : null;
   const g = d ? d.gunler.find((x) => x.gun === gun) : null;
   const kayit = g ? g.gorevler.find((t) => t.index === gorevIndex) : null;
-  if (kayit && kayit.tamamlandi) return true; // idempotent — zaten bitmiş; tekrar toggle etmeyip geri-almayı önle
-  if (gorevIslemde.has(anahtar)) return true; // aynı görev HÂLÂ işleniyor — çift toggle/geri-alma yarışını önle
+  if (kayit && kayit.tamamlandi) return true; // zaten bitmiş — gereksiz POST atma
+  if (gorevIslemde.has(anahtar)) return true; // aynı görev HÂLÂ işleniyor — ikinci POST gereksiz
   gorevIslemde.add(anahtar);
   try {
-    const yanit = await api("/api/gorev/toggle", {
+    const yanit = await api("/api/gorev/durum", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ hafta, gun, gorevIndex }),
+      body: JSON.stringify({ hafta, gun, gorevIndex, tamamlandi: true }),
     });
     if (kayit) kayit.tamamlandi = yanit.tamamlandi;
     await ozetYenile();
@@ -990,8 +992,8 @@ function aktifGorevKartiCiz() {
     const tamam = el("button", "aktif-gorev-tamam", "✓ Tamamladım");
     tamam.type = "button";
     tamam.addEventListener("click", async () => {
-      tamam.disabled = true; // çift-tık koruması: çift POST toggle'ı geri almasın (#r6)
-      if (!(await gorevToggle(gv.gun, gv.index, gv.satir, gv.kutu, gv.stat, gv.g))) { tamam.disabled = false; return; }
+      tamam.disabled = true; // çift-tık koruması: gereksiz ikinci POST atılmasın (#r6; uç artık idempotent)
+      if (!(await gorevDurumuGonder(gv.gun, gv.index, true, gv.satir, gv.kutu, gv.stat, gv.g))) { tamam.disabled = false; return; }
       tamam.textContent = "✓ Tamamlandı";
       haftaCiz(); // görev listesini tazele — sıradaki açılsın
     });
@@ -1442,7 +1444,7 @@ async function gonder() {
       const bek = durum.gorevBekleyen;
       const suanHafta = sohbetHaftasi();
       if (bek.hafta !== suanHafta) {
-        durum.gorevBekleyen = null; // başka haftaya geçilmiş — bayat kapıyı temizle (yanlış-hafta toggle YOK)
+        durum.gorevBekleyen = null; // başka haftaya geçilmiş — bayat kapıyı temizle (yanlış-hafta görev isteği YOK)
       } else {
         const kayit = gorevKaydiBul(bek.hafta, bek.gun, bek.index);
         if (kayit && kayit.tamamlandi) {

@@ -275,9 +275,9 @@ class SiteKimlikTest {
     @Test
     void csrfTokenSizPostReddedilir() throws Exception {
         MockHttpSession a = oturumAc("csrf@pera.software");
-        mvc.perform(post("/api/gorev/toggle").session(a)
+        mvc.perform(post("/api/gorev/durum").session(a)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"hafta\":1,\"gun\":1,\"gorevIndex\":0}"))
+                        .content("{\"hafta\":1,\"gun\":1,\"gorevIndex\":0,\"tamamlandi\":true}"))
                 .andExpect(status().isForbidden());
         // token'sız login de reddedilir (login CSRF)
         mvc.perform(post("/api/kimlik/giris").param("email", "csrf@pera.software").param("sifre", SIFRE))
@@ -314,9 +314,9 @@ class SiteKimlikTest {
         MockHttpSession b = oturumAc("b@pera.software");
 
         // A: görev işaretler, quiz kaydeder, sohbet geçmişi olur
-        mvc.perform(post("/api/gorev/toggle").session(a).with(csrf())
+        mvc.perform(post("/api/gorev/durum").session(a).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"hafta\":1,\"gun\":1,\"gorevIndex\":0}"))
+                        .content("{\"hafta\":1,\"gun\":1,\"gorevIndex\":0,\"tamamlandi\":true}"))
                 .andExpect(jsonPath("$.tamamlandi").value(true));
         mvc.perform(post("/api/quiz/statik-sonuc").session(a).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -341,9 +341,9 @@ class SiteKimlikTest {
         mvc.perform(get("/api/sohbet/1").session(b)).andExpect(jsonPath("$.length()").value(0));
 
         // B aynı görevi işaretleyince kendi kaydı oluşur; A'nınki değişmez
-        mvc.perform(post("/api/gorev/toggle").session(b).with(csrf())
+        mvc.perform(post("/api/gorev/durum").session(b).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"hafta\":1,\"gun\":1,\"gorevIndex\":0}"))
+                        .content("{\"hafta\":1,\"gun\":1,\"gorevIndex\":0,\"tamamlandi\":true}"))
                 .andExpect(jsonPath("$.tamamlandi").value(true));
         mvc.perform(get("/api/hafta/1").session(a))
                 .andExpect(jsonPath("$.gunler[0].gorevler[0].tamamlandi").value(true));

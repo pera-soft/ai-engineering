@@ -254,9 +254,11 @@ değil) — kategori + `retryable` + sonraki adımlar alanlarıyla. Bu, `llm-uyg
 Yani sözleşmenin çekirdeği (uygulama hatası ≠ protokol hatası) yerinde. İyileştirme payı da dürüstçe
 kayıtlı (borç listesi): düz metin mesaj, kategorili yapıya (`error_category` + `retryable` + kurtarma
 yolu — "geçerli slug'lar `kaynaklar` aracında") yükseltilebilir. `gorev_isaretle` için düşün:
-toggle yarı-yolda zaman aşımına uğrarsa istemcinin körlemesine tekrar denemesi işareti GERİ alır —
-"belirsiz yazma durumu" dersinin bizdeki somut yüzü. Kodun tam davranışı (sıralı ve eşzamanlı
-tekrar, kayıp güncelleme) ve "çevir" yerine "ayarla" düzeltmesinin tasarımı için bkz.
+2026-10-26'ya kadar araç bir toggle'dı; yarı-yolda zaman aşımına uğrarsa istemcinin körlemesine
+tekrar denemesi işareti GERİ alıyordu — "belirsiz yazma durumu" dersinin bizdeki somut yüzü.
+ADR-0016 bunu "çevir" yerine "ayarla"ya çevirdi (opsiyonel `hedef_durum`, varsayılan `true`); artık
+tekrar denemek sonucu değiştirmez. Eski kodun tam davranışı (sıralı ve eşzamanlı tekrar, kayıp
+güncelleme), düzeltme ve düzeltme sırasında çıkan istisna sarma bulgusu için bkz.
 [araç çağrısı güvenilirliği](arac-cagrisi-guvenilirligi.md) §8.
 
 ### 7.1 Araç arayüzünü zaman içinde korumak — üç kural daha
@@ -275,7 +277,8 @@ Araç tasarımı bir kez yapılıp bitmez; araç yayımlandıktan sonra **bir s�
   testler sessizce bozulur. Doğru yol yeni bir ad eklemek (`gorev_durum_ayarla` ya da `..._v2`),
   eskisini bir sürüm boyunca "kullanım dışı" diye işaretlemek ve sonra kaldırmaktır. **Anlamı**
   değiştirmek de adı değiştirmek kadar kırıcıdır: `gorev_isaretle`'yi aynı adla "toggle"dan
-  "ayarla"ya çevirmek, onu bugünkü anlamıyla çağıran istemciyi bozar.
+  "ayarla"ya çevirmek, onu eski anlamıyla çağıran istemciyi bozar. (Bu depoda tam olarak bu yapıldı —
+  aşağıdaki kutu kararı dürüstçe tartışıyor.)
 - **Annotation'lar ipucudur, zorlama değil.** MCP araç tanımına `readOnlyHint`, `destructiveHint`,
   `idempotentHint`, `openWorldHint` gibi ipuçları eklenebilir. Barındırıcı bunları onay penceresi ve
   sunum için kullanır. Ama resmî belirtim (2026-07-28, Tools) istemcinin bunları **güvenilir bir
@@ -284,6 +287,21 @@ Araç tasarımı bir kez yapılıp bitmez; araç yayımlandıktan sonra **bir s�
   olmadığına da ipucu değil, sözleşme ve kod karar verir (bkz.
   [araç çağrısı güvenilirliği](arac-cagrisi-guvenilirligi.md) §3). Bizim araçlarımız bugün hiç
   annotation taşımıyor (`Tool.builder()` yalnız ad, açıklama ve şema alıyor).
+
+> **Gerçek vaka — kuralı bilerek esnettik (ADR-0016, 2026-10-26).** `gorev_isaretle` toggle'dan
+> "ayarla"ya çevrildi ve **adı korundu**; yeni bir `gorev_durum_ayarla` eklenmedi. Yani yukarıdaki
+> ikinci kuralın tam karşısındaki şey yapıldı: aynı ad, yeni anlam. Bunu yapmak neden savunulabilir
+> oldu? (1) MCP sunucuları 2026-10-21'de kapandı; tek istemci yereldeki stdio bağlantısı — eski anlamı
+> ezberlemiş uzak bir istemci yok. (2) Yeni `hedef_durum` parametresi **opsiyonel**; eski üç argümanla
+> gelen çağrı hâlâ geçerli. (3) Varsayılan `true`, yani "işaretle" adının sözlük anlamıyla uyumlu:
+> eski çağrıların neredeyse tamamı zaten "tamamlandı yap" niyetiyle yapılıyordu; değişen tek davranış,
+> tamamlanmış görevi aynı çağrıyla **geri açmanın** artık mümkün olmaması (bunun için açıkça
+> `hedef_durum: false` gerekir). Ama dürüst olalım: bu, kuralın **istisnası**dır, yeni kuralı değil.
+> Uzakta çalışan, birden çok istemcili bir sunucuda doğru yol yeni araç adı (ya da sürüm) eklemek,
+> eskisini bir sürüm boyunca "kullanım dışı" diye işaretlemek ve sonra kaldırmak olurdu — çünkü
+> hangi istemcinin toggle davranışına (ör. "aynı çağrıyla geri al") dayandığını bilemezsin. Web
+> tarafında aynı kararın tersi verildi: `POST /api/gorev/toggle` sessizce yeniden anlamlandırılmadı,
+> **kaldırılıp** yerine yeni ad (`POST /api/gorev/durum`, `tamamlandi` zorunlu) geldi.
 
 > *Şerh:* Bu kuralların kaynağı olan ders (AIEFS 13-05), açıklama ve ad iyileştirmesinin seçim
 > doğruluğunu "10–20 puan" (Composio), "%62'den %89'a" (Databricks) artırdığını ve tek parça
@@ -446,8 +464,9 @@ Araç tasarımı bir kez yapılıp bitmez; araç yayımlandıktan sonra **bir s�
 12. Uzak bir MCP sunucusu için üç yetkilendirme kuralını say (kitle bağlama, token aktarımı yok,
     asgari kapsam). ADR-0007'deki `mcp-http` profili bunlardan hangisini uyguluyordu, hangisi eksikti?
 13. "2026-07-28 revizyonu protokolü durumsuz yaptı" cümlesi, "artık uygulamam da durumsuz olmalı"
-    anlamına gelir mi? `gorev_isaretle`'yi "ayarla" anlamına çevirmek istesen, aynı adı mı
-    kullanırsın, yeni bir araç mı eklersin; neden?
+    anlamına gelir mi? Bu depoda `gorev_isaretle` 2026-10-26'da aynı adla toggle'dan "ayarla"ya
+    çevrildi (ADR-0016). Bu karar §7.1'deki sürümleme kuralını hangi koşullar sayesinde esnetebildi,
+    ve aynı değişiklik uzak, çok istemcili bir sunucuda yapılsaydı doğru yol ne olurdu?
 
 ### Cevaplar (11–13)
 11. Araç = model denetimli, kaynak = uygulama güdümlü, prompt = kullanıcı denetimli. `sokratik`
@@ -461,12 +480,15 @@ Araç tasarımı bir kez yapılıp bitmez; araç yayımlandıktan sonra **bir s�
     olarak kapalıydı, çünkü sunucu hiçbir alt API çağırmıyordu. Kapsam ayrımı eksikti: tek bir token
     yazan araçlar dahil hepsini açıyordu.
 13. Hayır: durumsuz protokol ≠ durumsuz uygulama. Uzun ömürlü durum, sunucunun ürettiği açık bir
-    tutamaç altında paylaşılan depoda yaşar. Anlam değişikliği kırıcı olduğu için yeni bir araç
-    eklenir (ör. `gorev_durum_ayarla`), eskisi bir sürüm boyunca kullanım dışı işaretlenip kaldırılır.
+    tutamaç altında paylaşılan depoda yaşar. Esnetmeyi mümkün kılan koşullar: MCP sunucuları kapalı,
+    tek istemci yerel; yeni `hedef_durum` opsiyonel; varsayılanı (`true`) adın anlamıyla uyumlu.
+    Uzak, çok istemcili bir sunucuda anlam değişikliği kırıcıdır: yeni bir araç eklenir (ör.
+    `gorev_durum_ayarla` ya da `..._v2`), eskisi bir sürüm boyunca kullanım dışı işaretlenip kaldırılır.
 
 ## Kaynak ve lisans
 - **Bu deponun kendi vakası:** ADR-0007 (MCP sunucusu, `mcp-http` profili, OAuth 2.1 resource server),
-  `mcp/OgretmenMcpAraclari.java`, `application-mcp-http.yml`, `docs/tech-debt-tracker.md`.
+  `mcp/OgretmenMcpAraclari.java`, `application-mcp-http.yml`, `docs/tech-debt-tracker.md`;
+  ADR-0016 (`gorev_isaretle` toggle → ayarla, adın korunması; 2026-10-26).
 - **Model Context Protocol belirtimi** (modelcontextprotocol.io, 2026-10-25'te okundu): Versioning
   sayfası (güncel sürüm 2026-07-28), 2026-07-28 Changelog, Tools / Resources / Prompts sayfaları
   (kimin denetlediği, annotation'ların güvenilmezliği, durumlu araç notu) ve Authorization sayfası

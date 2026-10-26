@@ -66,14 +66,34 @@ class ProgramControllerTest {
     }
 
     @Test
-    void gorevToggleYeniDurumuDoner() throws Exception {
-        when(ilerlemeService.gorevToggle("yerel", 1, 2, 0)).thenReturn(true);
+    void gorevDurumuAyarlanirVeYeniDurumDoner() throws Exception {
+        when(ilerlemeService.gorevDurumuAyarla("yerel", 1, 2, 0, false)).thenReturn(false);
 
+        mvc.perform(post("/api/gorev/durum")
+                        .contentType("application/json")
+                        .content("{\"hafta\":1,\"gun\":2,\"gorevIndex\":0,\"tamamlandi\":false}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tamamlandi").value(false));
+    }
+
+    @Test
+    void gorevDurumundaTamamlandiZorunlu_yoksa400() throws Exception {
+        // hedef durum belirtilmezse sessizce varsayılan seçilmez — istemci hatası açıkça döner
+        mvc.perform(post("/api/gorev/durum")
+                        .contentType("application/json")
+                        .content("{\"hafta\":1,\"gun\":2,\"gorevIndex\":0}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.hata").exists())
+                .andExpect(jsonPath("$.detay").value(org.hamcrest.Matchers.containsString("tamamlandi")));
+        org.mockito.Mockito.verifyNoInteractions(ilerlemeService);
+    }
+
+    @Test
+    void eskiToggleUcuKaldirildi() throws Exception {
         mvc.perform(post("/api/gorev/toggle")
                         .contentType("application/json")
                         .content("{\"hafta\":1,\"gun\":2,\"gorevIndex\":0}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.tamamlandi").value(true));
+                .andExpect(status().is4xxClientError());
     }
 
     @Test
@@ -91,7 +111,7 @@ class ProgramControllerTest {
 
     @Test
     void bozukGovde400VeSozlesmeliDoner() throws Exception {
-        mvc.perform(post("/api/gorev/toggle")
+        mvc.perform(post("/api/gorev/durum")
                         .contentType("application/json")
                         .content("{bozuk json"))
                 .andExpect(status().isBadRequest())

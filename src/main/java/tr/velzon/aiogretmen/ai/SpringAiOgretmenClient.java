@@ -27,6 +27,8 @@ import java.util.List;
 public class SpringAiOgretmenClient implements OgretmenAiClient {
 
     private static final Logger log = LoggerFactory.getLogger(SpringAiOgretmenClient.class);
+    /** schema.sql: ai_kullanim.yanit_model VARCHAR(100). */
+    private static final int YANIT_MODEL_SINIRI = 100;
 
     private final ChatModel chatModel;
     private final AppProperties props;
@@ -82,6 +84,10 @@ public class SpringAiOgretmenClient implements OgretmenAiClient {
                 .build();
 
         ChatResponse yanit;
+        // Süre: duvar saati, chatModel.call'ın TAMAMI — Spring AI'nın kendi yeniden denemeleri
+        // (spring.ai.retry, 429/5xx) bu çağrının içinde olduğundan DAHİLDİR; kullanıcının beklediği
+        // gerçek gecikme budur, tek denemenin süresi değil. nanoTime: saat ayarından etkilenmez.
+        long baslangic = System.nanoTime();
         try {
             yanit = chatModel.call(new Prompt(mesajlar, secenekler));
         } catch (RuntimeException e) {
@@ -102,9 +108,27 @@ public class SpringAiOgretmenClient implements OgretmenAiClient {
         int input = kullanim == null || kullanim.getPromptTokens() == null ? 0 : kullanim.getPromptTokens();
         int output = kullanim == null || kullanim.getCompletionTokens() == null ? 0 : kullanim.getCompletionTokens();
 
-        kullanimRepo.save(AiKullanim.kayit(kullaniciId, islem.name(), model, input, output));
-        log.info("AI çağrısı: islem={} model={} input={} output={} token", islem, model, input, output);
+        int sureMs = (int) Math.min(Integer.MAX_VALUE, (System.nanoTime() - baslangic) / 1_000_000);
+        String yanitModel = yanitModeli(yanit);
+
+        kullanimRepo.save(AiKullanim.kayit(kullaniciId, islem.name(), model, input, output, sureMs, yanitModel));
+        log.info("AI çağrısı: islem={} model={} yanitModel={} input={} output={} token sure={}ms",
+                islem, model, yanitModel, input, output, sureMs);
 
         return new AiYanit(metin, input, output, model);
+    }
+
+    /**
+     * Sağlayıcının cevapta bildirdiği model ({@code ChatResponseMetadata.getModel()}; OpenAI-uyumlu
+     * cevabın {@code model} alanından doldurulur). Bildirilmediyse metadata boş metin döner → null
+     * (uydurma değer yazılmaz). Sütun sınırını (100) aşan değer kaydı düşürmesin diye kırpılır —
+     * ücreti ödenmiş çağrının kullanım satırı kaybolmamalı.
+     */
+    private static String yanitModeli(ChatResponse yanit) {
+        String m = yanit.getMetadata() == null ? null : yanit.getMetadata().getModel();
+        if (m == null || m.isBlank()) {
+            return null;
+        }
+        return m.length() > YANIT_MODEL_SINIRI ? m.substring(0, YANIT_MODEL_SINIRI) : m;
     }
 }

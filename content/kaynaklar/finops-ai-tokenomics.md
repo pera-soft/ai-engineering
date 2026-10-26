@@ -639,8 +639,8 @@ farklı nedenlerle büyüyen üç parçadan oluşur:
 | Hafıza (memory) | sohbet geçmişi, getirilen belgeler, öğrenci hafızası | bağlam birikiyor |
 | Cevap (response) | modelin çıktısı | format/uzunluk problemi |
 
-Dördü tek kovaya girerse hangisinin büyüdüğünü göremezsin. Bu depoda `ai_kullanim` yalnız girdi ve
-çıktı tutar; web yüzünde araç çağrısı yok, ama **hafıza** var: sohbet son 20 mesajı
+Dördü tek kovaya girerse hangisinin büyüdüğünü göremezsin. Bu depoda `ai_kullanim` token olarak yalnız
+girdi ve çıktı toplamını tutar; web yüzünde araç çağrısı yok, ama **hafıza** var: sohbet son 20 mesajı
 (`SohbetService`) ve öğrencinin `OGRENCI.md` hafızasını bağlama ekler. Hafıza büyüdükçe girdi token'ı
 artar ve pano bunu "prompt şişti" diye gösterir. Katmanı ayırmanın en ucuz yolu, prompt'u kuran
 yerde (`BaglamServisi` + `PromptFactory`) parça uzunluklarını ayrı ayrı loglamaktır.

@@ -36,5 +36,13 @@ class AiKullanimGocTest {
         jdbc.update("INSERT INTO ai_kullanim (kullanici_id, islem, model) VALUES ('a@pera.software','RAPOR','m')");
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM ai_kullanim WHERE kullanici_id='a@pera.software'",
                 Integer.class)).isEqualTo(1);
+
+        // 2026-10-26 (ADR-0016): süre + cevaptaki model — eklemeli, eski satırlar NULL kalır
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM ai_kullanim WHERE sure_ms IS NULL AND yanit_model IS NULL",
+                Integer.class)).isEqualTo(2);
+        jdbc.update("INSERT INTO ai_kullanim (islem, model, sure_ms, yanit_model) VALUES ('SOHBET','m',1234,?)",
+                "x".repeat(100));
+        assertThat(jdbc.queryForObject("SELECT sure_ms FROM ai_kullanim WHERE sure_ms IS NOT NULL", Integer.class))
+                .isEqualTo(1234);
     }
 }

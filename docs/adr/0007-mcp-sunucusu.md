@@ -178,6 +178,11 @@ Cursor**'da sorunsuz çalışır — doğrulandı. Sunucu tarafında yapılacak 
   `grep -rn "org.springframework.ai\|OgretmenAiClient\|AnlamArama" src/main/java/tr/velzon/aiogretmen/mcp/` → BOŞ.
 - ADR-0004 (OpenRouter), ADR-0005 (anlam-eşleşmeli bağlam — MCP'de KAPALI), ADR-0001 (Spring Boot + Spring AI).
 
+## Not (2026-10-26): `gorev_isaretle` idempotent set
+`gorev_isaretle` artık toggle değil, hedef-durum ayarlar: opsiyonel `hedef_durum` (boolean, verilmezse
+`true`). Aynı çağrı N kez = aynı sonuç; istemcinin zaman aşımı sonrası tekrar denemesi işareti geri almaz.
+Web tarafında `POST /api/gorev/toggle` yerine `POST /api/gorev/durum` (`tamamlandi` zorunlu). Gerekçe: ADR-0016.
+
 ## Kapanış (2026-10-21)
 Canlı sunucu kapatıldı; bu ADR'deki dağıtım adımları artık uygulanmaz. Uygulama yalnız yerelde
 (127.0.0.1:8090) çalışır; `tools/deploy.sh` kaldırıldı (git geçmişinde duruyor).

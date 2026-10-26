@@ -42,7 +42,7 @@ class CsrfKorumaTest {
 
     @Test
     void yabanciOriginliApiIstegi403() throws Exception {
-        MockHttpServletResponse yanit = calistir("/api/gorev/toggle", "POST",
+        MockHttpServletResponse yanit = calistir("/api/gorev/durum", "POST",
                 null, "https://kotu-site.example");
 
         assertThat(yanit.getStatus()).isEqualTo(403);

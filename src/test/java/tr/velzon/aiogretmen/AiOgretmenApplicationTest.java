@@ -57,8 +57,8 @@ class AiOgretmenApplicationTest {
         HttpHeaders basliklar = new HttpHeaders();
         basliklar.add("Content-Type", "application/json");
         basliklar.add("Sec-Fetch-Site", "cross-site");
-        ResponseEntity<String> yanit = rest.postForEntity("/api/gorev/toggle",
-                new HttpEntity<>("{\"hafta\":1,\"gun\":1,\"gorevIndex\":0}", basliklar), String.class);
+        ResponseEntity<String> yanit = rest.postForEntity("/api/gorev/durum",
+                new HttpEntity<>("{\"hafta\":1,\"gun\":1,\"gorevIndex\":0,\"tamamlandi\":true}", basliklar), String.class);
 
         assertThat(yanit.getStatusCode().value()).isEqualTo(403); // filtre gerçekten kayıtlı
     }

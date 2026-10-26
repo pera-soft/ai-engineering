@@ -24,9 +24,9 @@ class KullanimSorgulariTest {
 
     @Test
     void doluTablodaIslemBazindaToplamDoner() {
-        kullanimRepo.save(AiKullanim.kayit("yerel", "SOHBET", "m", 100, 50));
-        kullanimRepo.save(AiKullanim.kayit("yerel", "SOHBET", "m", 200, 80));
-        kullanimRepo.save(AiKullanim.kayit("yerel", "DEGERLENDIRME", "m", 500, 300));
+        kullanimRepo.save(AiKullanim.kayit("yerel", "SOHBET", "m", 100, 50, null, null));
+        kullanimRepo.save(AiKullanim.kayit("yerel", "SOHBET", "m", 200, 80, null, null));
+        kullanimRepo.save(AiKullanim.kayit("yerel", "DEGERLENDIRME", "m", 500, 300, null, null));
 
         List<Map<String, Object>> toplam = sorgular.islemBazindaToplam("yerel");
 
@@ -43,6 +43,19 @@ class KullanimSorgulariTest {
         assertThat(((Number) sohbet.get("output_tokens")).longValue()).isEqualTo(130);
     }
 
+    /** ADR-0016: süre + cevaptaki model sütunlara eşlenir ve geri okunur (toplam sorgusu değişmez). */
+    @Test
+    void sureVeYanitModeliKaydedilipOkunur() {
+        AiKullanim kayit = kullanimRepo.save(
+                AiKullanim.kayit("yerel", "SOHBET", "istenen-m", 1, 2, 1234, "saglayici/yedek-m"));
+
+        assertThat(kullanimRepo.findById(kayit.id())).hasValueSatisfying(k -> {
+            assertThat(k.sureMs()).isEqualTo(1234);
+            assertThat(k.yanitModel()).isEqualTo("saglayici/yedek-m");
+            assertThat(k.model()).isEqualTo("istenen-m");
+        });
+    }
+
     @Test
     void bosTablodaBosListeDoner() {
         assertThat(sorgular.islemBazindaToplam("yerel")).isEmpty();
@@ -51,9 +64,9 @@ class KullanimSorgulariTest {
     /** Faz 9b: /api/kullanim yalnız aktif kullanıcının çağrılarını sayar. */
     @Test
     void toplamYalnizVerilenKullanicininSatirlariniSayar() {
-        kullanimRepo.save(AiKullanim.kayit("a@pera.software", "SOHBET", "m", 100, 50));
-        kullanimRepo.save(AiKullanim.kayit("a@pera.software", "RAPOR", "m", 10, 5));
-        kullanimRepo.save(AiKullanim.kayit("b@pera.software", "SOHBET", "m", 7, 3));
+        kullanimRepo.save(AiKullanim.kayit("a@pera.software", "SOHBET", "m", 100, 50, null, null));
+        kullanimRepo.save(AiKullanim.kayit("a@pera.software", "RAPOR", "m", 10, 5, null, null));
+        kullanimRepo.save(AiKullanim.kayit("b@pera.software", "SOHBET", "m", 7, 3, null, null));
 
         List<Map<String, Object>> b = sorgular.islemBazindaToplam("b@pera.software");
         assertThat(b).hasSize(1);

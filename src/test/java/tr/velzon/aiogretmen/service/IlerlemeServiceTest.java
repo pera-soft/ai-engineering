@@ -25,8 +25,8 @@ class IlerlemeServiceTest {
     static final String YEREL = "yerel";
 
     @Test
-    void ilkToggleTamamlandiOlarakOlusturur() {
-        boolean durum = service.gorevToggle(YEREL, 1, 1, 0);
+    void ilkAyarlamaKaydiIstenenDurumdaOlusturur() {
+        boolean durum = service.gorevDurumuAyarla(YEREL, 1, 1, 0, true);
 
         assertThat(durum).isTrue();
         assertThat(ilerlemeRepo.findByKullaniciIdAndHaftaAndGunAndGorevIndex(YEREL, 1, 1, 0))
@@ -34,21 +34,24 @@ class IlerlemeServiceTest {
     }
 
     @Test
-    void ikinciToggleGeriAlir_kayitSayisiArtmaz() {
-        service.gorevToggle(YEREL, 2, 3, 1);
-        boolean durum = service.gorevToggle(YEREL, 2, 3, 1);
+    void ayniAyarlamaIkiKez_tekSatirAyniDurum() {
+        // idempotent: tekrar denenen çağrı (zaman aşımı + retry) işareti GERİ ALMAZ
+        service.gorevDurumuAyarla(YEREL, 2, 3, 1, true);
+        boolean durum = service.gorevDurumuAyarla(YEREL, 2, 3, 1, true);
 
-        assertThat(durum).isFalse();
-        assertThat(ilerlemeRepo.findByKullaniciIdAndHafta(YEREL, 2)).hasSize(1); // upsert — ikinci kayıt açılmadı
+        assertThat(durum).isTrue();
+        assertThat(ilerlemeRepo.findByKullaniciIdAndHafta(YEREL, 2)).singleElement()
+                .satisfies(k -> assertThat(k.tamamlandi()).isTrue()); // upsert — ikinci kayıt açılmadı
     }
 
     @Test
-    void ucuncuToggleTekrarTamamlar() {
-        service.gorevToggle(YEREL, 1, 2, 0);
-        service.gorevToggle(YEREL, 1, 2, 0);
-        boolean durum = service.gorevToggle(YEREL, 1, 2, 0);
+    void trueSonraFalse_falseOlur() {
+        service.gorevDurumuAyarla(YEREL, 1, 2, 0, true);
+        boolean durum = service.gorevDurumuAyarla(YEREL, 1, 2, 0, false);
 
-        assertThat(durum).isTrue();
+        assertThat(durum).isFalse();
+        assertThat(ilerlemeRepo.findByKullaniciIdAndHaftaAndGunAndGorevIndex(YEREL, 1, 2, 0))
+                .hasValueSatisfying(k -> assertThat(k.tamamlandi()).isFalse());
     }
 
     @Test

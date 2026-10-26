@@ -175,11 +175,16 @@ goodput başarısızlıktır; düşük verimde %99 goodput hedeftir.
   saniyelik tavanı aşmamak gerekir. Tek bir "gecikme SLO'su" yazan ekip ya sohbeti cezalandırır ya
   raporu yanlış alarm kaynağına çevirir.
 
-**Bu projedeki bağ — dürüst eksik.** `ai_kullanim` tablosu (`AiKullanim`: kullanıcı, işlem, model,
-girdi/çıktı token, tarih) her çağrıyı kaydeder ama **süre kaydetmez**. Yani bugün bu depoda goodput
-hesaplanamaz; ancak log satırlarından tahmin edilir. İlk adım şema değişikliği değil, karardır:
-"`islem` başına hangi E2E kısıtı?" sorusunu yazmak. Bu yazılmadan eklenen bir süre sütunu yalnızca
-bir sayı daha olur.
+**Bu projedeki bağ — veri var, SLO yok.** `ai_kullanim` tablosu (`AiKullanim`: kullanıcı, işlem,
+model, girdi/çıktı token, tarih) 2026-10-26'ya kadar **süre kaydetmiyordu**; goodput hesaplanamaz,
+ancak log satırlarından tahmin edilirdi. ADR-0016 (karar 4) iki eklemeli sütun getirdi: `sure_ms`
+ve `yanit_model` (eski satırlarda boş). `sure_ms`, `SpringAiOgretmenClient`'ta `System.nanoTime()`
+ile ölçülen **duvar saati** süresidir ve `chatModel.call`'ın tamamını kapsar — Spring AI'nın kendi
+yeniden denemeleri (429/5xx) bu çağrının içinde olduğu için **dahildir**. Yani kullanıcının gerçekten
+beklediği E2E'dir, tek denemenin süresi değil. Çağrı akışsız olduğu için TTFT ve TPOT ayrı ölçülmez;
+goodput bu depoda yalnız **E2E kısıtıyla** hesaplanabilir. Artık ölçülebilir veri var, ama asıl iş
+hâlâ yapılmadı: "`islem` başına hangi E2E kısıtı?" sorusunu yazmak. SLO yazılmadan süre sütunu
+yalnızca bir sayı daha olur; ADR-0016 da özet/panoyu bilinçli olarak eklemedi.
 
 ## 3. Yük testi — tek prompt'u tekrarlama tuzağı
 Klasik bir yük testi aynı isteği binlerce kez gönderir. LLM'de bu, ölçtüğünü sandığın şeyi ölçmez.
@@ -248,7 +253,7 @@ sayesinde servisler değişmez."
 | Yeniden deneme (retry) | sınırlı, geri çekilmeli | 3 deneme, yalnız 5xx/bağlantı hatası, 30 sn pencere (`AiYapilandirma`) |
 | Hız sınırı (rate limit) | kiracı/anahtar/model başına | **Yok** — sitede kota yok kararı (ADR-0012); bkz. [`finops-ai-tokenomics.md`](finops-ai-tokenomics.md) |
 | Sır referansı (secret reference) | anahtarı çalışma anında kasadan çek | Ortam değişkeni `OPENROUTER_API_KEY`; değiştirmek yeniden başlatma ister (`docs/kurulum-site.md` §8.3) |
-| Gözlem (observability) | iz, maliyet, kim/ne | `ai_kullanim`: kullanıcı + işlem + model + token; **süre yok** (§2) |
+| Gözlem (observability) | iz, maliyet, kim/ne | `ai_kullanim`: kullanıcı + işlem + istenen model + token + **süre** (`sure_ms`) + **cevaptaki model** (`yanit_model`) — ADR-0016; pano yok (§2) |
 | Korkuluk (guardrail) | PII, kötüye kullanım, konu filtresi | Kısmi: kimliksiz çağrı yapılmaz (fail-closed), ham sağlayıcı gövdesi kullanıcıya/loga gitmez (`AiHataCevirici`) |
 
 **Kendin mi işletirsin, yönetilen mi kullanırsın?** Bu karar teknik zevk değil, iki kısıtla verilir:
@@ -315,9 +320,13 @@ iyi cevap → dürüst "şu an hizmet veremiyoruz" mesajı. Her basamak **kalite
 takas eder.** Mimarın kararı zinciri kurmak değil, **işlem başına** zinciri seçmektir: sohbet için
 küçük modele düşmek kabul edilebilir; öğrencinin ödevini puanlayan değerlendirmede küçük modelin
 verdiği yanlış puan, "şu an puanlayamıyoruz" mesajından **daha kötüdür**. Bazı işlemlerde zincirin
-doğru son basamağı dürüst hatadır. Bu depoda zincir yok; kurulursa `Islem` enum'u zaten zincirin
-anahtarı olabilecek yerdedir, haftalık rapor dosya önbelleği de doğal bir "önbellekteki cevap"
-basamağıdır.
+doğru son basamağı dürüst hatadır. Bu depoda zincir yok — ve bu artık yazılı bir karar (ADR-0016
+karar 4): OpenRouter aynı model için sağlayıcılar arası yedeği zaten varsayılan yapar
+(`allow_fallbacks: true`); uygulamanın başka bir **modele** sessizce düşmesi quiz/değerlendirme JSON
+biçimini ve kaliteyi değiştirir; yedeğe geçiş de artık `yanit_model` ile görülebiliyor. Yeniden açma
+koşulu: `ai_kullanim` verisi tek modelin süreğen kesintisini gösterirse. Kurulursa `Islem` enum'u
+zaten zincirin anahtarı olabilecek yerdedir, haftalık rapor dosya önbelleği de doğal bir
+"önbellekteki cevap" basamağıdır.
 
 **Yeniden deneme yükü çarpar (retry amplification).** Varsayımsal bir yığın düşün: her katman kendi
 başına makul sayıda deneme yapıyor — ön yüz 2, adaptör 3, gateway 3. Sağlayıcı yavaşladığında tek bir kullanıcı tıklaması
@@ -546,13 +555,17 @@ bağlıdır. Ders iki parçayı birlikte ister:
 değiştirmek yeniden başlatma ister ve trafiği ikiye bölemez (ya hep eski ya hep yeni). İki somut
 gözlem:
 
-1. `ai_kullanim.model` sütununa **istenen** model kimliği yazılır (`calistir(...)`a giden parametre),
-   sağlayıcının cevapta bildirdiği kimlik değil. Gateway arkadaki modeli değiştirirse log bunu
-   göstermez. Ucuz bir iyileştirme: cevaptaki model bilgisini de kaydetmek.
+1. `ai_kullanim.model` sütununa **istenen** model kimliği yazılır (`calistir(...)`a giden parametre).
+   2026-10-26'ya kadar sağlayıcının cevapta bildirdiği kimlik hiç kaydedilmiyordu; gateway arkadaki
+   modeli değiştirse log bunu göstermezdi. Bu "ucuz iyileştirme" ADR-0016 ile yapıldı: yeni
+   `yanit_model` sütunu Spring AI'nın `ChatResponseMetadata.getModel()` değerini tutar (OpenAI-uyumlu
+   cevabın `model` alanı); sağlayıcı bildirmezse uydurma değer yazılmaz, `null` kalır; 100 karakteri
+   aşan değer kullanım satırı düşmesin diye kırpılır. Artık `model` ile `yanit_model` farkı istenenle
+   gerçekleşeni ayırır.
 2. OpenRouter dokümanına göre somut kimlik (`anthropic/claude-sonnet-4.6` gibi) tekrarlanabilirlik
    için önerilen yoldur; "hep en yenisi" isteyen takma ad ayrı bir sözdizimidir (`~…-latest`). Cevabın
-   `model` alanı isteği gerçekte hangi modelin karşıladığını bildirir — 1. maddedeki iyileştirme bu
-   yüzden aynı zamanda yedeğe geçişi de görünür kılar
+   `model` alanı isteği gerçekte hangi modelin karşıladığını bildirir — 1. maddedeki (artık yapılmış)
+   iyileştirme bu yüzden aynı zamanda yedeğe geçişi de görünür kılar
    ([latest resolution](https://openrouter.ai/docs/guides/routing/routers/latest-resolution)).
 
 Bir eğitim aracı için "property değiştir, yeniden başlat" yeterli olabilir. Ama merdiveni kurmadan
@@ -563,12 +576,12 @@ Bir eğitim aracı için "property değiştir, yeniden başlat" yeterli olabilir
 | Konu | Durum | Not |
 |---|---|---|
 | Gecikme ayrıştırması | Akışsız; kullanıcı E2E bekler; zaman bütçesi kodda (157 sn) | Rapor TPOT baskın |
-| Goodput | Ölçülemez — `ai_kullanim`'da süre yok | Önce `islem` başına SLO yaz |
+| Goodput | Veri var — `ai_kullanim.sure_ms` (E2E, yeniden denemeler dahil; ADR-0016); TTFT/TPOT yok (akışsız) | SLO hâlâ yazılmadı: `islem` başına E2E kısıtı |
 | Port/adaptör | Var, ArchUnit mühürlü | Port `ai/` paketinde (şerh §4) |
 | İki sağlayıcı | Yok — tek gateway, tek anahtar | ADR-0004 bilerek kabul eder |
 | Hata katmanları | Üçü de var (çevirici, toleranslı ayrıştırıcı, no-op düşüş) | 429 denenmez — bilinçli seçim gibi oku |
-| Yedek zinciri | Yok | İşlem başına tasarlanmalı |
-| Yayın merdiveni | Yok — model property, yeniden başlatma | Bayrak + cevaptaki model kimliği |
+| Yedek zinciri | Yok — bilinçli (ADR-0016 karar 4); sağlayıcı yedeği OpenRouter'da | Yeniden açma: tek modelin süreğen kesintisi `ai_kullanim`'da görünürse |
+| Yayın merdiveni | Yok — model property, yeniden başlatma | Bayrak eksik; cevaptaki model kimliği artık kayıtlı (`yanit_model`) |
 
 ## Öz-sınav (kendini test et)
 1. TTFT, TPOT ve E2E'yi tanımla. TTFT hangi üç bileşenden oluşur, hangisi prompt uzunluğuyla
@@ -595,6 +608,10 @@ Bir eğitim aracı için "property değiştir, yeniden başlat" yeterli olabilir
 12. **Şerh sorusu:** Ders "gateway X, rakiplerinden %859 daha hızlı" ve "kanaryada koşudan koşuya
     %15'e varan fark" diyor. Her iki rakamı bir mimari kararda nasıl kullanırsın — ya da neden
     kullanmazsın?
+13. ADR-0016 `ai_kullanim`'a `sure_ms` ve `yanit_model` ekledi. `sure_ms` neden yeniden denemeleri
+    **dahil** ölçer, ve bu sütunla bu depoda goodput'un hangi kısıtı hesaplanabilir, hangileri
+    hesaplanamaz? `model` ile `yanit_model` farklı çıkarsa bu neyi gösterir? Uygulamada yedek model
+    zinciri neden kurulmadı?
 
 ### Cevaplar
 1. TTFT = kuyruk + ağ + prefill; prefill prompt uzunluğuyla büyür. TPOT = ilk token'dan sonra token
@@ -627,6 +644,13 @@ Bir eğitim aracı için "property değiştir, yeniden başlat" yeterli olabilir
 12. İlki satıcının kendi yürüttüğü benchmark'tır; seçim gerekçesi olamaz, kendi trafiğinle ölçersin.
     İkincisi kaynaksızdır; yerine aynı sürümü iki kez koşturup kendi gürültü tabanını ölçer, kapı
     eşiğini onun üstüne koyarsın.
+13. Kullanıcının beklediği gerçek gecikme, Spring AI'nın kendi denemeleri dahil `chatModel.call`'ın
+    tamamıdır; tek denemenin süresi bunu küçük gösterir. Çağrı akışsız olduğu için yalnız E2E kısıtı
+    hesaplanır; TTFT ve TPOT ayrı ölçülmez. Veri var, ama `islem` başına SLO hâlâ yazılmadı. Fark,
+    istenenle gerçekleşenin ayrıştığını (gateway'in arkada başka bir model kimliğine yönlendirdiğini)
+    gösterir. Zincir kurulmadı, çünkü OpenRouter aynı model için sağlayıcı yedeğini zaten yapar; başka
+    bir modele sessizce düşmek quiz/değerlendirme JSON biçimini ve kaliteyi değiştirir. Yeniden açma
+    koşulu: veri tek modelin süreğen kesintisini gösterirse.
 
 ## Kaynak ve lisans
 Bu metin aşağıdaki derslerden **sentezlenmiştir** (çeviri değildir; ders kodları kopyalanmamış,
@@ -643,6 +667,8 @@ rakamlar şerhlenmiş, bu deponun vakası eklenmiştir):
 - Faz 17 · 22 *Load Testing LLM APIs* (prompt tekdüzeliği tuzağı, istemci darboğazı)
 - Faz 17 · 24 *Chaos Engineering for LLM* (yeniden deneme çarpılması, sağlayıcı 429 deneyi,
   önkoşullar)
+- Bu deponun vakası: ADR-0016 karar 4 (`ai_kullanim.sure_ms` / `yanit_model`, yedek model zinciri
+  kurulmaması), `ai/SpringAiOgretmenClient.java`, `schema.sql` (2026-10-26'da okundu)
 
 Kaynak depo: <https://github.com/rohitg00/ai-engineering-from-scratch> — **MIT Lisansı**, Copyright
 (c) 2026 Rohit Ghumare. Uyarlama notu: satıcı/ürün karşılaştırmaları, araç sürüm listeleri ve

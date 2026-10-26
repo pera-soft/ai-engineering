@@ -227,10 +227,10 @@ class SitePostgresEntegrasyonTest {
         assertThat(jdbc.queryForObject("SELECT basarisiz_deneme FROM kullanici WHERE email = ?", Integer.class, email))
                 .isZero();
 
-        // görev işaretle (insert) → geri al (update) → yeniden işaretle
-        String gorev = "{\"hafta\":1,\"gun\":1,\"gorevIndex\":0}";
-        for (boolean beklenen : new boolean[]{true, false, true}) {
-            mvc.perform(post("/api/gorev/toggle").with(csrf()).session(oturum)
+        // görev işaretle (insert) → tekrar (idempotent, yazma yok) → geri al (update) → yeniden işaretle
+        for (boolean beklenen : new boolean[]{true, true, false, true}) {
+            String gorev = "{\"hafta\":1,\"gun\":1,\"gorevIndex\":0,\"tamamlandi\":" + beklenen + "}";
+            mvc.perform(post("/api/gorev/durum").with(csrf()).session(oturum)
                             .contentType(MediaType.APPLICATION_JSON).content(gorev))
                     .andExpect(status().isOk()).andExpect(jsonPath("$.tamamlandi").value(beklenen));
         }
@@ -250,8 +250,11 @@ class SitePostgresEntegrasyonTest {
         when(ai.cagir(any())).thenReturn(new AiYanit("## Hafta 1 raporu\nİyi gidiyor.", 10, 20, "sahte"));
         mvc.perform(get("/api/rapor/1").session(oturum)).andExpect(status().isOk())
                 .andExpect(jsonPath("$.markdown").value(org.hamcrest.Matchers.containsString("Hafta 1 raporu")));
-        jdbc.update("INSERT INTO ai_kullanim (kullanici_id, islem, model, input_tokens, output_tokens) "
-                + "VALUES (?, 'RAPOR', 'sahte', 10, 20)", email);
+        // sure_ms + yanit_model (ADR-0016): PostgreSQL'de de ADD COLUMN IF NOT EXISTS ile eklendi
+        jdbc.update("INSERT INTO ai_kullanim (kullanici_id, islem, model, input_tokens, output_tokens, sure_ms, "
+                + "yanit_model) VALUES (?, 'RAPOR', 'sahte', 10, 20, 1500, 'sahte/yedek')", email);
+        assertThat(jdbc.queryForObject("SELECT sure_ms FROM ai_kullanim WHERE kullanici_id = ? AND yanit_model = ?",
+                Integer.class, email, "sahte/yedek")).isEqualTo(1500);
         mvc.perform(get("/api/kullanim").session(oturum)).andExpect(status().isOk())
                 .andExpect(jsonPath("$..islem").value(org.hamcrest.Matchers.hasItem("RAPOR")));
 

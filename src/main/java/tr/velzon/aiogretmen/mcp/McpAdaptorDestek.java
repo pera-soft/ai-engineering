@@ -56,6 +56,10 @@ final class McpAdaptorDestek {
         return Map.of("type", "string", "description", aciklama);
     }
 
+    static Map<String, Object> mantiksalAlan(String aciklama) {
+        return Map.of("type", "boolean", "description", aciklama);
+    }
+
     /** JSON sayıları Integer/Double/Long gelebilir; hepsini int'e indirger. Eksikse hata fırlatır. */
     static int tamsayi(Map<String, Object> args, String anahtar) {
         Object v = args.get(anahtar);
@@ -78,6 +82,27 @@ final class McpAdaptorDestek {
         }
         String s = v.toString().trim();
         return s.isBlank() ? varsayilan : Integer.parseInt(s);
+    }
+
+    /**
+     * Opsiyonel boolean argüman: yoksa varsayılan. Bazı istemciler "true"/"false" metni gönderir —
+     * kabul edilir; başka her değer (ör. "belki", 1) sessizce varsayılana DÜŞMEZ, hata olur
+     * (yanlış yorum görevi istenmeyen duruma ayarlardı). Harf katlaması Locale.ROOT ile — tr_TR'de
+     * varsayılan katlama I/ı tuzağına düşer (testler tr_TR koşar).
+     */
+    static boolean mantiksalVarsayilan(Map<String, Object> args, String anahtar, boolean varsayilan) {
+        Object v = args.get(anahtar);
+        if (v == null) {
+            return varsayilan;
+        }
+        if (v instanceof Boolean b) {
+            return b;
+        }
+        String s = v.toString().trim().toLowerCase(java.util.Locale.ROOT);
+        if (s.equals("true") || s.equals("false")) {
+            return Boolean.parseBoolean(s);
+        }
+        throw new IllegalArgumentException("Geçersiz mantıksal argüman (true/false bekleniyor): " + anahtar);
     }
 
     static String metin(Map<String, Object> args, String anahtar) {
