@@ -27,6 +27,8 @@ En yaygın hata, ajanın çıktısını "karar verilmiş" saymaktır: kod çalı
 ### Görevlere geçmeden önce
 Beş maddeni yazarken şu iskeleti kullan: (1) ajanın önerisini karar olarak adlandır ("bu bir mimari karardır"), (2) etkilenen ve uzman listesini çıkar, (3) radardaki halkasını kontrol et, (4) kararı ve alınan danışmayı ADR'ye yaz, (5) kuralı mümkünse bir teste dönüştür. Quiz'e geçerken haftanın tek cümlesini yanında tut: **karar tek kişide kalır, danışma zorunludur, kayıt geleceğe konuşur.**
 
+**Derinleşmek istersen:** "Bu haftanın kaynakları" kutusundaki **Ajan Mimarisi Desenleri** metninin §5 "Tekli ajandan çoklu ajana — ne zaman ve hangi parçalarla" ve §7 "Çoklu ajan hata taksonomisi ve doğrulama" bölümleri, bugünkü hizalama sorusunu ajanların kendi arasına taşır. §7'deki MAST taksonomisine göre çoklu ajan hatalarının en büyük payı tanım (spec) sorunlarıdır — rol belirsizliği, eksik görev tanımı, örtük başarı ölçütü; yani bugünkü "kararı adlandır, kaydet, teste dönüştür" disiplini olmadan ajan sayısını artırmak yalnız yanlışı hızlandırır. Quiz için şart değil; merak edersen oku.
+
 ## Görevler
 - [ ] 'Ajanın verdiği mimari kararı advice process'ten nasıl geçiririm' 5 madde
 - [ ] Haftalık quiz'i çöz (aşağıda)

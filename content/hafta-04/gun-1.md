@@ -37,6 +37,8 @@ En sık hata, ihlali gördüğünde **kuralı gevşetmektir**. Ajan (veya yorulm
 ### Görevlere geçmeden önce
 Bugünün pratik ölçütü tek soruda toplanır: *"Bu kural çiğnenirse, çiğnendiğini bana **kim** söyleyecek?"* Cevap "ben fark ederim" ise, o kural aslında **yoktur**. Cevap çalıştırılabilir bir komutsa (`./mvnw verify`), kural gerçekten vardır. Şimdi projendeki yazılı ama zorlanmayan kuralları çıkar ve her birinin karşısına hangi araçla çite dönüşeceğini yaz — yarın ArchUnit ile ilkini kuracaksın.
 
+**Derinleşmek istersen:** "Bu haftanın kaynakları" kutusundaki **Ajan Çalışma-Zamanı Kontrolleri** metninin §9 "Bu depodan vaka — derleme-zamanı kapı vs çalışma-zamanı kapı" bölümü, bugünkü "tabela değil çit" fikrinin öbür yarısını gösterir: `MimariTestleri` gibi bir çit **üretilen kodu** `./mvnw verify` anında yargılar, ama ajanın çalışırken yaptığı eylemleri (bir dosyayı silmesini, para yakan bir döngüyü, bir sırrı dışarı göndermesini) görmez. O davranışları yargılayan çite çalışma-zamanı kapısı (runtime gate) denir; ikisi birbirinin yerine geçmez, birbirini tamamlar. Bugünkü görev için şart değil; "bu kural çiğnenirse bana kim söyleyecek?" sorusunu ajanın eylemlerine de sormak istersen oku.
+
 ## Görevler
 - [ ] Projendeki 'yazılı ama zorlanmayan' 3 kuralı tespit et
 - [ ] Her biri için hangi araçla mekanikleştirilebileceğini not et

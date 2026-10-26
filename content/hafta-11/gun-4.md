@@ -28,6 +28,8 @@ En yaygın yanılgı: **"Veritabanım ACID, o hâlde eşzamanlılık sorunlarım
 ### Görevlere geçmeden önce
 İki cümleyi hazırla: "Veritabanımın varsayılan izolasyon seviyesi şudur" ve "bu seviyede bana açık kalan anomali şudur". Bunu bilmiyorsan sistemin doğruluğu hakkında bir varsayımın var, bilgin yok — ve bu tür varsayımlar üretimde, en yoğun saatte kendini gösterir.
 
+**Derinleşmek istersen:** "Bu haftanın kaynakları" kutusundaki **Araç Çağrısı Güvenilirliği** metninin §8 "Laboratuvar: `gorev_isaretle` tekrar çağrılınca ne olur? (önce / sonra)" bölümü, bugünkü kayıp güncellemenin (lost update) bu projedeki birebir örneğini gösterir: görev işaretleme eskiden "oku–tersine çevir–yaz" yapan bir toggle'dı ve iki eşzamanlı çağrı net bir çevirmeye iniyordu; düzeltme, "çevir" yerine "şu duruma getir" diyen idempotent bir komuttur. Aynı metnin §2 "Yeni RPC id idempotency değildir — anahtar, parmak izi, atomik sahiplenme" bölümündeki idempotency anahtarı ve outbox deseni de bugünkü transaction'ın sınırını dış dünyaya genişletir: dış etki, iş değişikliğiyle aynı transaction'da bir satır olarak yazılır ve teslimat "en az bir kez + tekrar ayıklama" ile güvenceye alınır. Görev için şart değil; "veritabanım ACID, o hâlde güvendeyim" yanılgısının gerçek bir kodda nasıl göründüğünü görmek istersen oku.
+
 ## Görevler
 - [ ] Bu haftanın kaynaklarındaki DDIA Türkçe çalışma metnini oku (İngilizce kitap ilgili bölümler opsiyonel-tamamlayıcı)
 - [ ] Kendi DB'nin izolasyon seviyesini öğren ve 1 potansiyel anomaliyi adlandır

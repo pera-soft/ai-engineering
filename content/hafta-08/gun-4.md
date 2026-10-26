@@ -34,6 +34,8 @@ Bu projede kademeleme baştan kurulu: uzun sokratik sohbet güçlü modelde, kı
 ### Görevlere geçmeden önce
 Görevde bir iş akışı seç ve adımlarını tek tek yaz. Her adım için üç soru: bu adım **kullanıcıyı bekletiyor mu**, çıktısı **başka bir adım tarafından mı** tüketiliyor, ve yanlış olursa **fark edilir mi**? Kullanıcıyı bekletmeyen, çıktısı makineye giden ve hatası sonraki adımda yakalanan adımlar, ucuz modele inmek için en güvenli adaylardır.
 
+**Derinleşmek istersen:** "Bu haftanın kaynakları" kutusundaki **Canlıda LLM** metninin §1 "Gecikmenin anatomisi — TTFT, TPOT, uçtan uca", §2 "Goodput — SLO'yu çok kısıtlı yazmak" ve §3 "Yük testi — tek prompt'u tekrarlama tuzağı" bölümleri, bugünkü "gecikmenin iki yüzü"nü ölçülebilir hâle getirir: ilk kelimenin gelme süresi TTFT (time to first token), sonraki her kelimenin süresi TPOT (time per output token) olur ve hangisi baskınsa kaldıracın (prompt'u kırpmak mı, çıktıyı sınırlamak mı) o olduğunu gösterir. §3 ise bugünkü önbelleğin yük testinde nasıl yanılttığını anlatır: aynı prompt'u tekrarlayan bir test, önbellek isabeti yüzünden kapasiteyi olduğundan yüksek gösterir. Görev için şart değil; bugünkü kavramların canlıdaki karşılığını merak edersen oku.
+
 ## Görevler
 - [ ] İlgili bölümü oku
 - [ ] Bir AI iş akışında kademeleme fırsatı bul: hangi adım ucuz modele inebilir?

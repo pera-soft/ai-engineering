@@ -44,6 +44,8 @@ Tuzaklar, hepsi somut:
 ### Görevlere geçmeden önce
 Rubriğini yazarken her madde için "tam puan neye denir" cümlesini de yaz — bu cümle yoksa madde ölçüt değil, temennidir. Sonra rubriği bir tanıdığına ver ve aynı çıktıyı puanlatmayı düşün: iki puan birbirine yakın çıkmıyorsa rubrik yeterince net değildir.
 
+**Derinleşmek istersen:** "Bu haftanın kaynakları" kutusundaki **Değerlendirme-Güdümlü Geliştirme (EDD) ve LLM Gözlemlenebilirliği** metninin §10 "Ölçümü ölçmek — beş ek disiplin (AIEFS ekleri)" bölümü, bugünkü judge'ın yanlış şeyi ölçmemesi için somut araçlar verir. Oradaki §10.2 (eşleştirilmiş karşılaştırma + bootstrap), küçük bir altın kümede "A, B'den iyi" demeden önce farkın gürültü mü gerçek mi olduğunu sınar; §10.3 ise bir koruma filtresini iki yönden, eksik ret ve aşırı ret olarak ölçmeyi öğretir — çünkü tek bir sayı iki farklı arızayı birbirine katar. Rubriği yazmak için şart değil; önce/sonra karşılaştırmana güvenmek istersen oku.
+
 ## Görevler
 - [ ] Evaluation bölümünü oku
 - [ ] Kendi AI özelliğin için 5 maddelik bir değerlendirme rubriği yaz

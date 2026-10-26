@@ -43,6 +43,8 @@ En sık refleks: *"şirket belgelerimizle modeli eğitelim."* Neredeyse her zama
 ### Görevlere geçmeden önce
 Tek soruyu ezberle: **"Modelin eksiği bilgi mi, davranış mı, yoksa sadece kötü talimat mı?"** Kötü talimat → prompt. Eksik bilgi → RAG. Yanlış davranış (ve prompt çare olmadı) → fine-tune. Görevde senaryolarını bu üç kutuya yerleştirirken her biri için bu soruyu yüksek sesle cevapla; kutulardan hangisine düştüğünü gerekçesiyle yaz.
 
+**Derinleşmek istersen:** "Bu haftanın kaynakları" kutusundaki **Ajan Mimarisi Desenleri** metninin §1 "İş akışı mı ajan mı — grafı kim sahipleniyor?" bölümü, bugünkü "hazır modeli al → adapte et" fikrinin bir adım sonrasını anlatır: prompt, RAG ve araçlarla güçlendirilmiş model çağrılarını (augmented LLM) önceden yazılmış senin kodun mu sıralıyor (iş akışı / workflow), yoksa model çalışma anında kendisi mi seçiyor (ajan / agent)? Bugünkü "önce prompt, en son fine-tune" sırası gibi metnin kuralı da en basitle başlamaktır: çoğu iş için sabit bir iş akışı yeter. Şimdilik zorunlu değil; ajanlara geldiğinde geri dönebilirsin.
+
 ## Görevler
 - [ ] Türkçe çalışma metnini oku ('Bu haftanın kaynakları' kutusundan; kaynak: kitap Böl. 1)
 - [ ] Şirketindeki AI kullanım senaryolarını 'adaptasyon tekniği' eksenine yerleştir (prompt mu, RAG mi, fine-tune mu?)

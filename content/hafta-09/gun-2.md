@@ -84,6 +84,8 @@ Outgoing port'u adapter paketine koymak: o an ok tersine döner ve inversion kay
 ### Görevlere geçmeden önce
 Şunu aklında tut: port varsa test bedavadır. Gerçek veritabanı yerine `class SahteHesapAdapter implements HesapKaydetPort` yazıp içine bir `Map` koyarsın; testler milisaniyede koşar ve iş kuralını ölçer, altyapıyı değil. Kağıt üstünde bölerken her kutunun altına "bunu kim çağırıyor, kim uyguluyor?" diye yaz.
 
+**Derinleşmek istersen:** "Bu haftanın kaynakları" kutusundaki **Canlıda LLM** metninin §4 "AI gateway — giden port'un adaptörü" bölümü, bugünkü outgoing port'un bu projedeki bir başka örneğini gösterir: servisler yalnız `ai/OgretmenAiClient` arayüzünü görür, Spring AI ve sağlayıcı ayrıntısı ise adaptörde (`ai/SpringAiOgretmenClient`) kalır. Aynı kutudaki **Araç Çağrısı Güvenilirliği** metninin §3 "Yeniden deneme sınıfları — önce sınıflandır, sonra dene" bölümü de adaptör sınırında hata alınınca ne olacağını anlatır: dışarı giden bir çağrıyı yeniden denemeden (retry) önce onun güvenli bir okuma mı, idempotency anahtarlı (idempotency key — "aynı iş iki kez yapılmaz" güvencesi) bir yazma mı, yoksa güvensiz bir yazma mı olduğunu bilmen gerekir. İkisi de opsiyoneldir; kağıt üstünde bölerken "bu adaptör hata alırsa ne olur?" diye de sormak istersen işine yarar.
+
 ## Görevler
 - [ ] Kitabın örnek yapısını (buckpal) incele
 - [ ] Küçük bir modülü port/adapter yapısına taslak olarak böl (kağıt üstünde)

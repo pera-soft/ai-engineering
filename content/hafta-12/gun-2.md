@@ -27,6 +27,8 @@ Bu proje bir örnektir: kök dizindeki `CLAUDE.md` (AGENTS.md) tam olarak böyle
 ### Görevlere geçmeden önce
 Toplantıya "onaylayın" diye değil, **üç soruyla** git: (1) Hangi işlerde AI'a güveniyoruz, hangilerinde güvenmiyoruz? (2) Bir AI çıktısının kabul edilmesi için hangi adımlar zorunlu? (3) Hangi veriler hiçbir koşulda modele gitmez? Bu üç sorunun cevabı, anlaşmanın iskeletidir; gerisi biçimdir.
 
+**Derinleşmek istersen:** "Bu haftanın kaynakları" kutusundaki **Ajan Çalışma-Zamanı Kontrolleri** metninin §3 "Görev başına yetki merdiveni" ve §5 "Ajanın uzanamadığı kontroller — kill switch, canary, log" bölümleri, bugünkü ilk soruya ("hangi işlerde AI'a güveniyoruz?") denetlenebilir bir cevap biçimi verir. Yetki merdiveni güveni "evet/hayır" yerine görev başına basamaklara böler (salt-oku, öner, onaylı yaz, serbest); kill switch (acil durdurma anahtarı) ise ajanın okuyabildiği ama yazamadığı, yeniden açılması bir insanın açık eylemi olan bir bayraktır — ikisi de "nasıl kontrol edeceğiz?" sorusuna cevap verebilen anlaşma maddeleri olarak v1'e girebilir. Toplantı için şart değil; maddelerini somutlaştırmak istersen oku.
+
 ## Görevler
 - [ ] Ekip toplantısında anlaşmayı tartışıp v1'i yayınla
 - [ ] Prompt/skill kütüphanesi için repo dizinini aç (.claude/commands veya .agents/skills)
