@@ -350,6 +350,98 @@ yüzü** (OpenRouter, `OgretmenAiClient`) her sohbette aynı sistem kimliğini v
 gönderiyor: tekrarlanan önek tam da bu. `AI_KULLANIM` tablosunda girdi token'ı yüksekse ilk bakılacak
 kaldıraç budur.
 
+#### 5.3. Üç kaldıracı derinleştirmek — uygulama önbelleği, paralel yarış, SLA'ya göre batch, rota başına kapı
+§5.2'deki üç kaldıraç kâğıt üstünde basittir; canlıda her birinin kendine özgü bir tuzağı vardır.
+
+**Uygulama seviyesi önbellek — ayrı bir katman, ayrı bir risk.** §5.2'deki prompt önbelleği
+**sağlayıcının** önbelleğidir (L2): aynı öneki ucuza yeniden işler, ama model yine çağrılır ve
+cevap yine taze üretilir. Bunun önünde, **senin** uygulamanda duran ikinci bir katman olabilir
+(L1): model hiç çağrılmadan, daha önce verilmiş bir cevap geri döner. İki türü vardır:
+
+- **Birebir (exact) önbellek:** prompt'un tamamının özeti (hash) anahtar olur; aynı girdi → aynı
+  kayıtlı cevap. Yalnız **deterministik** sayılabilecek çağrılarda güvenlidir (aynı model, aynı
+  prompt, sıcaklık 0, cevabın zamana bağlı olmadığı iş).
+- **Anlamsal önbellek (semantic cache):** soru gömülür (embedding), önbellekte **benzer** bir soru
+  aranır; benzerlik eşiği aşılırsa (tipik olarak kosinüs 0,92–0,95) onun cevabı döner. "İade
+  politikası nedir?" ile "Ürünü nasıl iade ederim?" aynı cevabı alır.
+
+Anlamsal önbelleğin kendine özgü riski **yanlış cevaptır**: eşik gevşekse, *benzer ama farklı* bir
+soru başkasının cevabını alır ("Java 17'de record nasıl yazılır?" ile "Java 21'de record pattern
+nasıl yazılır?" gömme uzayında çok yakındır). Prompt önbelleği asla yanlış cevap vermez — en kötü
+ihtimalle ıskalar; anlamsal önbellek ise **kendinden emin biçimde yanlış** cevap verebilir. Bu yüzden
+eşik bir maliyet ayarı değil, bir **doğruluk** ayarıdır ve eval ile ölçülür.
+
+Gerçekçi isabet oranları iş yüküne göre çok değişir. Dersin aktardığı, **uygulayıcıların bildirdiği**
+(satıcı dokümanı ya da ölçülmüş bir taban değil) aralıklar: açık uçlu sohbette ~%10–15, yapılandırılmış
+SSS/destekte %40–70, kod sorularında %20–30 (küçük farklar isabeti öldürür). Satıcıların "doğruluk"
+dediği şey çoğu zaman isabet oranı değil, **isabet olduğunda dönen cevabın uygun olma oranıdır** —
+ikisini karıştırma.
+
+> *Şerh:* Derslerden biri "sorguların %40–60'ı neredeyse aynıdır" der ve kaynak göstermez; bir
+> başkası anlamsal önbellekle "%15–30 tasarruf", yönlendirmeyle "%40–70" gibi katman tasarrufları
+> sıralar — bunlar da kaynaksızdır. Kendi trafiğinden bir haftalık örnekle ölç.
+
+**Bu projedeki bağ.** Bu depoda zaten bir **birebir** uygulama önbelleği var: haftalık rapor
+`RaporService`'te kullanıcı + hafta anahtarıyla dosyaya yazılır, "Yenile" denmedikçe model
+çağrılmaz. Anlamsal önbellek ise sohbet için **yanlış** bir fikir olurdu ve sebebi maliyet değil
+**izolasyondur**: sohbet prompt'u öğrencinin kendi hafızasını (`OGRENCI.md`) ve son mesajlarını
+taşır; iki öğrencinin "benzer" sorusu farklı cevap gerektirir. Kullanıcıdan bağımsız anahtarlı bir
+anlamsal önbellek, A'nın kişisel bağlamla üretilmiş cevabını B'ye verir — ADR-0012'nin "bir
+kullanıcının başkasının verisini görmesi" başarısızlık ölçütünü doğrudan ihlal eder. Kural: L1
+önbelleğin anahtarı, cevabı etkileyen **her** girdiyi (kullanıcı, bağlam sürümü, model) içermelidir.
+
+**Paralel çağrıda önbellek yarışı (fan-out race).** Bir ajan aynı uzun sistem prompt'uyla 10 çağrıyı
+**aynı anda** başlatır. Sağlayıcı önbelleği ilk isteğin yazması bittikten sonra okunabilir; diğer 9
+istek aynı milisaniye penceresinde gelir ve hepsi ıskalar. Sonuç: **N paralel çağrı = N yazma, 0
+okuma** — §5.2'deki yazma primini 10 kez ödersin, okuma indirimini hiç almazsın. Çözüm basittir:
+**önce bir çağrı, sonra yelpaze**: ilkini tek başına gönder, önbellek dolunca kalan 9'u paralel
+başlat. İlk çağrıya birkaç yüz milisaniye eklersin, faturanın katlanmasını önlersin. (Bu depoda web
+yüzü AI çağrılarını paralel başlatmaz; tuzak ajan iş akışlarında ve toplu değerlendirmede doğar.)
+
+**Batch kararını "canlı mı?" sorusuyla değil, SLA ile ver.** Sık yapılan hata: "bu üretimde çalışıyor,
+o hâlde senkron olmalı." Üretim bir gecikme şartı değildir; **SLA** gecikme şartıdır. Üç sınıf:
+
+| Sınıf | Kullanıcı ne bekler | Doğru yol |
+|---|---|---|
+| Etkileşimli (interactive) | cevabı ekranda bekler | senkron + prompt önbelleği; batch olmaz |
+| Yarı etkileşimli (semi-interactive) | işi verir, dakikalar sonra bakar | asenkron kuyruk |
+| Toplu (batch) | "sabaha kadar", "gün sonuna kadar" | toplu işleme API'si + önbellek |
+
+**Kısmi etkileşim tuzağı (partial-interactivity trap):** bazı özellikler etkileşimli *görünür* ama
+10 dakikalık beklemeye razıdır — "Yenile" düğmeli bir gece raporu gibi. Ekip onu senkron yazar; 50
+kişi aynı anda yeniler; her biri tam fiyat öder. Sorulacak soru: **"24 saat bu kullanıcı için ne
+demek?"** Cevap "fark etmez" ise batch'tir. Bu depodaki haftalık rapor bu soruya adaydır: haftanın
+sonunda bir kez üretilip hazır beklese öğrenci büyük ihtimalle fark etmezdi. (OpenRouter'ın da bir
+[Batch API](https://openrouter.ai/docs/guides/features/batch-api)'si var: tipik olarak eşzamanlı
+token fiyatının ~%50'si, çoğu sağlayıcıda 24 saat içinde teslim; oran sağlayıcıya göre değişir.)
+
+İki ek not: Toplu işleme ile prompt önbelleği **üst üste** biner; ders bu yığının senkron, önbelleksiz
+maliyetin ~%10'una inebileceğini söyler — bu, açıklayıcı bir hesap örneğidir, ölçülmüş bir taban
+değil. Ve batch dosya biçimleri **sağlayıcıya özeldir**: "tek bir batch istemcisi" yazmak sağlayıcı
+başına bir adaptör demektir — taşınabilirlik ekseninde bir bedel (port/adaptör: Hafta 9).
+
+**Yönlendirmede rota başına sapma kapısı.** §5.2 yönlendirmeyi eval ile ölç der. Hangi desende
+olduğun, ölçülecek şeyi değiştirir:
+
+| Desen | Nasıl | Gecikme bedeli |
+|---|---|---|
+| Ön yönlendirme (pre-route) | önce sınıflandırıcı, sonra model | küçük (sınıflandırıcı kadar) |
+| Kademeli (cascade) | önce ucuz model; güvensizse pahalıya yükselt | yükselen isteklerde ~iki çağrı |
+| Topluluk (ensemble) | ikisini paralel koş, iyisini seç | en pahalı; yalnız kritik A/B için |
+
+Asıl risk **sapmadır (drift)**: yönlendirici ilk çeyreğin verisiyle kuruldu, kullanıcıların soruları
+altı ayda uzadı ve zorlaştı; ucuz rotanın kalitesi sessizce düşer, kimse yüksek sesle şikâyet etmez.
+Bu yüzden her rotanın **kendi** kapısı olur: rota başına olumsuz geri bildirim; rota başına küçük bir
+örneklemde (ders ~%5 der) yargıç-model puanı; rota başına ret oranı; kademeli desende **yükseltme
+oranı** — ucuz modelden pahalıya yükselenlerin payı ~%30'u aşıyorsa ucuz rotaya fazla iş gidiyordur
+ve "iki kez ödeme" tuzağı (§5.2) büyümüştür. Bu depodaki yönlendirme statik bir ön yönlendirmedir
+(ADR-0003: işlem türüne göre GUCLU/HIZLI); ADR-0003'ün kendi "(−)" maddesi ve
+`docs/tech-debt-tracker.md`'deki 3. kalem ("Haiku'nun quiz üretim kalitesi izlenmedi") tam olarak
+eksik bir rota başına kapıdır.
+
+> *Şerh:* Dersin "yönlendirmeyle aynı kalitede %20–60 tasarruf" rakamı vaka çalışmalarına dayanır ve
+> kaynakları verilmez; eşik değerleri (%30 yükseltme, %5 örneklem) pratik kurallardır, standart değil.
+
 ### 6. Bu projedeki canlı örnek — iki zıt ekonomi
 Bu özetin en değerli bölümü burası; çünkü kavram burada soyut olmaktan çıkıyor. **AI Öğretmen, aynı
 içeriği iki tamamen farklı ekonomiyle sunuyor.** Aynı müfredat, aynı kaynaklar, aynı prompt'lar — iki
@@ -520,6 +612,75 @@ Buradan iki kural çıkar:
 > **Quantify Business Value** (karşılık). Birincisi olmadan kör uçarsın; ikincisi olmadan **ucuz ve
 > işe yaramaz** bir sisteme doğru optimize edersin.
 
+#### 7.1. Maliyeti çağrı noktasında damgala — ve dört token katmanı
+Yukarıdaki ölçümlerin hepsi bir şarta bağlıdır: her çağrının **kimin, hangi iş için, hangi rotada**
+yapıldığını bilmek. Bu bilgi ya çağrı anında kayda yazılır ya da hiç yazılmaz; sonradan yapılan
+atıf (retroactive attribution) her zaman bazı durumları kaçırır. Üç boyut:
+
+- **Kullanıcı başına** (`user_id`) — kim neye mal oluyor,
+- **İş/rota başına** (`task_id` + model) — hangi ürün yüzeyi neye mal oluyor,
+- **Kiracı başına** (`tenant_id`) — hangi müşteri kârlı (çok müşterili üründe).
+
+**Bu projedeki bağ.** `OgretmenAiClient.AiIstek` her çağrıda bir `Islem` taşır (DEGERLENDIRME,
+SOHBET, QUIZ…; enum'un kendi yorumu "maliyet raporunun etiketi (ADR-0003)" der) ve
+`SpringAiOgretmenClient` kaydı çağrının yapıldığı yerde, model adıyla birlikte `ai_kullanim`'a
+yazar. Yani iş + rota damgası **ilk günden** vardı. Kullanıcı damgası ise sonradan geldi: Faz 9b'de
+`ai_kullanim.kullanici_id` sütunu eklendi ve eski satırlar varsayılan `yerel` değerini aldı
+(ADR-0012 §10). O satırların kime ait olduğu artık bilinemez — "geriye dönük atıf her zaman eksik
+kalır" kuralının bu depodaki küçük kanıtı. Kiracı boyutu tek şirketlik sitede gereksizdir.
+
+**Dört token katmanı.** Girdi/çıktı ayrımı (§7) gereklidir ama yeterli değildir; girdinin kendisi
+farklı nedenlerle büyüyen üç parçadan oluşur:
+
+| Katman | Örnek | Büyürse ne demek |
+|---|---|---|
+| Prompt | sistem prompt'u + kullanıcının mesajı | talimat/şablon şişti |
+| Araç (tool) | araç çağrısı sonuçlarının modele geri verilmesi | ajan çok araç çağırıyor ya da sonuçlar kırpılmıyor |
+| Hafıza (memory) | sohbet geçmişi, getirilen belgeler, öğrenci hafızası | bağlam birikiyor |
+| Cevap (response) | modelin çıktısı | format/uzunluk problemi |
+
+Dördü tek kovaya girerse hangisinin büyüdüğünü göremezsin. Bu depoda `ai_kullanim` yalnız girdi ve
+çıktı tutar; web yüzünde araç çağrısı yok, ama **hafıza** var: sohbet son 20 mesajı
+(`SohbetService`) ve öğrencinin `OGRENCI.md` hafızasını bağlama ekler. Hafıza büyüdükçe girdi token'ı
+artar ve pano bunu "prompt şişti" diye gösterir. Katmanı ayırmanın en ucuz yolu, prompt'u kuran
+yerde (`BaglamServisi` + `PromptFactory`) parça uzunluklarını ayrı ayrı loglamaktır.
+
+#### 7.2. Oran sınırı → harcama tavanı → kill switch — ve bu sitenin "kota YOK" kararı
+Derslerin önerdiği yaptırım merdiveni (enforcement ladder) üç basamaklıdır: (1) kiracı/kullanıcı
+başına **hız sınırı** (beklenen tepenin 2–3 katı; aşılırsa 429), (2) günlük **harcama tavanı**
+(aşılırsa sınır sıkılaşır, uyarı gider), (3) olağandışı harcamada (ör. kişinin kendi tabanından çok
+sapan bir gün) **kill switch** — otomatik durdurma + nöbetçiye haber. Eşiklerin nasıl seçildiği,
+kill switch'in nasıl tetiklendiği ve ajan bağlamındaki operasyonel ayrıntı için:
+[`ajan-calisma-zamani-kontrolleri.md`](ajan-calisma-zamani-kontrolleri.md). Burada tek soru şudur:
+bu merdiven **bu depoya** nasıl oturur?
+
+Çok kullanıcılı site (ADR-0012) bilinçli bir kullanıcı kararı taşır: "şirketin tek OpenRouter
+anahtarı, **kota yok**." ADR'nin başarısızlık ölçütü de bellidir: "pera dışından birinin kayıt olup
+şirket anahtarını harcaması." Yani bu karar "harcama önemsiz" demiyor; **kişi başı tavanı**
+reddediyor ve kötüye kullanım riskini **kimlik** katmanında kapatıyor: yalnız `@pera.software`,
+kayıt ekip koduyla (ADR-0015), kimliksiz model çağrısı yok (`SpringAiOgretmenClient` kimliği
+çağrıdan önce çözer). 50–60 kişilik, kimliği bilinen bir iç kitlede kişi başı kota çoğu zaman
+öğrenmeyi cezalandırır; bu karar savunulabilirdir.
+
+Kota yokken **hangi korkuluk yine de anlamlı?** Merdivenin her basamağını "kota mı, değil mi"
+sorusuyla ayır:
+
+| Korkuluk | Kota mı? | Bu depoda | Yorum |
+|---|---|---|---|
+| Çağrı başına tavan (`max_tokens`, sınırlı yeniden deneme) | Hayır | **Var** (`max_tokens`: ADR-0003; 3 deneme / 30 sn: `application.yml`) | Tek bir çağrının kaçmasını önler; kotayla çelişmez |
+| Toplam harcama tavanı (gateway'de) | Hayır — kişiye değil şirkete | **Runbook'ta**: aylık tavan OpenRouter panelinden (`docs/kurulum-site.md` §8.3); aşılınca 402 → `KREDI_BITTI` | Şirketi korur; ama aşılınca **herkes** durur (geniş patlama yarıçapı) |
+| Olağandışılık uyarısı (kişi başı günlük toplam) | Hayır — engellemez, haber verir | **Yok**; veri var (`ai_kullanim` kullanıcı + işlem) | En düşük sürtünmeli eksik; "kota yok" ile tam uyumlu |
+| Yüksek hız sınırı (insanın ulaşamayacağı, döngünün ulaşacağı) | Hayır — toplamı değil hızı sınırlar | **Yok** (AI uçlarında) | Takılan bir sekme/betik döngüsüne karşı; ADR ile karar verilmeli |
+| Kill switch | — | **Kaba**: anahtarı kaldırıp yeniden başlatınca AI uçları 503, site açık kalır (`AiYapilandirma`) | Çalışır ama dakikalar sürer, tümden kapatır |
+| Kişi başı günlük/aylık token kotası | **Evet** | Bilinçli olarak yok (ADR-0012) | Kullanıcı kararı |
+
+Sonuç: "kota YOK" kararı merdivenin **kişiye özel toplam tavanını** kaldırır, merdivenin kendisini
+değil. Çağrı başına tavan ve gateway'deki şirket tavanı zaten var; en ucuz eksik basamak
+**engellemeyen bir olağandışılık uyarısıdır** (ör. `ai_kullanim` üzerinden günlük kişi başı toplamın
+o kişinin olağan düzeyinden çok sapması). Yüksek bir hız sınırı ise kota değil bir **hata
+korkuluğudur**; eklenecekse bu ayrım bir ADR'ye yazılmalı ki ileride "kotayı gizlice getirdik" diye
+okunmasın. Bunlar bir reçete değil, kaydedilecek kararlardır.
+
 ## Diyagram 3 — Çağrı başına maliyet vs başarılı çıktı başına maliyet
 Solda ucuz model üç denemede tutturuyor; sağda pahalı model bir denemede. Çağrı başına metrik solu
 seçtirir; başarılı çıktı başına metrik gerçeği gösterir.
@@ -619,6 +780,26 @@ seçtirir; başarılı çıktı başına metrik gerçeği gösterir.
     bu sayıdan bilebilir misin? En az üç zıt açıklama üret (biri kalite regresyonu olsun) ve
     "ölçmediğini yönetemezsin **ama ölçtüğünü de yorumlaman gerek**" kuralını `AI_KULLANIM` +
     `kullanim_istatistik` üzerinden savun.
+14. Prompt önbelleği (sağlayıcı, L2) ile anlamsal önbellek (uygulama, L1) arasındaki fark nedir —
+    hangisi **yanlış cevap** verebilir, neden? Bu depoda sohbet için kullanıcıdan bağımsız anahtarlı
+    bir anlamsal önbellek kurulsaydı ADR-0012'nin hangi başarısızlık ölçütü ihlal edilirdi?
+    *Cevap:* L2 yalnız aynı öneki ucuza işler, model yine çalışır; L1 modeli atlayıp kayıtlı cevabı
+    döner ve gevşek eşikte benzer-ama-farklı soruya yanlış cevap verir. Sohbet prompt'u öğrencinin
+    kendi hafızasını taşıdığı için A'nın cevabı B'ye gider: "bir kullanıcının başkasının verisini
+    görmesi."
+15. Bir ajan aynı sistem prompt'uyla 10 çağrıyı paralel başlatıyor ve önbellek okumaları sıfır
+    çıkıyor. Ne oluyor, nasıl düzeltirsin? Haftalık raporun senkron mu batch mi olacağına hangi
+    soruyla karar verirsin?
+    *Cevap:* Hepsi ilk yazma bitmeden gelir: 10 yazma, 0 okuma. Önce tek çağrı, önbellek dolunca
+    kalan 9'u paralel. Rapor için "24 saat bu kullanıcı için ne demek?" — "üretim" olması değil
+    SLA'sı belirler.
+16. Sitede kişi başı kota yok (ADR-0012). Yine de anlamlı olan iki korkuluğu say ve neden kotayla
+    çelişmediklerini açıkla. Çağrı noktasında damgalamanın bu depodaki kanıtı nedir (hangi sütun
+    sonradan geldi, eski satırlara ne oldu)?
+    *Cevap:* Ör. çağrı başına tavan (`max_tokens` + sınırlı deneme) ve engellemeyen olağandışılık
+    uyarısı; ikisi de kişinin toplam kullanımını sınırlamaz. (Gateway'deki şirket tavanı da var ama
+    aşılınca herkesi durdurur.) `Islem` + model ilk günden damgalı; `kullanici_id` Faz 9b'de
+    eklendi, eski satırlar `yerel` oldu — kimin olduğu artık bilinemez.
 
 ## Kaynaklar
 - **FinOps for AI — teknoloji kategorisi (FinOps Framework):**
@@ -627,6 +808,12 @@ seçtirir; başarılı çıktı başına metrik gerçeği gösterir.
   <https://www.finops.org/insights/2026-finops-framework/>
 - **FinOps X 2026 — 1. Gün açılış konuşması ("The Great Token Panic and Is FinOps Dead?!"):**
   <https://www.finops.org/insights/finops-x-2026-day-1-keynote/>
+- **AI Engineering from Scratch** (Rohit Ghumare, MIT Lisansı, Copyright (c) 2026 Rohit Ghumare) —
+  <https://github.com/rohitg00/ai-engineering-from-scratch> — §5.3, §7.1 ve §7.2 şu derslerden
+  sentezlendi (çeviri değil; rakamlar metin içinde şerhli): Faz 11 · 11 *Caching, Rate Limiting &
+  Cost Optimization*; Faz 17 · 14 *Prompt & Semantic Caching*; Faz 17 · 15 *Batch APIs*; Faz 17 · 16
+  *Model Routing*; Faz 17 · 27 *FinOps for LLMs*. Bu deponun vakası (`RaporService`, `ai_kullanim`,
+  ADR-0003/0012/0015, `docs/kurulum-site.md` §8.3) eklendi.
 
 ### Bu programdaki ilgili kaynaklar
 - [`evals-llm-observability.md`](evals-llm-observability.md) — başarılı çıktı başına maliyet metriği,
@@ -636,3 +823,7 @@ seçtirir; başarılı çıktı başına metrik gerçeği gösterir.
 - [`mcp-adapter.md`](mcp-adapter.md) — MCP'nin adaptör olarak mimarisi (Hafta 9).
 - `docs/adr/0004-openrouter-saglayici.md` · `docs/adr/0007-mcp-sunucusu.md` — bu özetteki iki ekonomi
   kararının kayıtları.
+- [`llm-uretim-yolu.md`](llm-uretim-yolu.md) — aynı katmanın canlı işletim yüzü: gecikme SLO'su, AI
+  gateway, yedek model zinciri, güvenli yayın.
+- [`ajan-calisma-zamani-kontrolleri.md`](ajan-calisma-zamani-kontrolleri.md) — harcama tavanı, hız
+  limiti ve kill switch'in operasyonel ayrıntısı (§7.2).

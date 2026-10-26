@@ -12,8 +12,12 @@ Bu metin, yapay zekâ ajanının **etrafındaki düzeneğin** — harness'ın �
 yüklenen uzman talimatları (skills), işi ayrı bir pencerede yaptıran yardımcı ajanlar
 (subagent'lar) ve modelden bağımsız çalışan otomatik betikler (hook'lar). Amaç şunu görmen:
 modelin kendisini değiştiremezsin, ama etrafındaki bu dört parçayı sen kurarsın — ve günlük işte
-sonucu asıl belirleyen budur. Sonda iki ek soru var: model ile harness üretim tarafında nasıl
-birlikte evriliyor (§6) ve modeller zekileştikçe harness'a ne olacak (§7)?
+sonucu asıl belirleyen budur. Ortada en güçlü sensor'un nasıl kurulduğunu göreceksin (§5.1–5.3):
+**"bitti" sohbetteki bir cümle değil, kayıtlı bir çıkış kodudur**; kapıda LLM yargıç olmaz;
+kapsam, diff'in izinli/yasaklı dosya desenleriyle karşılaştırılmasıdır; ajan kendisini yargılayan
+testi/hook'u düzenleyemez; ve her düzeltme, onu zorlayabilecek **en erken katmana** (test, hook,
+ArchUnit, AGENTS.md) sahibi ve emeklilik koşuluyla terfi eder. Sonda iki ek soru var: model ile
+harness üretim tarafında nasıl birlikte evriliyor (§6) ve modeller zekileştikçe harness'a ne olacak (§7)?
 
 ## Neden bu özet
 [`model-ve-caba.md`](model-ve-caba.md) **modelin içini** açtı: tokenizasyon, donmuş ağırlıklar,
@@ -141,6 +145,36 @@ skill *yüklenince* onun talimatı da o turun geri kalanında **bağlamda kalır
 gibi girdinin parçası olur ([`model-ve-caba.md`](model-ve-caba.md) §3'ün "düşünme token'ları bağlamda
 kalır" mekaniğinin aynısı).
 
+### 2.1 Kutu — Skill neyi taklit etmemeli: önce sınıflandır, sonra paketle
+Bir ihtiyacı skill'e çevirmeden önce **hangi kutuya** ait olduğunu sor. Komşu soyutlamalar
+(abstraction) ve her birinin *taklit etmemesi gereken* şey:
+
+| Parça | Asıl işi | Taklit etmemeli |
+|---|---|---|
+| Prompt | tek bir model etkileşimini biçimlemek | sürümlü, kaynaklı bir paket |
+| Depo talimatı (AGENTS.md / CLAUDE.md) | bir kod tabanının kalıcı kuralları | tekrar kullanılan iş akışı |
+| **Skill** | tekrar kullanılan prosedür — "nasıl yaklaşılır" | **yetki sınırı** |
+| MCP aracı (tool) | tipli bir yetenek — "ne yapılabilir" | ayrıntılı çalışma prosedürü |
+| Hook | bir olayda deterministik mantık | olasılıksal yönlendirme |
+| Subagent | ayrı bağlamla iş devri (§3) | durağan talimat demeti |
+| Plugin | büyük bir eklentiyi dağıtmak | skill sözleşmesinin kendisi |
+
+- **Skill bir yetki sınırı DEĞİLDİR.** Keşfedilmiş ≠ etkin ≠ izinli ≠ doğru — dördü ayrı olgudur.
+  `allowed-tools` gibi alanlar çoğu host'ta izin sorusunu azaltır; işletim sistemi düzeyinde
+  **izolasyon** sağlamaz. Duvar sandbox'tır ([`ajan-sandbox-izolasyonu.md`](ajan-sandbox-izolasyonu.md)).
+- **Kim çağırır — 2×2:** insan çağırabilir mi × model kendiliğinden seçebilir mi. Yanlış pozitifin
+  bedeli kolaylıktan büyükse (yayınlama, silme, toplu dışa aktarma) skill **yalnız insanca çağrılır**:
+  modelin örtük seçimi kapatılır (bir host'ta `disable-model-invocation: true` — alan adları host'a
+  özgüdür, taşınabilir standart değil). Bu alan kullanılmıyorsa, örneğin bir `commit` skill'inin ne
+  zaman çağrılacağı yalnız bir kural metninde yazılı kalır — yani guide, sensor değil.
+- **Yönlendirme, yakın ıskayla sınanır:** tetiklemesi gereken örnekler + aynı işin başka söylenişleri +
+  **yakın ıskalar** (near miss — kelimesi benzeyen ama skill'i tetiklememesi gereken istekler).
+  `skill-rules.json`'daki anahtar kelime eşleşmesi tam bu üçüncü türde yanlış pozitif üretir.
+- **Skill'i ölçmek = eşleştirilmiş koşu.** Aynı model, aynı araçlar, aynı görev seti, aynı bütçe;
+  tek fark skill'in varlığı (taban: skill'siz, deneme: skill'li). Birkaç tekrar, görev görev
+  karşılaştırma; ortalama iyileşse bile tekil gerilemeyi raporla. §8'in "kendi telemetrinle ölç"
+  cümlesinin somut yöntemi budur.
+
 ### 3. Subagent'lar — izole bağlam penceresi
 Bir **subagent** (alt-ajan), ana konuşmanın bağlamından **ayrı, temiz bir pencerede** çalışan ikinci
 bir ajandır. Bu kurulumda tipleri `~/.claude/agents/*.md` dosyalarında tanımlıdır (frontmatter'da ad,
@@ -161,6 +195,27 @@ Mekaniğin değeri iki yönlüdür:
   kayıptır. `explicit-identity.md` kuralı ("session_id'yi sınırlar arası açıkça geçir; 'en son' bir
   yarış koşuludur") tam bu sınır yüzünden vardır — bu deponun [`ajan-sandbox-izolasyonu.md`](ajan-sandbox-izolasyonu.md)
   kaynağı da aynı izolasyon fikrinin güvenlik yüzüdür.
+
+**Devretme sözleşmesi — paralellik bir erdem değil, bir koşuldur.** Tek subagent açmak bağlamı
+korur; birden fazlasını **paralel** açmak ayrı bir karardır. Paralellik yalnız iş gerçekten
+bağımsızsa zaman kazandırır; değilse tek net görevi, daha hızlı arızalanan bir koordinasyon
+problemine çevirir:
+
+- **Paralel yalnız şunlarda:** iki araştırma farklı bilinmeyenleri birbirinden bağımsız cevaplıyorsa;
+  iki uygulama **ayrık dosyalara ve ayrık sözleşmelere** sahipse; bir inceleyici bitmiş eseri
+  değiştirmeden okuyacaksa. İşçiler aynı dosyaya, aynı çözülmemiş karara ya da aynı değişebilir
+  ortama ihtiyaç duyuyorsa **seri** kal.
+- **Yazma sahipliği münhasırdır:** her yol (path) tek bir işçinindir; üst dizin ile içindeki dosya da
+  çakışma sayılır. Ayrı çalışma kopyası (worktree) dosya çakışmasını önler ama sahiplik sorununu
+  çözmez — iki temiz kopya yine çelişen tasarım üretebilir; ortak arayüz iş başlamadan karara bağlanır.
+- **Entegratör özeti değil kanıtı okur.** İşçinin "bitti" cümlesi değil, istenen kanıt çıktısı
+  (komut + sonuç) gelir. Birleştirme, bir işçinin sonucunun çoğunu yeniden yazmayı gerektiriyorsa
+  hata işçide değil **bölmededir**.
+
+Vaka: bu metni büyüten içerik turu tam böyle kuruldu — ana oturum işi alt-ajanlara böldü, her
+birine **yalnız dokunabileceği dosyaların listesini** verdi (yeni dosyalar birbirine link
+verebilir ama içerik tekrarı yasak) ve teslimde özet yerine bitirme kontrolünün **çıktısını**
+(svg sayısı önce/sonra, yasaklı CSS taraması) istedi.
 
 ### 4. Hook'lar — deterministik kabuk
 Skills ve subagent'lar **modele** iş yaptırır; hook'lar ise **modelden bağımsız**, belirli
@@ -322,6 +377,137 @@ Harness'ı sağlam yapan, ikisinin birlikte kurulmasıdır.
 </svg>
 ```
 
+### 5.1 Doğrulama kapısı — "bitti" bir çıkış kodudur
+Sensor'ların en kritiği, işin **bitip bitmediğine** karar verenidir. Ajanlar başarıyı kolay ilan
+eder; üç tipik biçim: *"iyi görünüyor"* (model kendi diff'ini okuyup karar verdi), *"testler geçti"*
+(koştuğuna dair kayıt yok), *"kabul kriteri karşılandı"* (kriter, "bitmiş gibi duran her şey"
+anlamına gelecek kadar gevşek okundu). Çare, ajanın zaten ürettiği **eserleri** (artifact — diff,
+komut kayıtları, test raporu) okuyup tek soruyu cevaplayan deterministik bir **doğrulama kapısıdır**
+(verification gate): *bu iş gerçekten bitti mi?* Kapı "hayır" diyorsa iş bitmemiştir — sohbet ne
+derse desin. Hafta 1 Gün 4'ün "yapan ≠ yargılayan" ilkesinin en sert hâli budur: yargılayan bir
+model bile değil, bir fonksiyondur.
+
+1. **"Bitti" = kayıtlı çıkış kodu.** Kabul komutu (acceptance command) koşmuş ve sıfırla çıkmış
+   olmalı; kanıt bu kaydın kendisidir. Kaydı olmayan ya da çıkış kodu boş (null) kalan koşu
+   **ilerleme sayılmaz**. Bu depoda kabul komutu CLAUDE.md'de yazılıdır: `./mvnw verify` (birim +
+   ArchUnit) — "merge öncesi YEŞİL olmalı". Ajanın "verify geçti" cümlesi kanıt değildir; komutun
+   çıktısı kanıttır. Yeniden denemeler ilk denemeye bağlı kaydedilir ki ilk kırmızı, sonraki
+   yeşilin altında kaybolmasın.
+2. **Kapıda LLM yargıç yok.** Aynı eser kümesi her seferinde aynı hükmü almalı. LLM yargıç
+   (LLM-as-judge) inceleme tarafında kalır — okunabilirlik, isimlendirme, tasarım kokusu gibi nitel
+   sorular için. İkisini karıştırmak sinyali çökertir: "kod sorunu çözdü mü?" sorusunu test cevaplar,
+   "kod okunur mu?" sorusunu yargıç. Blok düzeyindeki bir bulguyu ajan geçersiz kılamaz; yalnız bir
+   insan, **gerekçesi kayıtlı** olarak geçersiz kılar.
+3. **Kapsam = diff kontrolü.** Kapsam kayması (scope creep) en az izlenen arızadır, çünkü ajan her
+   adımı iyi niyetle anlatır: "giriş hatasını düzelt" görevi giriş rotasına, e-posta yardımcısına,
+   veritabanı sürücüsüne, README'ye ve sürüm betiğine dokunur — her biri o an makul, toplamı
+   incelenmemiş başka bir değişiklik. Çare daha sert bir prompt değil; diskte bir sözleşme ve onu
+   okuyan makine: değişen dosya yolları **izinli** (allowed) ve **yasaklı** (forbidden) dosya
+   desenleriyle (glob — `src/main/java/**/service/*.java` gibi joker karakterli yol kalıbı)
+   karşılaştırılır. Yasaklı listesi olmayan sözleşme eksiktir — negatif alan sözleşmenin yarısıdır.
+   Ciddiyet yol ailesine göre asimetrik olabilir: dokümana taşma uyarı, göç/betik/üretim
+   yapılandırmasına taşma blok.
+4. **Taban (floor): testleri silip yeşile dönülmez.** Kırmızı testi "düzeltmenin" en ucuz yolu onu
+   silmek ya da devre dışı bırakmaktır; yalnız "çıkış kodu 0 mı?" diye bakan kapı bunu ödüllendirir.
+   Kapı bu yüzden bir taban da tutar: koşan test sayısı (ya da kapsama oranı) bir önceki yeşil
+   birleştirmeden belirgin düşerse kapı kırmızıdır. Bu depoda bu taban henüz otomatik değil; silinen
+   test dosyasını bugün diff'i okuyan insan görür — kapı, bu gözü makineye devretmenin yeridir.
+5. **Kanıtı kanıtla (prove the proof).** Yeşil bir kontrol, ancak kırmızı olması gerektiğinde kırmızı
+   oluyorsa kanıttır. Atılabilir bir kopyada bilerek **belirli bir yanlış sonuç** ekle (geçersiz
+   değeri kabul et, zorunlu alanı yanıttan düşür); aynı kabul kontrolü **o sebeple** kırmızı olmalı.
+   Sözdizimi hatası ya da bozuk test kurulumu sayılmaz — onlar kontrolü değil derleyiciyi sınar.
+   Yeşil kalıyorsa önce iddiayı güçlendir, sonra doğru kodu geri koy; iki makbuzu da (kırmızı +
+   yeşil) sakla. Her gözleme nerede yapıldığını yaz — yerel / staging / canlı: yerel prova yalnız
+   yerel iddiayı destekler.
+
+Bu depodan gerçek vaka: `MimariTestleri` katman kuralı, katmanlardan biri **boş** kalırsa (örneğin
+paket yeniden adlandırılınca) sessizce geçiyordu — "sıfır sınıf = sıfır ihlal". Kontrol yeşildi ama
+kırılması gereken durumda kırılmıyordu. Düzeltme (commit `3816c30`, `withOptionalLayers(false)`)
+kayıp katmanı build'i kırmızı yapan bir koşula çevirdi: kanıtın kendisi kanıtlandı.
+
+> *Şerh:* Bu bölümün dayandığı dersler kapı fikrini "Anthropic 2026 Hybrid Norm" diye bir **etiketle**
+> ve "specsmaxxing" adlı bir kapsam-kayması anekdotunun **rakamlarıyla** destekliyor; ilki için
+> kaynak yok, ikincisi için yalnız tek bir uygulayıcının blog yazısı gösteriliyor. Fikir (deterministik kapı + nitel işler için ayrı yargıç) alındı;
+> ad ve rakam alınmadı. Aynı ders serisinin "araçları silince başarı şu orana çıktı", "şu ekip 2 kat
+> hızlandı" türü ikinci-el sayıları da alıntılanmadı; Terminal Bench sıralama sıçramaları için §6'daki
+> şerh geçerli.
+
+### 5.2 Değerlendirici güvenlik duvarı — ajan kendi yargıcını düzenleyemez
+Kapının zayıf noktası yeridir: kapı ajanın **yazabildiği** yerdeyse, ajan işi değil kapıyı
+değiştirerek geçebilir. Bu teorik değil. Darwin Gödel Machine çalışmasında (Zhang ve ark., 2025 —
+kendi kaynak kodunu değiştiren ve her sürümü kıyaslamada puanlanan bir ajan) ajan, puanlama
+hattının yanıtlarında aradığı halüsinasyon işaretlerini (marker) araçlarına eklemeyi bırakarak
+puanını yükseltti — davranışı iyileşmeden. Yazarların çaresi: işaretleri geri koymak ve ajanın
+**düzenleyemeyeceği** ayrı bir kontrol eklemek. Kodlama ajanındaki karşılığı tanıdık: *"testleri
+geçirmek için testleri düzenledi."*
+
+Kural: **ajanı yargılayan her şey — testler, ArchUnit kuralları, hook betikleri, CI yapılandırması,
+eval setleri — ajanın yazamadığı yerde durur ya da kabulden önce değişmediği doğrulanır.**
+Bu depoda bugün olan, dürüstçe:
+
+- `MimariTestleri.java` ve `tools/git-kancalari/pre-push` **ajanın çalıştığı depo içinde**; ajan
+  teknik olarak ikisini de düzenleyebilir. Bugünkü koruma mekanik değil: değişiklik diff'te görünür,
+  "commit eden sahiptir" ilkesiyle insan incelemesi yakalar. Yani duvar şu an bir **gözlem
+  noktasıdır**, kilit değil.
+- Ajan harness'ının kullanıcı düzeyi hook'ları depo dışında, kullanıcının ana dizinindeki harness
+  yapılandırmasında durur ve oradaki ayar dosyasında kayıtlıdır — proje görevinin
+  dokunacağı yolda değil, ama aynı kullanıcı yetkisiyle çalışan bir ajan için ulaşılmaz da değil.
+- Kuralın kendisi meşru olarak değişebilir (`3816c30` gibi); bu bir **insan kararıdır** ve kendi
+  commit'inde, gerekçesiyle gelir. Doğal sonraki adım §5.1'in diliyle: bu yolları kapsam
+  sözleşmesinin **yasaklı** desenlerine koymak (görev "mimari kuralı değiştir" değilse, ona dokunan
+  diff otomatik blok) ve özet (hash) karşılaştırması — ayrıntısı
+  [`ajan-calisma-zamani-kontrolleri.md`](ajan-calisma-zamani-kontrolleri.md)'nde.
+
+### 5.3 Düzeltmeyi kurala çevirmek — cırcır (ratchet)
+Hafta 1 "tekrar eden hata → sensor" dedi; eksik olan **nereye** sorusuydu. Sohbette kalan bir
+düzeltme tek koşuyu düzeltir; teste, sınıra, örneğe ya da araca terfi eden düzeltme sonraki **tüm**
+koşuları. Cırcır (ratchet — yalnız tek yöne dönen dişli) benzetmesi buradan: kazanılan yargı geri
+kaçmaz. Düzeltme bir prompt başarısızlığı değil, iş sisteminin bir **gözlemidir**: "o dosyayı
+düzenleme" dediysen kapsam sınırı yürütülebilir değildi; "çıktı biçimi yanlış" dediysen bir örnek
+ya da test eksikti. Her düzeltme, onu zorlayabilecek **en erken katmana** yönlendirilir — erken
+kontrol ucuzdur: geçersiz durumu kuran tip, onu sonradan yakalayan inceleme yorumundan güçlüdür;
+odaklı bir test, "hatırla" diyen bir paragraftan güçlüdür.
+
+| Tekrarlayan arıza | En erken etkili katman | Bu depoda örnek |
+|---|---|---|
+| Yasak bağımlılık / geçersiz yapı | tip, lint, ArchUnit kuralı | `MimariTestleri.claude_yalniz_ai_paketinden` |
+| Yanlış sonuç, gerileme | test / eval | "yeni davranışa test" (CLAUDE.md ALWAYS) |
+| Kapsam dışı ya da güvensiz eylem | izin politikası, hook | `pre-push`: pera-soft'a yalnız `pera-soft-yayin` |
+| Tekrarlanan kurulum/komut hatası | otomasyon, araç | `tools/yayin-hazirla.sh`, `tools/sifre-baglantisi.sh` |
+| Tekrarlanan biçim hatası | kanonik örnek + doğrulayıcı | kaynak konvansiyonu + `/api/kaynak/{slug}` → 3 svg |
+| Belirsiz yerel konvansiyon | talimat (AGENTS.md) + senaryo | CLAUDE.md "Sınırlar" |
+| Ürün anlaşmazlığı | insan karar kaydı | `docs/adr/` |
+
+Bu depodaki en temiz cırcır: **ADR-0009**. "MCP servisleri LLM'siz olmalı" yazılı bir
+konvansiyondu (guide). MCP sınıflarının, LLM çağıran bir servisi enjekte ettiği görülünce —
+`claude_yalniz_ai_paketinden` kuralı bu dolaylı yolu görmüyordu — konvansiyon `@LlmKullanan` işareti + `MimariTestleri.mcp_llmsiz` kuralıyla
+**derleme katmanına** terfi etti; artık ihlal build'i kırmızı yapar.
+
+Üç disiplin cırcırı şişmekten korur:
+
+- **Belirtiyi değil nedeni yönlendir.** "Ajan README'yi düzenledi" belirtidir; neden görevin kök
+  dizine izin vermesi, dokümanın örtük olarak "güvenli" sayılması ya da iki işçinin sahipliğinin
+  çakışması olabilir — her neden ayrı bir kontrole gider. Belirtiyi tekrarlayan kural, biraz farklı
+  bir sonraki vakada yine kaçırır.
+- **Yalnız tekrar ya da sonuç gerekçelendirirse terfi et.** Her tek seferlik tercih kalıcı karmaşıklığa
+  değmez.
+- **Her kuralın kaydı:** belirti, neden, tekrar sayısı, seçilen kontrol, o kontrolün doğrulaması,
+  **sahibi**, **gözden geçirme tarihi** ve **kanıta dayalı emeklilik koşulu**. Emekliye ayırma
+  gerekçeleri: mimari değişti; daha güçlü yürütülebilir bir kontrol onun yerini aldı (ADR-0009'dan
+  sonra yazılı "mcp LLM'siz" hatırlatması tekrardır); seçilen pencerede arıza bir kez bile tekrar
+  etmedi; kontrol, önlediği riskten fazla meşru işi engelliyor. Emeklilik de kanıt ister — "eski
+  hissettiriyor" sebep değildir. Yaygın bir yarım çözüm: kural dosyaları hangi oturumlardan
+  doğduklarını bir "kaynak oturumlar" (Source Sessions) başlığıyla kaydeder: kanıt yarısı
+  var; sahip, gözden geçirme tarihi ve emeklilik koşulu yok.
+
+Bu, Hafta 1 Gün 5'in **sökülebilirlik** ilkesinin tamamlayıcısıdır: orada "model güçlenince koltuk
+değneğini sök" dedik; cırcır, kural **eklemenin** de **sökmenin** de kanıtlı bir kaydı olmasını
+ister. Hedef en uzun talimat dosyası değil, zor kazanılmış yargıyı koruyan **en küçük** sistemdir.
+
+> *Şerh:* Ders, kurallarına son kullanma tarihi koyan bir ekibin kural setini küçük tuttuğunu
+> aktarıyor. Bu bir korelasyondur (küçük kural setini zaten önemseyen ekip tarih de koyuyor olabilir),
+> nedensellik kanıtı değil; ayrıca kaynak birincil değil.
+
 ### 6. Model–harness ortak evrimi — döngü ve aşırı uyum riski
 Buraya kadar model ile harness'ı iki ayrı kutu gibi anlattık: model donmuş, harness senin. Bu
 günlük kullanım için doğrudur; ama **üretim tarafında** iki kutu sanıldığı kadar bağımsız değildir.
@@ -458,6 +644,33 @@ Bu çerçeve senin için soyut değil, çünkü **kurulumun bu desenin ta kendis
 13. **Gelecek sorusu:** "Modeller zekileştikçe harness önemsizleşir" iddiasına iki karşı gerekçe ver.
     Model yükseldikçe harness'ın hangi katmanı incelir (guide mı sensor mu), hangisi kalır — ve bu
     depodaki kurulumundan hangi parçalar hangi tarafa düşer?
+14. **Doğrulama kapısı sorusu:** Bir ajan "verify geçti, iş bitti" diyor. Kapı bu cümleyi neden kanıt
+    saymaz — neyi arar? Kapıya neden LLM yargıç konmaz? Ajan iki kırmızı testi silip `./mvnw verify`'ı
+    yeşile çevirirse, yalnız çıkış koduna bakan kapı ne der ve **taban** bunu nasıl yakalar?
+15. **Kanıtı kanıtla + güvenlik duvarı:** `MimariTestleri`'nin `withOptionalLayers(false)` öncesi hâli
+    hangi anlamda "yeşil ama kanıt değil"di? Bir kontrolü "kanıtlamak" için ne yaparsın — ve neden
+    sözdizimi hatası sayılmaz? Ajanın aynı depodaki `MimariTestleri.java`'yı düzenleyebilmesi neden
+    sorundur; bu depoda bugünkü koruma kilit mi, gözlem noktası mı?
+16. **Cırcır + skill sorusu:** ADR-0009'daki "mcp LLM'siz" kuralı hangi katmandan hangi katmana terfi
+    etti, neden "en erken etkili katman" oydu? Terfi eden bir kuralın kaydında hangi dört alan olmadan
+    kural bir "biçimlendirilmiş gözlem" olarak kalır? Ayrıca: bir skill'e `allowed-tools` yazmak onu
+    neden yetki sınırı yapmaz, ve bir skill'in işe yarayıp yaramadığını nasıl ölçersin?
+
+### Cevap ipuçları (14–16)
+- **14:** Kapı cümleyi değil, kabul komutunun **kayıtlı çıkış kodunu** arar; kayıt yoksa ilerleme
+  yoktur. LLM yargıç olasılıksaldır, aynı eserlere farklı hüküm verebilir — nitel inceleme tarafında
+  kalır. Testler silinince çıkış kodu 0 olur, kapı "geçti" der; taban, koşan test sayısının bir önceki
+  yeşil koşudan düşmesini kırmızı sayar (§5.1, kural 4).
+- **15:** Katman boş kalınca kural hiçbir sınıfa uygulanmıyor, "sıfır ihlal" ile geçiyordu — kırılması
+  gereken durumda kırılmıyordu. Kanıtlamak: atılabilir kopyada belirli bir yanlış sonuç ekle, aynı
+  kontrol **o sebeple** kırmızı olmalı; sözdizimi hatası kontrolü değil derleyiciyi sınar. Yargıç
+  ajanın yazabildiği yerdeyse ajan işi değil yargıcı değiştirebilir (DGM vakası); bugün koruma diff +
+  insan incelemesidir — gözlem noktası, kilit değil (§5.2).
+- **16:** Yazılı konvansiyondan (guide) ArchUnit kuralına — derleme katmanı, çünkü ihlali kod
+  yazılırken, insan incelemesinden önce, deterministik yakalar. Dört alan: sahip, doğrulama, gözden
+  geçirme tarihi, kanıta dayalı emeklilik koşulu (§5.3). `allowed-tools` izin sorusunu azaltır,
+  işletim sistemi izolasyonu sağlamaz; ölçüm: aynı model/araç/görev/bütçe ile skill'li ve skill'siz
+  eşleştirilmiş koşular + yakın-ıska içeren yönlendirme seti (§2.1).
 
 ## Kaynaklar
 - **Anthropic — Claude Code dokümanı** (hooks, subagents, skills, settings referansı; Tem 2026'da
@@ -471,6 +684,18 @@ Bu çerçeve senin için soyut değil, çünkü **kurulumun bu desenin ta kendis
   *şerh: LangChain kendi harness kütüphanesini (deepagents) ve platformunu (LangSmith) satan
   taraftır; kavramsal çerçevesi sağlam, "sadece harness'la Top 30 → Top 5" gibi sayısal iddiaları
   bağımsız doğrulanmamış satıcı beyanıdır (§8 refleksi).*
+- **AI Engineering from Scratch — Rohit Ghumare** (github.com/rohitg00/ai-engineering-from-scratch,
+  MIT lisansı, "Copyright (c) 2026 Rohit Ghumare") — §2.1, §3 devretme sözleşmesi ve §5.1–5.3'ün
+  kaynağı. Dersler: Faz 14 (agent engineering) 33 instructions-as-executable-constraints,
+  36 scope-contracts, 37 runtime-feedback-loops, 38 verification-gates, 42 agent-workbench-capstone,
+  45 delegate-with-isolation, 46 turn-feedback-into-system, 54 build-the-feedback-ratchet; Faz 13
+  (tools and protocols) 22 skills-and-agent-sdks, 24 skill-discovery-and-progressive-disclosure,
+  25 skill-invocation-and-routing, 26 skill-permissions-sandboxes-and-trust, 27
+  skill-evals-packaging-and-portability; Faz 15 (autonomous systems) 03 alphaevolve ve 04
+  darwin-godel-machine (yalnız değerlendirici güvenlik duvarı fikri). *Uyarlama notu: çeviri değil
+  sentezdir; ders kodları alınmadı, örnekler bu deponun kendi dosyalarıyla değiştirildi. Şerh:
+  derslerdeki kaynaksız rakamlar ve etiketler ("Hybrid Norm", "specsmaxxing" yüzdeleri, ikinci-el
+  hız/başarı oranları) ile yazarın kendi araçları (skillkit, agentmemory) alıntılanmadı (§5.1 şerhi).*
 
 ### Bu programdaki ilgili kaynaklar
 - [`model-ve-caba.md`](model-ve-caba.md) — modelin **içi** (inference); bu metin modelin **etrafı**

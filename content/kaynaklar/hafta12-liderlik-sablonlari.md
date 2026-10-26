@@ -57,6 +57,9 @@ bölümleri madde madde doldur.
 
 **2. Hedef (goal) — "bitti" neye benziyor?**
 - Başarı ölçülebilir tek cümleyle: kullanıcı/işletme için hangi sonuç doğar?
+- Çözüm sızıntısı testi: hedef cümlesi bir **biçim** mi dayatıyor ("haftalık AI özeti üret"), yoksa
+  gözlemlenebilir bir **sonuç** mu söylüyor ("ekip lideri pazartesi 5 dakikada riskli PR'ları görür")?
+  Biçim dayatıyorsa onu çözüm alanına taşı, hedefe sonucu yaz.
 
 **3. Kapsam-içi (in scope)**
 - [ ] Bu iş kesinlikle şunları KAPSAR: …
@@ -67,13 +70,74 @@ bölümleri madde madde doldur.
 **5. Kabul kriterleri (acceptance criteria)**
 - [ ] Doğrulanabilir madde: "… olduğunda … görünür/olur."
 - [ ] Her kriter test edilebilir olmalı (gözlemlenebilir çıktı).
+- [ ] **Kanıt, iddiayla aynı katmanı test eder.** Birim testi yerel bir fonksiyon sözleşmesini,
+  HTTP testi serileştirme + taşımayı, tarayıcı yolculuğu arayüz yolunu, denetim kaydı (audit log)
+  yetki sınırını kanıtlar. Alt katmanın kanıtını üst katmanın iddiası için kabul etme ("servis testi
+  geçti" ≠ "kullanıcı ekranda doğru mesajı görüyor"). "Testler geçiyor" bir kanıt planı değildir —
+  yetkili testi ve desteklediği iddiayı adıyla yaz.
+- [ ] Örnek seti: en az bir **normal**, bir **sınır** (edge), bir **hata** ve bir **yasak** durum
+  örneği. Örnekler niyeti sıfatlardan ("sağlam", "kullanıcı dostu") iyi taşır — ama bir değişmezin
+  (invariant) yerini tutmaz: tek geçen örnek evrensel bir güvenlik kuralını kanıtlamaz.
 
 **6. Riskler ve varsayımlar (risks & assumptions)**
 - Varsayım: "… doğru kabul ediyoruz." (yanlışsa iş çöker mi?)
 - Risk: "… olursa ne yaparız?" (özellikle geri dönüşü zor olanlar)
+- **Geri alınamaz adım kuralı:** planda geri alınamaz ilk adım (şema göçü, veri silme, dış sözleşme),
+  bağlı olduğu belirsizlik çözülmeden **önce** geliyorsa plan reddedilir. Sıra: önce belirsizliği
+  ucuz ve geri alınabilir bir adımla çöz, sonra geri dönüşü olmayana geç.
 
 **7. Bağımlılıklar ve açık sorular**
 - Neyi/kimi bekliyoruz? Cevabı olmayan hangi soru işi bloke eder?
+- Her bilinmeyeni **dört türden birine** ayır (bilinmeyen kontrollü bir boşluktur; varsayım ise o
+  boşluğa verilmiş kontrolsüz bir cevap):
+
+  | Tür | Anlamı | Ajan ne yapar? |
+  |---|---|---|
+  | Keşfedilebilir | depo ya da çalışan sistem cevaplayabilir | araştırır, devam eder |
+  | Karar verilebilir | sözleşme ajana seçme yetkisi veriyor | seçer, gerekçesini yazar, devam eder |
+  | İnsan | ürün davranışını, maliyeti, riski ya da dış uyumluluğu değiştirir | **durur, sorar** |
+  | Ertelenebilir | bu dilimin dışında | kapsam-dışına (alan 4) yazar |
+
+  Ajan yalnız **"insan"** türünde durur — seçim koda gömülmeden önce.
+
+**8. Repo gerçekleri — kanıtla (receipts)**
+- Spec'teki her "depo böyle çalışıyor" cümlesi bir **makbuzla** gelir: `dosya:satır` ya da komut
+  çıktısı. Örnek: "AI çağrısı yalnız `ai/` paketinden yapılabilir —
+  `src/test/java/tr/velzon/aiogretmen/MimariTestleri.java:58` (`claude_yalniz_ai_paketinden`)."
+  Makbuzu olmayan cümle gerçek değil, varsayımdır → alan 6'ya (riskler ve varsayımlar) taşı.
+- Keşif (reconnaissance) bütün depoyu okumak değildir; değişikliği **kısıtlayan** yüzeyleri arar:
+  mevcut davranış ve çağıranı, en yakın test, dışa açık sözleşme/serileştirilmiş biçim, o yolu
+  yöneten talimat (AGENTS.md), derleme/doğrulama komutu, benzer bitmiş bir değişiklik. Her planlı
+  karar ya kanıtla desteklendiğinde, ya açıkça devredildiğinde ya da bilinmeyen olarak listelendiğinde
+  dur — ötesi çoğu zaman kaçınmadır.
+
+**9. Karar politikası — her karar işaretli**
+Her önemli karar üç moddan biriyle, **gerekçesiyle** işaretlenir (gerekçe, sonraki ekibin kararı
+arkeoloji yapmadan değiştirebilmesi içindir):
+
+| Mod | Ne zaman | Bu projeden örnek |
+|---|---|---|
+| **Kilitli** (locked) — ajan seçemez | dış uyumluluk, yetki, güvenlik, geri alınamaz maliyet, ürün taahhüdü | uygulama yalnız 127.0.0.1'e bağlanır (CLAUDE.md NEVER) |
+| **Sınırlı** (bounded) — sınır içinde seçer | arama/yeniden deneme bütçesi, izinli bağımlılıklar, bilinen arayüz ailesi | yalnız mevcut bağımlılıklarla; yenisi ADR ister (ASK FIRST) |
+| **Ajana bırakılmış** (delegated) — seçer ve açıklar | yerel yapı, isimler, geri alınabilir refactor | servis içi yardımcı metodun adı ve bölünmesi |
+
+İki uç da kötüdür: eksik tanımlı spec ajana sistemi **tahmin** ettirir; aşırı tanımlı spec ona
+yanlış olabilecek bir tasarımı **dikte** ettirir. Ucuz ve geri alınabilir yerde yargıyı ajana
+bırak; sonucu ağır ya da dışa açık yerde insan kontrol noktası koy.
+
+**10. Ölçüm planı — sonucu görmeden ÖNCE yazılır**
+- **Geçti / kaldı / belirsiz** yolları ölçümden önce yazılır; yoksa ekip eşiği, inşa ettiğini
+  korumak için kaydırır. Örnek: *geçti* = doğru tanı oranı ≥ 0,9 ve ortanca süre ≤ 120 sn;
+  *kaldı* = herhangi bir üretim yazması ya da doğru oranı < 0,75; *belirsiz* = küçük iyileşme, geniş
+  sapma → daha büyük tekrar seti.
+- Her metriğin sözleşmesi: ad, yön (en az / en çok), eşik, pencere, kaynak, nüfus. Kaynağı ve
+  penceresi olmayan sayı tekrar üretilemez; eşiği olmayan sayı karar sürdüremez.
+- **Sonuç metriği** (istenen durum iyileşti mi?) + **koruyucu metrik** (guardrail — sabit bir kısıt
+  hâlâ doğru mu? ör. tanı salt-okur kaldı mı?) + **karşı metrik** (counter-metric — yerel iyileşme
+  maliyeti başka yere mi itti? ör. nöbetçinin iş yükü, kaçan alarm).
+- **Durma kuralı:** "her sonuç 'devam et' diyorsa bu bir deney değildir." En küçük test edilebilir
+  dilimi seç ve sahte minimumlardan kaçın — yalnız arayüz, yalnız mutlu yol, yalnız demo dilimi
+  asıl riski test etmez.
 
 > İpucu: Spec bittiğinde kendine sor — "Bunu hiç konuşmadığım biri okusa, benimle aynı
 > şeyi mi inşa eder?" Cevap "hayır" ise henüz spec hazır değil.
@@ -206,6 +270,23 @@ savunması.
 > İpucu: "Doğru" mimari yok; belirsizliği soruyla daraltıp kararını SAVUNABİLMEK var.
 > Bir varsayımı açıkça yazıp üstüne karar kurmak, sessizce varsaymaktan iyidir.
 
+> **Kutu — Hafta 12 bitirme projesi fikirleri** (her biri §1 spec şablonuyla başlar; AI Engineering
+> from Scratch Faz 19 bitirme projelerinden uyarlandı)
+> - **Kod göçü ajanı (en uygun seçim):** Java 8/11 → 17/21 ya da Spring Boot 2 → 3. Önce
+>   **deterministik** dönüşüm (OpenRewrite tarifleri), ajan yalnız **kalan** kısımda; kapsama düşerse
+>   kırmızı olan bir kapı ve bütçe tavanı. Asıl teslim: göçün **hata taksonomisi** — hangi tür kırılma
+>   tarifle, hangisi ajanla, hangisi insanla çözüldü.
+> - **AI Öğretmen'in kendi etkinlik çalışması:** bir haftalık modülü, uyarlanmayan bir tabana
+>   (ör. aynı içeriğin düz metni) karşı küçük bir **ön test / son test** ile ölç. Kavrama ölçülür,
+>   memnuniyet değil — [`ai-verimlilik-olcumu.md`](ai-verimlilik-olcumu.md)'nün deney refleksiyle.
+> - **Salt-okur teşhis ajanı:** bir Spring uygulamasının log ve metriklerinden tanı koyar; varsayılan
+>   salt-okurdur, düzeltici araçlar ajanın **hiç tutmadığı** bir onay jetonunun arkasındadır; denetim
+>   kaydı yalnız çalıştırılan değil **değerlendirilen** komutları da yazar (kıl payı kaçanları gösterir).
+> - **Etiketten PR'a ajan:** kendi deponda bir issue etiketi → PR. Kısa ömürlü, dar yetkili jeton;
+>   "main'e push yok / force-push yok" uygulama izniyle değil **dal korumasıyla** zorlanır; jeton
+>   izinleri yol bazlı olmadığından "`.github/workflows`'a yazma yok" diff üzerinde kontrol edilir;
+>   depo/gün başına bütçe.
+
 ---
 
 ## Öz-sınav (kendini test et)
@@ -223,3 +304,34 @@ savunması.
    neye bakarak anlarsın?
 7. Mimari kata'da "moderatöre soru sormak" neden kata'nın kalbi sayılıyor? Hiç soru sormadan
    doğrudan çizime başlayan bir ekip neyi kaçırır?
+8. Spec'indeki bir bilinmeyen "giriş e-postası büyük/küçük harf duyarlı mı?". Bu dört türden hangisi
+   olabilir, ajan hangisinde durur? Aynı spec'te "uygulama 127.0.0.1'e bağlanır" kararı hangi moddadır
+   (kilitli / sınırlı / ajana bırakılmış) — neden?
+9. Hedefin "tanı süresini kısalt". Ölçümden önce hangi üç yolu (geçti/kaldı/belirsiz) yazarsın, ve
+   hangi koruyucu + karşı metrik "hızlı ama güvensiz" bir sonucu yakalar? Bir servis birim testi,
+   "kullanıcı ekranda doğru hata mesajını görüyor" iddiasının kanıtı olur mu?
+10. Bitirme projesi olarak kod göçü ajanında neden önce OpenRewrite, sonra ajan? Asıl teslimin neden
+    "göç tamamlandı" değil de bir hata taksonomisi?
+
+### Cevap ipuçları (8–10)
+- **8:** Kod/test mevcut davranışı gösteriyorsa **keşfedilebilir**; spec seçimi ajana bırakmışsa **karar
+  verilebilir**; değişiklik mevcut kullanıcıların girişini etkileyecekse (dışa açık davranış) **insan** —
+  ajan yalnız burada durur. 127.0.0.1 **kilitli**dir: güvenlik/yetki sınırı, CLAUDE.md NEVER.
+- **9:** Eşikli geçti/kaldı/belirsiz yolları sonucu görmeden yaz; koruyucu = tanı salt-okur kaldı mı
+  (üretim yazması sıfır), karşı = nöbetçi iş yükü, kaçan alarm. Hayır: birim testi alt katmandır;
+  iddia arayüz katmanındadır, kanıt da orada olmalı.
+- **10:** Deterministik dönüşüm ucuz, tekrarlanabilir ve denetlenebilir; ajan yalnız kalan belirsiz işe
+  harcanır. Taksonomi tekrar kullanılabilir bilgidir: bir sonraki göçte hangi kırılma türünün tarife,
+  hangisinin insana gittiğini söyler.
+
+## Kaynak ve lisans
+- §1 spec şablonundaki eklemeler (2, 5, 6, 7. alanlara eklenen maddeler; yeni 8–10. alanlar) ve §5
+  sonundaki bitirme projesi kutusu: **AI
+  Engineering from Scratch — Rohit Ghumare** (github.com/rohitg00/ai-engineering-from-scratch, MIT
+  lisansı, "Copyright (c) 2026 Rohit Ghumare"). Dersler: Faz 14 (agent engineering) 43
+  frame-the-task-before-code, 44 plan-from-evidence, 47 outcomes-before-output, 50
+  choose-the-smallest-testable-slice, 51 write-specifications-that-preserve-judgment, 52
+  design-success-metrics; Faz 19 bitirme projeleri 06 (DevOps teşhis ajanı), 09 (kod göçü ajanı),
+  16 (issue'dan PR'a ajan), 17 (kişisel AI öğretmen). *Uyarlama notu: çeviri değil sentezdir; ders
+  kodları alınmadı, örnekler bu projenin dosyalarıyla değiştirildi. §10'daki ölçüm örneği dersin
+  kendi örnek eşikleridir — bir hedef değil, biçim örneğidir.*

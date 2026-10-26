@@ -261,8 +261,8 @@ GPAI yaptırımlarını gösterir. AI Öğretmen büyük olasılıkla "yüksek r
   <text x="200" y="294" text-anchor="middle" font-size="10.5" font-weight="700" fill="#25804C" font-family="system-ui">MİNİMAL RİSK</text>
   <text x="200" y="309" text-anchor="middle" font-size="8" fill="#25804C" font-family="system-ui">çoğu sistem — serbest</text>
 
-  <text x="200" y="348" text-anchor="middle" font-size="9" fill="#5D7789" font-family="system-ui">Yüksek risk = risk yönetimi + veri yönetişimi</text>
-  <text x="200" y="362" text-anchor="middle" font-size="9" fill="#5D7789" font-family="system-ui">+ dokümantasyon + insan gözetimi (Madde 10)</text>
+  <text x="200" y="348" text-anchor="middle" font-size="9" fill="#5D7789" font-family="system-ui">Yüksek risk = risk yönetimi (Md. 9) + veri yönetişimi (Md. 10)</text>
+  <text x="200" y="362" text-anchor="middle" font-size="9" fill="#5D7789" font-family="system-ui">+ dokümantasyon (Md. 11) + insan gözetimi (Md. 14)</text>
 
   <line x1="392" y1="88" x2="392" y2="360" stroke="#5D7789" stroke-width="1.4" marker-end="url(#gov-c)"/>
   <text x="392" y="80" text-anchor="middle" font-size="9.5" font-weight="700" fill="#5D7789" font-family="system-ui">zaman</text>
@@ -330,6 +330,35 @@ Böylece silme talebi geldiğinde:
 Bu, Hafta 11'in "veri sistemleri" konusunun tam kalbidir: veri **nereden geldi, nereye türedi**
 sorusunu (**provenance / köken**) mühendislik olarak yanıtlayamıyorsan, GDPR/KVKK silme hakkını da
 yerine getiremezsin. Lineage olmadan "unutma" imkânsızdır.
+
+### 5.1 Ağırlıklar unutamaz — kişisel veri RAG'da kalır, ince ayar setine girmez
+Vektör DB'de silme **zordur ama mümkündür**: lineage ile kaydı bulur, siler, indeksi yeniden
+kurarsın. İnce ayarlanmış (fine-tuned) bir modelin **ağırlıklarında** ise bu bile yoktur. Veri bir
+kez eğitimden geçip ağırlıklara karıştığında, onu oradan "cerrahi olarak" çıkarmanın pratik bir
+yolu yoktur. Tek tam çözüm, o veri olmadan **baştan yeniden eğitmektir** — pahalı ve çoğu zaman
+gerçekçi değil. Literatürdeki kısmi yollar (unutturma / *machine unlearning*, veriden en çok
+etkilenen ağırlıkları bulup güncellemek, modele "bundan türeyen çıktıyı verme" diye ek eğitim)
+**yaklaşıktır**; hiçbiri "bu öğrencinin verisi artık modelde yok" diye kanıtlanabilir bir sonuç
+vermez. Yani silme hakkı (GDPR Madde 17, KVKK m.7) ağırlıkta **fiilen uygulanamaz**; uyumun tek
+penceresi **toplama anıdır**.
+
+Bu, Hafta 8'in "önce prompt, sonra RAG, en son ince ayar" merdivenine bir **veri kuralı** ekler:
+
+> **Kişisel veri RAG'da, soy kaydıyla (lineage) tutulur; asla ince ayar setine girmez.**
+> RAG'da her parça `kullanici_id` + `kaynak_belge_id` taşır, silme talebi oraya uygulanır.
+> İnce ayar seti yalnız kişisel veriden **arındırılmış** (ya da gerçekten anonim) örneklerden
+> kurulur ve setin kendisi de versiyonlanır — "hangi model sürümü hangi veriyle eğitildi?"
+> sorusunun cevabı, AB Yapay Zekâ Yasası Madde 10'un istediği veri yönetişiminin de parçasıdır.
+
+AI Öğretmen için somut karşılığı: öğrencinin gönderimleri ve hafızası (`data/hafiza/`, yerel
+vektör deposu) silinebilir kayıtlardır; ileride "değerlendirme modelini kendi verimizle ince
+ayarlayalım" fikri gelirse, ilk soru kalite değil **"bu sette kimin verisi var ve geri
+alabilir miyiz?"** olmalıdır. Cevap "geri alamayız" ise o veri o sete girmez.
+
+*Şerh:* Kaynak ders (AIEFS 18-27) aynı bağlamda AB/İngiltere veri koruma otoritelerinin 2025
+kararlarını ve "en çok kullanılan eğitim kaynaklarının yaklaşık %25'i kısıtlama ekledi" gibi
+rakamları aktarıyor; bunları birincil metinden doğrulamadığımız için burada **alıntılamıyoruz**.
+Buradaki kural, o rakamlara değil mekanizmaya (ağırlıktan cerrahi silme yok) dayanır.
 
 ## Diyagram 3 — RAG'de silme problemi: kaynak silinir, vektör kalır
 Kaynak belge silinir ama ondan türeyen embedding vektörü vektör DB'de kalır → GDPR Madde 17 ihlali.
@@ -478,6 +507,17 @@ alırken bu metne değil, birincil kaynağa ve gerekiyorsa bir hukukçuya dayan.
     **hareketli takvim**, öteki **somut kullanıma bağlı sınıflandırma**)? Bir mevzuat sayısını
     aktarırken hangi iki bilgiyi yanında taşımak zorundasın — ve mevzuat değişince kodundaki
     hangi üç şey **yerinde kalır**, hangi kısmı değişir?
+12. (§5.1) Vektör DB'de silme "zor ama mümkün", ince ayarlanmış ağırlıkta ise "fiilen imkânsız"
+    deniyor. Bu farkın sebebi nedir, ve bu yüzden kişisel veri için hangi kural konur (nerede
+    tutulur, nereye asla girmez)?
+13. (§5.1) Ekip "değerlendirme modelini öğrenci gönderimleriyle ince ayarlayalım" diyor. Kalite
+    sorusundan önce sorman gereken soru nedir ve "machine unlearning" bu soruyu neden kapatmaz?
+
+**Cevap ipuçları (12–13):** 12 — vektör DB'de her kayıt ayrı ve adreslenebilir (lineage ile
+bulunur, silinir, indeks yeniden kurulur); ağırlıkta veri milyarlarca parametreye dağılmıştır,
+tek tam çözüm yeniden eğitimdir. Kural: kişisel veri RAG'da soy kaydıyla tutulur, ince ayar setine
+girmez. 13 — "bu sette kimin verisi var, silme talebi gelirse geri alabilir miyiz?"; unutturma
+yaklaşıktır, verinin modelden çıktığını kanıtlamaz — uyum penceresi toplama anıdır.
 
 ## Kaynaklar
 Hepsi **birincil metindir**; ikincil blog özetleri yerine bunlara git (§7).
@@ -488,9 +528,14 @@ Hepsi **birincil metindir**; ikincil blog özetleri yerine bunlara git (§7).
 - **GDPR — (AB) 2016/679 Genel Veri Koruma Tüzüğü** (özellikle Madde 17, unutulma hakkı):
   eur-lex.europa.eu
 - **EU AI Act — (AB) 2024/1689 Yapay Zekâ Yasası** (risk kademeleri, Madde 10 veri yönetişimi,
-  Madde 101 GPAI para cezaları, Madde 113 yürürlük takvimi): eur-lex.europa.eu
+  Madde 14 insan gözetimi, Madde 101 GPAI para cezaları, Madde 113 yürürlük takvimi): eur-lex.europa.eu
   — *şerh: takvim, Komisyon'un "Dijital Omnibus" önerisiyle tartışmaya açıldı; kullanmadan önce
   güncel durumu doğrula (§7).*
+- **AI Engineering from Scratch (Rohit Ghumare, MIT lisansı, © 2026)** — ders
+  `18-ethics-safety-alignment/27-data-provenance-training-governance` (§5.1'in "ağırlıklar
+  unutamaz" mekanizması); github.com/rohitg00/ai-engineering-from-scratch. Çeviri değil, bu
+  programa uyarlanmış sentezdir; dersteki otorite kararları ve yüzdeler doğrulanmadığı için
+  aktarılmadı.
 - **Avrupa Komisyonu — Dijital Omnibus paketi** (Kasım 2025 önerisi; bu metin yazıldığında
   **yasama sürecindeydi**, kabul edilmiş kural değildi): commission.europa.eu
 

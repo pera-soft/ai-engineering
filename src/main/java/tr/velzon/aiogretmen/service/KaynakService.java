@@ -9,6 +9,7 @@ import tr.velzon.aiogretmen.repo.KaynakRepo;
 import tr.velzon.aiogretmen.types.BulunamadiException;
 import tr.velzon.aiogretmen.types.Kaynak;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -92,9 +93,16 @@ public class KaynakService {
                 "metin", semaSiz(k.govde()));
     }
 
-    /** Aktif haftayla etiket-eşleşen çalışma metinleri — sistem prompt'una girer. SVG AI bağlamından ayıklanır. */
+    /**
+     * Aktif haftayla etiket-eşleşen çalışma metinleri — sistem prompt'una girer. SVG AI bağlamından ayıklanır.
+     * Sıra ÖNCELİKLİ, alfabetik değil: bütçe (~4 öz) aşılınca sondakiler kırpılır; alfabetik sırada her
+     * haftaya etiketli genel metinler haftanın kendi metnini ({@code haftaNN-…}) dışarıda bırakıyordu.
+     */
     public String baglamIcin(int hafta) {
+        String haftaOneki = String.format("hafta%02d-", hafta);
         List<String> parcalar = kaynakRepo.haftaninKaynaklari(hafta).stream()
+                .sorted(Comparator.comparing((Kaynak k) -> !k.slug().startsWith(haftaOneki)) // haftanın kendisi
+                        .thenComparingInt(k -> k.etiketler().size()))                        // özel → genel
                 .map(k -> "### " + k.baslik() + " — " + k.yazar() + "\n" + semaSiz(k.govde()))
                 .toList();
         return BaglamKirpici.birlestir(parcalar, KAYNAK_BASI_SINIR, BAGLAM_KARAKTER_SINIRI,

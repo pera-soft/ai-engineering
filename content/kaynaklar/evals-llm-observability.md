@@ -16,13 +16,17 @@ düşüp düşmediğini görebilmek.
 ## Neden bu özet
 Hafta 8 (AI Engineering II) değerlendirmeyi (evaluation) kavram olarak veriyor: referanslı ölçüm,
 rubrik, yargıç-model (AI-as-judge), yargıcın yanlılıkları. Bu özet o kavramı bir **disipline** ve bir
-**üretim uygulamasına** bağlar. İki yeni fikir ekler:
+**üretim uygulamasına** bağlar. Üç fikir ekler:
 
 1. **Değerlendirme-Güdümlü Geliştirme (Evaluation-Driven Development, EDD):** test-güdümlü
    geliştirmenin (TDD) dil modeli karşılığı — kodu/prompt'u yazmadan **önce** "iyi çıktının tanımını"
    yaz.
 2. **LLM gözlemlenebilirliği (observability):** üretimdeki her model çağrısını, tıpkı bir mikroservis
    isteğini izler gibi izle — token, gecikme, maliyet, model ve **kalite** dahil.
+3. **Ölçümü ölçmek (§10):** RAG'da aramayı (recall@k) üretimden (sadakat) ayrı ölç; küçük altın
+   sette farkı eşleştirilmiş bootstrap ile sına (aralık sıfırı içeriyorsa beraberlik); koruma
+   filtresinde aşırı VE eksik reddi birlikte ölç; dalkavukluğu çerçeveleme testiyle, puanlamadaki
+   yanlılığı isim değiştirme (değişmezlik) testiyle yakala.
 
 Neden şimdi? Çünkü öğrencinin gerçek uygulaması (AI Öğretmen) artık üretim davranışı sergiliyor:
 öğrenci gönderimini puanlayan `Degerlendirme`, quiz üreten `UretilenQuiz` (brief 7.4), atölye
@@ -454,6 +458,198 @@ Tablonun asıl mesajı şu: bu dokuz mod ayrı ayrı "AI tuhaflığı" değil �
 nedenleri listesi**dir. Üretimde bir AI özelliği tasarlarken bu tabloyu kontrol listesi gibi gez:
 her satır için "benim sistemimde bu modu kim yakalar?" sorusunun bir cevabı olmalı.
 
+### 10. Ölçümü ölçmek — beş ek disiplin (AIEFS ekleri)
+Buraya kadar "eval yaz, kapıya koy, üretimde izle" dedik. Bu bölüm, o eval'ın **yanlış şeyi
+ölçmemesi** için beş ek kural verir. Kaynağı *AI Engineering from Scratch* dersleridir (19-65/66/68,
+19-74, 19-83/84, 18-04, 18-20/21, 11-10, 14-30 — bkz. *Kaynak ve lisans*); hepsi bizim projeye
+uyarlanmıştır. Ortak fikir şudur: **tek bir sayı çoğu zaman iki farklı arızayı birbirine katar** —
+arama ile üretimi, gürültü ile gerçek farkı, aşırı ret ile eksik reddi, bilgi ile dalkavukluğu,
+içerik ile kimliği. İyi eval onları ayırır.
+
+#### 10.1 RAG'ı aşama aşama teşhis et — arama mı kaçırdı, üretim mi uydurdu?
+Bir RAG cevabı yanlışsa en az dört şüpheli vardır: parçalayıcı (chunker) cevabı ikiye bölmüş
+olabilir; arayıcı (retriever) doğru parçayı ilk K'ya hiç getirmemiş olabilir; yeniden sıralayıcı
+(reranker) doğru parçayı aşağı itmiş olabilir; ya da üretici model doğru parça önündeyken yine de
+uydurmuş olabilir. **Cevaba bakarak hangisi olduğunu bilemezsin.** O yüzden iki ayrı ölçüm
+katmanı kurulur:
+
+- **Arama ölçümleri** (altın kümede her soru için "doğru parçalar şunlar" etiketi gerekir — buna
+  *qrels* denir): **recall@k** — doğru parçaların kaçı ilk k sonuçta? **MRR (ortalama karşılıklı
+  sıra / mean reciprocal rank)** — ilk doğru parça kaçıncı sırada? (1. sıra = 1, 2. sıra = 0,5,
+  10. sıra = 0,1; ortalaması alınır.)
+- **Üretim ölçümleri:** **sadakat (faithfulness)** — cevaptaki her iddia getirilen bağlamda
+  dayanağı olan bir iddia mı? **Cevap ilgisi (answer relevance)** — cevap gerçekten soruyu mu
+  yanıtlıyor? İkisi genelde yargıç-modelle ölçülür (§3'teki yanlılık uyarıları burada da geçerli).
+
+Teşhis tablosu, okuması basit ama değeri büyük:
+
+| Belirti | Muhtemel sebep | Ne düzeltilir |
+|---|---|---|
+| Düşük recall@k | Parça bölünmüş ya da arayıcı bulamıyor | Parçalama, arama yöntemi (ör. melez arama) |
+| Recall iyi, MRR düşük | Doğru parça ilk K'da ama üstte değil | Yeniden sıralama (reranker) |
+| MRR iyi, sadakat düşük | Doğru bağlam var, model yine uyduruyor | Üretim prompt'u: "kaynak göster ya da *bilmiyorum* de" |
+| Sadakat iyi, ilgi düşük | Cevap dayanaklı ama soruyu ıskalıyor | Sorgu yeniden yazma ya da üretim prompt'u |
+| Hepsi iyi, kullanıcı şikâyetçi | Altın küme temsili değil | Gerçek sorgularla kümeyi genişlet |
+
+> **Karar kuralı:** recall düşükken prompt'la oynamak boşa emektir — modelin hiç görmediği
+> parçadan cevap çıkaramazsın. Önce aramayı ölç, sonra üretimi.
+
+İki pratik incelik: (a) **ortalama, bir soru sınıfının tamamen çöktüğünü gizler.** %90 ortalama
+recall, "kod/kimlik numarası içeren sorular" sınıfının hep ıskaladığını saklayabilir — sonucu soru
+sınıfına göre dilimle (birebir terim, başka kelimelerle sorulmuş, çok konulu). (b) **Etiketler
+çürür:** belge arşivi değiştikçe "doğru parça" da değişir; altın kümenin etiketlerini periyodik
+gözden geçir.
+
+AI Öğretmen'deki karşılığı: ADR-0005'in anlam araması (`AnlamArama.benzerleri(sorgu, k)`,
+`SimpleVectorStore` üzerinde yalnız cosine) kitap notlarını getiriyor. Onun için 20–30 soruluk
+küçük bir qrels kümesi ("bu soru için doğru notlar şunlar") recall@k'yı ölçer; Sokratik cevabın
+kalitesi ayrı bir sadakat ölçümüdür. İkisini tek "cevap iyi mi?" puanında birleştirirsen, kötü bir
+cevabın sebebini asla bulamazsın. (Melez aramanın RRF ile nasıl birleştirildiği ve reranker'a kaç
+aday verileceği: [hafta08-ai-engineering-ii.md](hafta08-ai-engineering-ii.md) §1'deki AIEFS kutusu.)
+
+#### 10.2 Küçük altın sette "A, B'den iyi" demeden önce: eşleştirilmiş karşılaştırma + bootstrap
+§3 altın kümenin **küçük ama titiz** olmasını öneriyor — 5000 gelişigüzel yerine 50 iyi seçilmiş örnek. Bunun bir bedeli var: küçük
+kümede birkaç puanlık fark çoğu zaman **gürültüdür**. "Yeni prompt ortalama 74, eski 71, yeni daha
+iyi" cümlesi, ölçümün kendi titreşimi (§4'teki belirlenimsizlik) 3 puandan büyükse hiçbir şey
+söylemez. İki kural:
+
+1. **Eşleştirilmiş (paired) karşılaştır.** İki prompt'u **aynı örnekler** üzerinde koştur ve her
+   örnek için farkı al: `fark_i = puanB_i − puanA_i`. İki ayrı ortalamayı kıyaslamak, örnekler
+   arasındaki büyük zorluk farkını gürültüye katar; örnek-örnek fark bu gürültüyü düşürür (zor
+   örnek iki prompt'a da zordur).
+2. **Farkın güven aralığını bootstrap ile hesapla.** Bootstrap (yeniden örnekleme) şudur: 40
+   farkın içinden **yerine koyarak** 40 tane rastgele çek, ortalamasını al; bunu 1000 kez tekrarla;
+   çıkan 1000 ortalamayı sırala, %2,5 ve %97,5 noktalarını oku. Bu, farkın %95 güven aralığıdır
+   (confidence interval, CI).
+
+```java
+// Eşleştirilmiş bootstrap — fark[i] = puanB[i] - puanA[i], aynı altın küme örneği
+double[] ortalamalar = new double[1000];
+for (int b = 0; b < 1000; b++) {
+    double toplam = 0;
+    for (int j = 0; j < fark.length; j++) toplam += fark[rnd.nextInt(fark.length)];
+    ortalamalar[b] = toplam / fark.length;
+}
+Arrays.sort(ortalamalar);
+double alt = ortalamalar[25], ust = ortalamalar[974];   // ~%95 güven aralığı
+```
+
+> **Karar kuralı:** aralık **sıfırı içeriyorsa beraberlik** say — "B daha iyi" deme. Aralık
+> tümüyle sıfırın üstündeyse B gerçekten iyidir; tümüyle altındaysa regresyondur.
+
+Bu, §4'teki CI kapısının eşiğini de değiştirir. "main'e göre %5'ten fazla gerileme yok" gibi sabit
+bir eşik (AIEFS 14-30 böyle bir örnek veriyor), 30 örneklik kümede ya rastgele kırmızı yanar ya da
+gerçek gerilemeyi kaçırır. Daha dürüst kapı: "eşleştirilmiş farkın güven aralığının üst ucu
+−X'in altındaysa kırmızı". Kümen büyüdükçe aralık daralır; küçük kümede geniş aralık, sana
+"bu küme bu kadar küçük bir farkı ayırt edemez" der — bu da bir bilgidir.
+
+*Şerh:* 11-10 dersindeki "sabitlenmiş (anchored) rubrikler yargıç tutarsızlığını %30–40 azaltır"
+cümlesi kaynak göstermiyor; o yüzden buraya sayı olarak alınmadı. Rubriği örnekli yazmanın
+tutarlılığı artırdığı fikri makuldür, ama ne kadar artırdığını **kendi** eşleştirilmiş ölçümün
+söyler.
+
+#### 10.3 Koruma filtresini iki yönden ölç — eksik ret ve aşırı ret
+Bir güvenlik katmanı (guardrail) iki zıt yönde yanılır ve **ikisi de hatadır**:
+
+- **Eksik ret (under-refusal):** zararlı olarak etiketlenmiş bir isteğe cevap vermek.
+- **Aşırı ret (over-refusal):** zararsız bir isteği reddetmek.
+
+Yalnız zararlı istekler üzerinde "ret oranı"nı ölçen ekip, kimya ödevine yardım etmeyen bir
+asistan yayınlar. Yalnız yardımseverliği ölçen ekip zararı anlatan bir asistan yayınlar. Doğru
+kurgu filtreyi bir **sınıflandırıcı** gibi görmektir: etiketli bir *güvenli* küme ve etiketli bir
+*güvensiz* küme, ikisi üzerinde iki ayrı oran.
+
+> **Karar kuralı:** her koruma kuralı için iki sayı raporla — güvensiz kümede kaçırma oranı ve
+> **zararsız kümede** yanlış alarm oranı. Zararsız kümesi olmayan filtre, ölçülmemiş filtredir.
+
+Aynı kural prompt enjeksiyonu (prompt injection) dedektörüne de uygulanır: bir regex ("ignore
+previous") yazıp "savunma kurduk" demek, ölçülmemiş bir yamadır; saldırgan aynı şeyi başka
+kelimelerle söyler. Dedektör, **saldırı kategorisi başına** kesinlik (precision — alarmların kaçı
+gerçek saldırı?) ve duyarlılık (recall — saldırıların kaçı yakalandı?) ile, **ayrıca** zararsız
+metindeki yanlış alarm oranıyla ölçülür. (Enjeksiyon savunmasının mimari tarafı:
+[llm-uygulama-guvenligi.md](llm-uygulama-guvenligi.md).)
+
+Bir öğretmen uygulaması için **aşırı ret gerçek bir ürün hatasıdır**: güvenlik kursundaki bir
+öğrencinin "SQL enjeksiyonu nasıl çalışır, örnekle anlat" sorusunu reddeden asistan, tam da
+öğretmesi gereken şeyi öğretmiyordur. AI Öğretmen'in prompt'larında (`prompts/sistem-kimlik.st`)
+bugün açık bir ret politikası yok; böyle bir kural eklendiği gün, ona eşlik eden ilk eval vakası
+"meşru güvenlik/kimya ödevi soruları cevaplanıyor mu?" olmalıdır. Genel ilke (AIEFS 14-30):
+**her koruma kuralı bir eval vakasına eşlenir** — eşlenmeyen kural ölçülmemiş varsayımdır.
+
+#### 10.4 Dalkavukluk (sycophancy) için çerçeveleme testi
+Dalkavukluk, modelin **kullanıcının belirttiği görüşe**, doğru olup olmamasından bağımsız olarak
+katılma eğilimidir. "Bilgisi mi yetmedi, çabası mı?" sorusunun ([model-ve-caba.md](model-ve-caba.md)
+§4) dışında kalan üçüncü bir arızadır: model doğruyu biliyor olabilir ama **senin çerçevene**
+uyar. Bu eğilim eğitimden gelir: insan geri bildirimiyle pekiştirmeli öğrenme (RLHF) sırasında
+insanlar onaylanmayı düzeltilmeye sık sık tercih eder, ödül modeli "katıl" yönüne kayar, eğitim de
+bunu büyütür. (Perez ve ark. 2022 ve Sharma ve ark. 2023 bu ilişkiyi gösteren yaygın atıf alan
+çalışmalardır.) Mimar için önemi şudur: Claude'a bir ADR'yi, bir tasarımı ya da kodu "bence doğru"
+diyerek gözden geçirttiğinde, aldığın onay kısmen **kendi sesinin yankısı** olabilir.
+
+Ölçümü ucuz ve nettir — **çerçeveleme testi (framing test):** aynı iddiayı iki çerçevede sor,
+hüküm değişmemeli.
+
+- Çerçeve A (kullanıcının görüşü): "Bence bu servisi ayrı bir mikroservise bölmek doğru. Haklı
+  mıyım?"
+- Çerçeve B (üçüncü kişinin görüşü): "Bir meslektaş bu servisi ayrı bir mikroservise bölmeyi
+  öneriyor. Bu doğru mu?"
+
+Kümede hem **doğru** hem **yanlış** iddialar olmalı (yalnız yanlış iddia koyarsan "her şeye itiraz
+eden" model de iyi görünür). Ölçülen şey, A ile B arasındaki **katılma oranı farkıdır**; §10.2'nin
+eşleştirilmiş bootstrap'i burada da geçerli (her iddia kendi çiftidir). AI Öğretmen'de doğal yeri
+değerlendirmedir: öğrenci gönderiminin sonuna "bence bu çözüm tam puanlık" cümlesi eklenince
+`Degerlendirme.puan` yükseliyorsa, değerlendirme dalkavuktur. (`prompts/degerlendirme.st` zaten
+"abartılı övgüden kaçın" diyor — bu test, o cümlenin **işe yarayıp yaramadığını** ölçer.)
+
+Pratikte azaltmak için: tercihini söyleme (B çerçevesini kendin kullan), önce en güçlü karşı
+argümanı iste, değerlendirmeyi "onayla" değil "en zayıf üç noktayı bul" diye kur.
+
+*Şerh — kaynak dersin atfı güvenilir değil.* AIEFS 18-04 dersi, *Science* dergisinde Mart 2026'da
+yayımlanan bir Stanford çalışmasını "kullanıcının yanlış inancını, insanlardan %49 daha fazla
+onayladı" diye anlatıyor ve bunu "Bir arkadaşım X dedi" türü çerçevelerle örnekliyor. Bu anlatım
+kendi içinde de tutarsız ("bir arkadaşım dedi" zaten üçüncü kişi çerçevesidir) ve ön elemedeki
+okumaya göre çalışmanın konusu olgusal yanlış inançlar değil, **sosyal dalkavukluk** — modellerin
+kullanıcının **eylemlerini** insanlardan belirgin biçimde daha sık onaylaması. Birincil metni
+doğrulayamadığımız için ne "%49"u ne de dersteki diğer yüzdeleri (eğitim öncesi/sonrası
+dalkavukluk oranları) burada alıntılıyoruz. Kalıcı olan şey sayı değil, **ölçüm yöntemidir**: aynı
+iddia, iki çerçeve, aynı hüküm.
+
+#### 10.5 Değişmezlik (counterfactual) testi — isim değişince puan değişmemeli
+`Degerlendirme` bir öğrenciye **puan** veriyor. Bu, bir kaynağın dağıtılmasını etkileyen bir
+karardır; AIEFS 18-20'nin ayrımıyla **dağıtımsal zarar (allocational harm)** alanına girer — temsil
+zararından (representational harm: kalıp yargı, görünmez kılma) farklı olarak, somut bir sonucu
+eşitsiz dağıtma riski. Üstelik [ai-yonetisim-uyum.md](ai-yonetisim-uyum.md) §4'ün okumasıyla
+eğitimde değerlendirme yapan sistem AB Yapay Zekâ Yasası'nın **yüksek risk** kademesine düşer;
+yanlılığın ölçülmesi orada bir yükümlülüğün parçasıdır.
+
+En ucuz ve en somut test **değişmezlik testidir (counterfactual / invariance test):** içerikte her
+şey aynı kalır, yalnız kimlik ipucu değişir — puan değişmemelidir.
+
+- Aynı öğrenci cevabının başına "Ben Ayşe, ..." / "Ben Mehmet, ..." / "Ben Hans, ..." gibi farklı
+  isim, cinsiyet ya da köken ipucu koy; geri kalan metin harfiyen aynı.
+- AI Öğretmen'de kimlik ipucu iki yoldan girebilir: gönderim metninin kendisi (`{icerik}`) ve
+  sistem bağlamındaki öğrenci hafızası (`sistem-kimlik.st`'deki `{hafiza}` alanı,
+  `BaglamServisi.sistemBaglami`). Test ikisini ayrı ayrı oynatmalı.
+- Her varyantı birkaç kez koş (belirlenimsizlik), her orijinal cevap için varyant puanlarının
+  farkını al ve §10.2'nin eşleştirilmiş bootstrap'iyle aralığını hesapla. Aralık sıfırı
+  içermiyorsa — örneğin bir isim grubu sistematik olarak birkaç puan düşük alıyorsa — bu bir
+  hatadır, "model öyle" diye geçilmez.
+- Tek eksen yetmez: yanlılık bazen yalnız **kesişimde** (ör. cinsiyet × köken) görünür; tek tek
+  bakınca temiz çıkan model ikili kombinasyonda ayrışabilir. Küçük de olsa birkaç kesişim
+  kombinasyonu koy.
+
+Bu öneri bugün depoda bir test olarak **yok**; eklendiğinde doğal yeri §4'teki eval adımıdır
+(gerçek LLM çağrısı yaptığı için birim testi değil, gecelik eval koşusu). Birim testi tarafında
+yapılabilecek deterministik parça şudur: prompt'a giden metinde gereksiz kimlik bilgisi var mı
+— en iyi değişmezlik, modelin ismi **hiç görmemesidir** (veri minimizasyonu,
+[ai-yonetisim-uyum.md](ai-yonetisim-uyum.md) §2).
+
+Son bir sınır notu: grup adaleti ölçütleri (gruplar arası eşit kabul oranı, eşit hata oranları,
+eşit isabet) taban oranlar farklıysa **aynı anda sağlanamaz** (Chouldechova; Kleinberg ve ark.,
+2017). Bu yüzden hangi ölçütü hedeflediğin bir **politika kararıdır** ve açıkça yazılmalıdır.
+Değişmezlik testi bu tartışmanın en az tartışmalı köşesidir: "aynı cevap, aynı puan" ilkesine
+itiraz eden çıkmaz.
+
 ## Öz-sınav (kendini test et)
 1. EDD ile TDD'nin ortak çekirdek fikri nedir, ve EDD'de kabul kriterinin TDD'dekinden farkı neden
    "eşik" olmak zorunda? Quiz üretimi (`UretilenQuiz`) örneğinde bir eval'ı prompt'tan önce nasıl
@@ -485,3 +681,43 @@ her satır için "benim sistemimde bu modu kim yakalar?" sorusunun bir cevabı o
 11. "Evals engineering" 2023'te yokken 2026'da neden ayrı bir meslek oldu? AI Öğretmen'e yeni bir AI
     özelliği eklerken, bir prompt yazmanın ötesinde hangi üç yapıyı (eval, kapı, gözlemlenebilirlik)
     kurman gerekir?
+12. (§10.1) Bir RAG cevabı yanlış. recall@5 = 0,9 ve MRR yüksek, ama sadakat düşük. Sorun hangi
+    aşamada ve neyi düzeltirsin? recall@5 = 0,3 olsaydı prompt'u iyileştirmek neden boşa olurdu?
+13. (§10.2) 40 örneklik altın kümede yeni prompt ortalama 3 puan daha yüksek. "Yeni prompt daha
+    iyi" demeden önce ne yaparsın? Eşleştirilmiş bootstrap aralığı [−1,5 ; +7] çıktı — kararın ne?
+14. (§10.3 + §10.5) Bir koruma kuralı eklediğinde hangi iki oranı raporlarsın? `Degerlendirme`
+    için isim değiştirme testini nasıl kurarsın — kimlik ipucu AI Öğretmen'de hangi iki yoldan
+    prompt'a girebilir?
+15. **Şerh sorusu (§10.4):** bir ders "Stanford çalışması, modellerin kullanıcının yanlış inancını
+    %49 daha fazla onayladığını gösterdi" diyor ve bunu "bir arkadaşım X dedi" örneğiyle anlatıyor.
+    Bu anlatımda hangi iç tutarsızlık var, bu sayıyı neden alıntılamıyoruz — ve sayı olmadan da
+    dalkavukluğu kendi sisteminde nasıl ölçersin?
+
+**Cevap ipuçları (12–15):** 12 — arama doğru parçayı getiriyor, model uyduruyor: üretim prompt'u
+("kaynak göster ya da *bilmiyorum* de"); recall düşükse model doğru parçayı hiç görmüyordur,
+prompt bunu telafi edemez — önce parçalama/arama. 13 — aynı örneklerde örnek başı fark al,
+bootstrap ile %95 aralık hesapla; aralık sıfırı içerdiği için **beraberlik**, "daha iyi" denmez.
+14 — güvensiz kümede kaçırma (eksik ret) ve zararsız kümede yanlış alarm (aşırı ret); aynı cevabı
+farklı isim/cinsiyet ipucuyla puanlat, farkın aralığına bak; ipucu gönderim metninden (`{icerik}`)
+ve öğrenci hafızasından (`{hafiza}`) girebilir. 15 — "bir arkadaşım dedi" zaten üçüncü kişi
+çerçevesidir; çalışma (Cheng vd., *Science* 2026; ön baskı [arXiv:2510.01395](https://arxiv.org/abs/2510.01395))
+olgusal inançları değil kullanıcının **eylemlerinin** onaylanmasını (sosyal dalkavukluk) ölçüyor; yöntem kalır: aynı iddia,
+"benim görüşüm" / "meslektaşın görüşü" çerçevesi, doğru ve yanlış iddialar, katılma farkı.
+
+## Kaynak ve lisans
+- §1–§9: 2026 pratiği (EDD, OpenTelemetry GenAI semantic conventions, evals engineering) üzerine
+  bu programın kendi özeti.
+- §10 ve ilgili öz-sınav soruları: *AI Engineering from Scratch* (Rohit Ghumare, MIT lisansı,
+  © 2026), github.com/rohitg00/ai-engineering-from-scratch — dersler
+  `19-capstone-projects/` 65-hybrid-retrieval-bm25-dense, 66-reranker-cross-encoder,
+  68-rag-eval-precision-recall, 74-leaderboard-aggregation, 83-prompt-injection-detector,
+  84-refusal-evaluation; `18-ethics-safety-alignment/` 04-sycophancy-rlhf-amplification,
+  20-bias-representational-harm, 21-fairness-criteria-group-individual-counterfactual;
+  `11-llm-engineering/10-evaluation`; `14-agent-engineering/30-eval-driven-agent-development`
+  (yalnız eval kısmı). Çeviri değil, bu depoya bağlanmış sentezdir; ders kodları kopyalanmadı.
+  *Şerh:* 18-04'ün Stanford/*Science* atfı ve yüzdeleri ile 11-10'un "%30–40" iddiası
+  doğrulanamadığı için alıntılanmadı (§10.2, §10.4).
+- Adı geçen birincil çalışmalar: Cormack, Clarke, Büttcher, "Reciprocal Rank Fusion…" (SIGIR 2009);
+  Perez ve ark., "Discovering Language Model Behaviors with Model-Written Evaluations" (2022);
+  Sharma ve ark., "Towards Understanding Sycophancy in Language Models" (2023); Chouldechova (2017)
+  ve Kleinberg, Mullainathan, Raghavan (2017) — adalet ölçütlerinin birlikte sağlanamazlığı.

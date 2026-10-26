@@ -194,6 +194,12 @@ bir *rica*dır; sandbox bir *duvar*: izin verilmemiş bir işlem denendiğinde a
 </svg>
 ```
 
+> **Kutu — sınırın içi de daraltılır:** Otomatik düzeltme yalnız **dar, önceden listelenmiş güvenli
+> bir küme** için yapılır (biçim, bağımlılık yaması gibi geri alınabilir işler); kümenin dışı öneridir.
+> İki model (ya da model ile kontrol) **anlaşmazsa** karar insana gider — çoğunluk oyu değil. İnsan
+> onayını beklemek **kalıcı bir durumdur**: süreç yeniden başlasa da onay yeniden sorulmaz, yarım
+> kalan yan etki tekrar koşmaz. Ayrıntı: [`ajan-calisma-zamani-kontrolleri.md`](ajan-calisma-zamani-kontrolleri.md).
+
 > **Liderlik bağı:** Bu üç resim aynı şeyi söylüyor — **hız serbest bırakılan yerde, güvenlik
 > sabitlenen yerde kazanılır.** Junior'ı zorlanmadan kurtarmak da, ajana geri dönüşü zor işi
 > devretmek de aynı hatanın iki yüzü: kısa vadede iş biter, uzun vadede kapasite kaybolur.
@@ -222,3 +228,14 @@ bir *rica*dır; sandbox bir *duvar*: izin verilmemiş bir işlem denendiğinde a
    Etmiyorsan, yerine ne ölçerdin? (Cevabı yokladıktan sonra `ai-verimlilik-olcumu` kaynağına bak.)
 10. Bu haftanın üç resmi (körelme · ritim · sınır) tek bir liderlik ilkesinde birleşiyor. O ilkeyi
     kendi cümlenle yaz — ve mimari kata'nda (RFP) nerede işine yarayacağını göster.
+11. Ajan bir PR'da hem biçim düzeltmesi hem de bir sorgu değişikliği öneriyor; iki inceleyici model
+    sorgu değişikliğinde anlaşmıyor. Hangisi otomatik uygulanabilir, hangisi kime gider — ve onay
+    beklerken süreç yeniden başlarsa ne olmamalı? *(İpucu: biçim, dar güvenli kümede → otomatik;
+    sorgu, anlaşmazlık → insan; onay beklemesi kalıcı durumdur, yeniden sorulmaz, yan etki tekrar koşmaz.)*
+
+## Kaynak ve lisans (ek)
+- §3 sonundaki kutu: **AI Engineering from Scratch — Rohit Ghumare** (github.com/rohitg00/ai-engineering-from-scratch,
+  MIT lisansı, "Copyright (c) 2026 Rohit Ghumare") Faz 15 (autonomous systems) izin modları (10) ve dayanıklı
+  yürütme (12) dersleri ile Faz 17 · 23 (SRE for AI — dar otomatik düzeltme, iki model anlaşmazsa
+  insana yükseltme) dersinden uyarlanmış sentez; ayrıntı ve tam atıf
+  [`ajan-calisma-zamani-kontrolleri.md`](ajan-calisma-zamani-kontrolleri.md)'nde.

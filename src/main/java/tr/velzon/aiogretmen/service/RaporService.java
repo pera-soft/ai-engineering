@@ -54,7 +54,9 @@ public class RaporService {
     private final KullaniciBaglami kullaniciBaglami;
     /** GFM tablo eklentisi — commonmark çekirdeği tablo bilmez (ADR-0006). escapeHtml korunur. */
     private static final List<Extension> MD_EKLENTILER = List.of(TablesExtension.create());
-    private final Parser mdParser = Parser.builder().extensions(MD_EKLENTILER).build();
+    /** Rapor AI çıktısıdır (güvenilmeyen): bağlantı/görsel metne indirgenir — {@link BaglantiSokucu}. */
+    private final Parser mdParser = Parser.builder().extensions(MD_EKLENTILER)
+            .postProcessor(new BaglantiSokucu()).build();
     private final HtmlRenderer htmlRenderer = HtmlRenderer.builder()
             .extensions(MD_EKLENTILER).escapeHtml(true).build();
 

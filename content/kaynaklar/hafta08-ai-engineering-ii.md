@@ -136,6 +136,27 @@ belgeye göre değişir; tahminle değil, ölçerek bulunur.
 > "bağlamda yoksa *bilmiyorum* de" talimatı ve düzenli değerlendirme. Kısacası RAG bir çözüm
 > değil, bir **risk azaltma** aracıdır.
 
+> **Kitap dışı ek (AIEFS) — melez aramayı nasıl birleştirirsin, reranker'a kaç aday verirsin?**
+> Bu kutu Huyen'in kitabından değil, *AI Engineering from Scratch* derslerinden (19-65, 19-66)
+> eklendi.
+> - **Puanları toplama, sıraları oylat.** BM25 puanı sınırsızdır ve belge arşivine göre değişir;
+>   cosine benzerliği −1 ile 1 arasındadır. `alfa × bm25 + (1 − alfa) × cosine` gibi ağırlıklı
+>   toplam, iki farklı cetveli toplamaktır: alfa her arşive ayrı ayarlanır ve yeniden indekslemede
+>   bozulur. Bunun yerine **karşılıklı sıra birleştirme (Reciprocal Rank Fusion, RRF)** kullan:
+>   her aday, her listedeki sırası için `1 / (k + sıra)` puan alır, puanlar toplanır, yeniden
+>   sıralanır. Yaygın varsayılan **k = 60**'tır (Cormack ve ark., 2009). Sıralar iki yöntem
+>   arasında karşılaştırılabilir, puanlar değildir.
+> - **Reranker, ilk aşamanın kaçırdığını geri getiremez.** Çapraz kodlayıcı (cross-encoder)
+>   reranker yalnız kendisine verilen N adayı yeniden dizer. Doğru parça ilk aşamanın ilk N'inde
+>   yoksa, reranker ne kadar iyi olursa olsun onu bulamaz: nihai kalite, ilk aşamanın **N'deki
+>   recall'u** ile sınırlıdır. Kural: **N ≥ 3 × K** (K = modele vereceğin parça sayısı). N = K
+>   seçersen reranker yalnız sırayı değiştirir, yeni aday getiremez. Dersin gözlemi, kazancın
+>   birkaç on adaydan sonra doyduğu yönünde; bu bir ölçüm değil, kendi eğrinde bulunacak bir
+>   eşik — N'yi kendi ölçümün ve gecikme bütçen belirler.
+>
+> Hatalı bir cevabın hangi aşamadan (arama mı, sıralama mı, üretim mi) geldiğini nasıl ölçeceğin
+> [evals-llm-observability.md](evals-llm-observability.md) §10'da.
+
 ## 2. Karar merdiveni — ne zaman hangisi
 Aynı sorunu üç farklı yolla çözebilirsin ve maliyetleri çok farklıdır. Kural: **ucuzdan
 başla**. Önce prompt (yönerge) dene; yetmezse RAG/bağlam ile bilgi getir; **en son**
@@ -336,3 +357,16 @@ bir anti-pattern'dir. Pratik teknikler:
    birine güvenirsen ne kaçırırsın?
 10. AI-as-judge'ı "karar mercii" değil "süzgeç" olarak kullanmak ne demek? Yargıcın verdiği
     puanların güvenilir olup olmadığını neyle kontrol edersin?
+11. (Kitap dışı ek) BM25 ve cosine puanlarını ağırlıklı toplamak yerine neden RRF ile sıraları
+    birleştirirsin? Reranker'a K = 5 parça için kaç aday vermelisin, ve N = K seçersen ne olur?
+
+    *Cevap ipucu:* puanlar farklı cetvellerde (BM25 sınırsız, cosine −1…1), sıralar ise
+    karşılaştırılabilir; RRF `1/(k+sıra)` toplar. N ≥ 3 × K → en az 15; N = K ise reranker yeni
+    aday getiremez, recall değişmez.
+
+## Kaynak ve lisans
+- Ana kaynak: Chip Huyen, *AI Engineering* (O'Reilly, 2025) — bu özetin gövdesi.
+- §1'deki "Kitap dışı ek (AIEFS)" kutusu: *AI Engineering from Scratch* (Rohit Ghumare, MIT
+  lisansı, © 2026), dersler `19-capstone-projects/65-hybrid-retrieval-bm25-dense` ve
+  `66-reranker-cross-encoder` — github.com/rohitg00/ai-engineering-from-scratch. Çeviri değil,
+  uyarlanmış özettir.

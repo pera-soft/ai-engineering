@@ -110,4 +110,26 @@ class KaynakServiceTest {
         assertThat(baglam.length()).isLessThan(14100);
         assertThat(baglam).contains("bağlam sınıra kırpıldı");
     }
+
+    @Test
+    void baglamIcinHaftaninKendiVeOzelKaynaklariniGenellerdenOnceKoyar(@TempDir Path tempDir) throws Exception {
+        // alfabetik sırada önce gelen 5 GENEL kaynak (her haftaya etiketli) bütçeyi doldurmasın:
+        // haftanın kendi metni ve tek-haftalık özel kaynak bağlama GİRMELİ, genellerden biri kırpılmalı
+        for (int i = 1; i <= 5; i++) {
+            Files.writeString(tempDir.resolve("a" + i + "-genel.md"),
+                    "---\nbaslik: \"GENEL" + i + "\"\netiketler: 1,2,3,4,5,6,7,8\n---\n" + "g".repeat(4000));
+        }
+        Files.writeString(tempDir.resolve("hafta02-ana.md"),
+                "---\nbaslik: \"HAFTA_ANA\"\netiketler: 2,7\n---\n" + "h".repeat(4000));
+        Files.writeString(tempDir.resolve("z-ozel.md"),
+                "---\nbaslik: \"OZEL\"\netiketler: 2\n---\n" + "o".repeat(4000));
+        KaynakService servis = new KaynakService(new KaynakRepo(tempDir));
+
+        String baglam = servis.baglamIcin(2);
+
+        assertThat(baglam).startsWith("### HAFTA_ANA");             // haftanın kendi metni EN BAŞTA
+        assertThat(baglam).contains("### OZEL");                    // tek-haftalık özel kaynak genellerden önce
+        assertThat(baglam.indexOf("### OZEL")).isLessThan(baglam.indexOf("### GENEL1"));
+        assertThat(baglam).doesNotContain("### GENEL5");            // bütçe aşımında kırpılan GENEL olur
+    }
 }

@@ -66,6 +66,24 @@ MCP'nin sunduğu üç şey var (bkz. **Diyagram 2**):
   "öğretmen kimliği + Sokratik yöntem", değerlendirme rubriği. İşte can alıcı nokta bir sonraki
   bölümde: bu prompt'u **ajan alır ve muhakemeyi kendisi yapar.**
 
+> **Kim seçer? Yapı taşını buna göre seç.** Üçü arasındaki asıl fark *ne* sundukları değil,
+> **kimin devreye soktuğudur.** Resmî belirtim (2026-07-28) üçünü böyle tanımlar:
+> **araç = model denetimli** (model-controlled: model bağlama bakıp kendisi çağırır),
+> **kaynak = uygulama güdümlü** (application-driven: barındırıcı uygulama neyi bağlama koyacağına
+> kendisi karar verir; listeden seçtirmek de olur, otomatik eklemek de),
+> **prompt = kullanıcı denetimli** (user-controlled: kullanıcı açıkça seçer, tipik olarak bir eğik
+> çizgi komutuyla `/sokratik`). Belirtim şunu da ekler: bu "kimin *ne zaman* kullandığı"
+> sorusudur, içeriği kimin yazdığı değil. Prompt metnini sunucu yazar. Yukarıdaki "ajan alır"
+> cümlesinin doğru okuması da bu: prompt'u **kullanıcı seçer**, muhakemeyi **ajan** yapar.
+> İki pratik sonuç var. (1) Aynı işlemi üç yapı taşından birden sunma; kimin tetiklemesi
+> gerektiğine karar ver. "Hafta 3'ü getir" kullanıcı istemeden modelin de çağırabileceği bir okuma
+> ise araçtır, kullanıcının bağlama iliştireceği bir belgeyse kaynaktır. (2) Kaynak içeriği **veridir,
+> talimat değildir.** İçinde "önceki talimatları yok say" yazan bir ders metni komut değil, metindir
+> (bkz. `llm-uygulama-guvenligi`, dolaylı prompt enjeksiyonu). Bizim sunucuda prompt'lar
+> (`ogretmen-sistem`, `sokratik`, `degerlendir`, `atolye-degerlendir`, `quiz-uret`) kullanıcının
+> seçeceği oturum kipleridir; `content://hafta/{no}` kaynakları uygulamanın iliştireceği metinlerdir;
+> `hafta_detay` aracı ise modelin kendi başına çağırdığı okumadır (ADR-0007).
+
 ### 3. Kritik olay — token kimin? (ve MCP neden bir adapter)
 Programın ana derdi hep şuydu: uygulaman AI'yı çağırıyor, yani **her kullanıcı senin OpenRouter
 token'ını yakıyor.** Çok kullanıcı = fatura patlar. MCP bunu tersine çevirir (bkz. **Diyagram 3**):
@@ -83,6 +101,14 @@ Yani sunucun bir "öğretmen" değil, bir **öğretmen donanımı** olur: müfre
 REST bir adapter, veritabanı bir adapter, MCP de bir adapter. Senin çekirdek servislerin
 (`MufredatService`, `IlerlemeService`) **hiç değişmeden**, onlara yeni bir dış kapı (MCP) eklersin.
 Hafta 9'da teorisini gördüğün port-adapter, burada gerçek bir MCP adapter'ıyla somutlaşır.
+
+> **Sampling notu (Ekim 2026):** MCP'de bir de **Sampling** özelliği vardı: sunucu, *barındırıcının*
+> modelini kullanarak LLM çağrısı yaptırabiliyordu. 2026-07-28 revizyonu Sampling'i (Roots ve
+> Logging ile birlikte) **kullanım dışı** (deprecated) ilan etti. Kullanım dışı bırakılma penceresi
+> boyunca çalışmaya devam eder, ama yeni uygulamalara eklenmemesi istenir. Önerilen geçiş yolu
+> "LLM sağlayıcısının API'sini doğrudan çağır"dır; bu, yukarıdaki **klasik model**dir ve token yine
+> sende yanar. Bizim token modelimizi bu değişiklik **etkilemez**, çünkü sunucumuz hiçbir LLM
+> çağrısı yapmaz; ne doğrudan ne Sampling üzerinden. Muhakeme baştan beri istemcidedir.
 
 ### 4. En güzel yanı — kural mimariyle mühürlenir
 "MCP LLM çağırmasın ki token kullanıcıda kalsın" bir **niyet** değil, **derleme-zamanı garantisi**
@@ -107,12 +133,72 @@ protokolün *ne söylediği* değil, *nasıl iletildiği*. MCP bugün iki taşı
   "Başkalarına açmak" senaryosu budur — ama gerçek kullanıcı verisi işleyeceğin için burada
   KVKK/gizlilik (bkz. `ai-yonetisim-uyum` kaynağı) mimari bir karar haline gelir.
 
-> **Tarih notu (eskiyebilir):** Uzak bağlantı için ilk sürümlerde ayrı bir "HTTP+SSE" taşıması
-> vardı; 2025'teki protokol revizyonunda yerini **Streamable HTTP**'ye bıraktı ve eski taşıma
-> geriye dönük uyumluluk için tutulan bir miras hâline geldi. Eski bir eğitimde "SSE endpoint'i
-> aç" diyorsa, o metin bu değişiklikten önceye aittir. Taşıma katmanı değişse de §1-§4'te
-> anlattığımız hiçbir şey değişmez — çünkü **protokol taşımadan bağımsızdır**; zaten iyi bir
-> katman ayrımının anlamı budur.
+> **Tarih notu (güncellendi: Ekim 2026, eskiyebilir):** Uzak bağlantı için ilk sürümlerde ayrı bir
+> "HTTP+SSE" taşıması vardı; 2025'teki revizyonda yerini **Streamable HTTP**'ye bıraktı. Eski bir
+> eğitimde "SSE endpoint'i aç" diyorsa, o metin bu değişiklikten önceye aittir.
+> Sonra daha büyük bir değişiklik geldi. Resmî belirtimin sürüm sayfasına göre **güncel (current)
+> sürüm 2026-07-28'dir** (taslak değil; https://modelcontextprotocol.io/specification/versioning).
+> Değişiklik günlüğüne göre (https://modelcontextprotocol.io/specification/2026-07-28/changelog)
+> bu revizyon çekirdeği **durumsuz** (stateless) yaptı:
+> - `initialize` el sıkışması ve protokol oturumu (`Mcp-Session-Id` başlığı) **kaldırıldı**. Her
+>   istek kendi protokol sürümünü ve istemci yeteneklerini `_meta` alanında taşır.
+> - Sunucular **`server/discover`** RPC'sini uygulamak zorundadır (desteklenen sürümler, yetenekler,
+>   kimlik). İstemcinin bunu çağırması isteğe bağlıdır.
+> - Streamable HTTP'de SSE akışını sürdürme (`Last-Event-ID`) kaldırıldı: kopan akış uçuştaki
+>   isteği kaybettirir ve istemci onu yeni bir istek olarak gönderir. Eski GET uç noktası yerine
+>   tek bir uzun ömürlü POST yanıtı (`subscriptions/listen`) geldi.
+> - Görevler (Tasks) çekirdekten çıkıp resmî bir uzantıya taşındı. **Roots, Sampling ve Logging
+>   kullanım dışı** (deprecated) ilan edildi (bkz. §3 notu). Eski HTTP+SSE taşıması da resmen
+>   "Deprecated" sınıfına alındı.
+>
+> Mimari ders şu: **durumsuz protokol ≠ durumsuz uygulama.** Sepet, taslak ya da uzun süren bir iş
+> hâlâ durum ister. Belirtimin önerisi, bu durumu bağlantıya değil, sunucunun ürettiği **açık bir
+> tutamaca** (handle) bağlamak ve tutamacı sıradan bir araç argümanı olarak taşımaktır. Ayrıntı, dört
+> durum ömrü ve "yapışkan oturum neden çözüm değil" sorusu için
+> [araç çağrısı güvenilirliği](arac-cagrisi-guvenilirligi.md) §5. Bu deponun sunucusu (MCP Java SDK
+> 0.18.3, ADR-0007) el sıkışmalı **eski nesilden** bir sürüm konuşur: ADR'deki doğrulama
+> `initialize` + `tools/list` ile yapıldı. SDK'nın `ProtocolVersions` sınıfı yalnız 2024-11-05,
+> 2025-03-26, 2025-06-18 ve 2025-11-25 sürümlerini tanır; yani bu depo henüz 2025-11-25'te ve
+> durumsuz 2026-07-28'i konuşmaz. Geçiş = SDK yükseltmesi + oturum varsayımlarının gözden
+> geçirilmesi. Yeni belirtim el sıkışmalı sürümlerle birlikte çalışma
+> için bir geriye dönük uyumluluk bölümü tanımlar. Taşıma ve oturum katmanı değişse de §1-§4'te
+> anlattığımız hiçbir şey değişmez, çünkü **protokol taşımadan bağımsızdır**; iyi bir katman
+> ayrımının anlamı budur.
+
+### 5.1 Uzak sunucuda yetkilendirme — üç kural
+Streamable HTTP'ye geçince sunucun bir **OAuth 2.1 kaynak sunucusu** (resource server) olur: token'ı
+kendisi basmaz, harici bir yetkilendirme sunucusunun (Auth0 gibi) bastığı token'ı **doğrular.**
+(stdio'da bu bölüm geçerli değildir: belirtime göre stdio uygulamaları OAuth akışını izlememeli,
+kimlik bilgisini ortamdan almalıdır.) Üç kural ezber değerindedir:
+
+1. **Kitle bağlama (audience binding, RFC 8707).** Sunucu yalnız **kendisi için** basılmış token'ı
+   kabul eder. İstemci token isterken `resource` parametresiyle sunucunun kanonik adresini (ör.
+   `https://sunucu.ornek/mcp`) bildirmek zorundadır; sunucu da token'daki `aud` değerinin bu adres
+   olduğunu kontrol etmek zorundadır. Bu yapılmazsa, başka bir hizmet için alınmış bir token seninkini
+   de açar.
+2. **Token aktarımı (token passthrough) YOK.** Belirtimin cümlesi açıktır: MCP sunucuları kendi
+   kaynakları için geçerli olmayan token'ları **kabul etmemeli ve başka yere taşımamalıdır.**
+   Sunucun bir alt API'yi (GitHub, takvim) çağıracaksa, istemcinin sana verdiği token'ı ona
+   **iletmez**; o API için ayrı, doğru kitleli bir token alır. Aksi hâlde "kafası karışmış vekil"
+   (confused deputy) olursun: alt API, isteğin gerçekte kimden geldiğini bilemez.
+3. **Asgari kapsam, gerektikçe yükselt.** İstemci başta yalnız gerekli kapsamı (scope) ister.
+   Kapsamı yetmeyen bir çağrıda sunucu **403** + `WWW-Authenticate: … error="insufficient_scope",
+   scope="…"` döner, istemci yeni bir onayla kapsamını yükseltir (step-up). "Her şeye baştan izin"
+   istemek en az ayrıcalık ilkesine aykırıdır.
+
+**Bu depoda (ADR-0007, `mcp-http` profili; sunucu 2026-10-21'de kapatıldı):** Kural 1 uygulanmıştı.
+`mcp-server-security` modülünün `JwtResourceValidator`'ı `aud` değerinin MCP kaynak adresini
+(istek kökeni + `/mcp`) içermesini şart koşuyordu (`validate-audience: true`). Nginx arkasında
+bunun çalışması için `server.forward-headers-strategy: framework` gerekti; yoksa köken
+`http://127.0.0.1:8091` kalır ve audience eşleşmezdi. Auth0 tarafında `resource_parameter_profile=compatibility`
+şarttı, çünkü Auth0 varsayılanda `resource=` parametresine değil `audience=`'a bakıyordu. Kural 2
+doğal olarak sağlanıyordu: sunucu hiçbir alt API çağırmıyor, LLM bile çağırmıyor (§4'ün ArchUnit
+mührü). Kural 3 ise **eksikti**: kodda kapsam kontrolü yok, geçerli bir token sekiz aracın hepsini
+açıyordu (yazan iki araç `gorev_isaretle` ve `statik_quiz_kaydet` dahil). Asgari kapsam ilkesine göre
+sonraki adım okuma/yazma kapsam ayrımı olurdu. Bir not daha: 2026-07-28 revizyonu Dinamik İstemci
+Kaydını (DCR) **İstemci Kimliği Üst Veri Belgeleri** (CIMD) lehine kullanım dışı bıraktı. ADR-0007'de
+CIMD'yi Auth0 reddettiği için kapatıp DCR'ye düşmüştük. Bugün yeniden kursaydık, CIMD'yi destekleyen
+bir yetkilendirme sunucusu seçmek bir kriter olurdu.
 
 ### 6. MCP tek katman değil — A2A onun **üstünde** durur
 Piyasada "MCP mi A2A mı?" diye bir tartışma göreceksin. **Yanlış soru** — ikisi rakip değil, farklı
@@ -169,7 +255,42 @@ Yani sözleşmenin çekirdeği (uygulama hatası ≠ protokol hatası) yerinde. 
 kayıtlı (borç listesi): düz metin mesaj, kategorili yapıya (`error_category` + `retryable` + kurtarma
 yolu — "geçerli slug'lar `kaynaklar` aracında") yükseltilebilir. `gorev_isaretle` için düşün:
 toggle yarı-yolda zaman aşımına uğrarsa istemcinin körlemesine tekrar denemesi işareti GERİ alır —
-"belirsiz yazma durumu" dersinin bizdeki somut yüzü.
+"belirsiz yazma durumu" dersinin bizdeki somut yüzü. Kodun tam davranışı (sıralı ve eşzamanlı
+tekrar, kayıp güncelleme) ve "çevir" yerine "ayarla" düzeltmesinin tasarımı için bkz.
+[araç çağrısı güvenilirliği](arac-cagrisi-guvenilirligi.md) §8.
+
+### 7.1 Araç arayüzünü zaman içinde korumak — üç kural daha
+Araç tasarımı bir kez yapılıp bitmez; araç yayımlandıktan sonra **bir sözleşmedir.** Üç kural:
+
+- **`action` argümanı 3'ten fazla değer alıyorsa aracı böl.** `notlar(action: "listele" | "ara" |
+  "olustur" | "sil", ...)` gibi tek bir "İsviçre çakısı" araç DRY (tekrarsız) görünür, ama modeli
+  doğru eylemi bir dizeden, doğru seçenekleri de tipsiz bir sözlükten seçmeye zorlar. Model aracı
+  **adından** seçer; dört ayrı ad (`not_listele`, `not_ara`, `not_olustur`, `not_sil`) dört ayrı
+  açıklama, dört ayrı şema ve dört ayrı onay kapısı demektir. Silme aracını onaya bağlamak, ancak
+  silme ayrı bir araçsa mümkündür. Büyük kayıt defterlerinde ortak önek (`not_*`) ve kimlik
+  alanlarına `pattern` (ör. `^not-[0-9]{8}$`, uydurma kimliği şemada yakalar) eklenir. Bizim sekiz
+  aracımızın hiçbirinde `action` argümanı yok; her araç tek bir iş yapıyor.
+- **Yeniden adlandırma yerine sürümle.** Yayımlanmış bir aracın adını değiştirmek ya da argüman
+  tipini değiştirmek **kırıcı değişikliktir**: o adı ezberlemiş istemciler, kayıtlı prompt'lar ve
+  testler sessizce bozulur. Doğru yol yeni bir ad eklemek (`gorev_durum_ayarla` ya da `..._v2`),
+  eskisini bir sürüm boyunca "kullanım dışı" diye işaretlemek ve sonra kaldırmaktır. **Anlamı**
+  değiştirmek de adı değiştirmek kadar kırıcıdır: `gorev_isaretle`'yi aynı adla "toggle"dan
+  "ayarla"ya çevirmek, onu bugünkü anlamıyla çağıran istemciyi bozar.
+- **Annotation'lar ipucudur, zorlama değil.** MCP araç tanımına `readOnlyHint`, `destructiveHint`,
+  `idempotentHint`, `openWorldHint` gibi ipuçları eklenebilir. Barındırıcı bunları onay penceresi ve
+  sunum için kullanır. Ama resmî belirtim (2026-07-28, Tools) istemcinin bunları **güvenilir bir
+  sunucudan gelmedikçe güvenilmez** saymasını şart koşar. Yani `destructiveHint: false` yazmak hiçbir
+  şeyi korumaz; gerçek yetki kontrolünü yine **sunucu** yapar. Yeniden denemenin güvenli olup
+  olmadığına da ipucu değil, sözleşme ve kod karar verir (bkz.
+  [araç çağrısı güvenilirliği](arac-cagrisi-guvenilirligi.md) §3). Bizim araçlarımız bugün hiç
+  annotation taşımıyor (`Tool.builder()` yalnız ad, açıklama ve şema alıyor).
+
+> *Şerh:* Bu kuralların kaynağı olan ders (AIEFS 13-05), açıklama ve ad iyileştirmesinin seçim
+> doğruluğunu "10–20 puan" (Composio), "%62'den %89'a" (Databricks) artırdığını ve tek parça
+> araçların "%15–30 daha kötü seçildiğini" söyler. Bunlar satıcıların kendi iç benchmark'larıdır,
+> bağımsız doğrulanmamıştır ve kendi araç setine taşınmaz. Kuralların kendisi sağlam mühendislik
+> gerekçesine dayanır (ad = seçim yüzeyi, ayrı araç = ayrı kapı); rakamlar dayanmaz. Kendi
+> değerlendirme setinle ölç (bkz. `ai-verimlilik-olcumu`).
 
 > Bu bölümün çerçevesi, Claude Certified Architect – Foundations sınavının topluluk rehberinden
 > (Daron Yöndem) süzülmüştür — sınav, araç arayüzünü ve hata sözleşmesini **mimari beceri** olarak
@@ -319,3 +440,44 @@ toggle yarı-yolda zaman aşımına uğrarsa istemcinin körlemesine tekrar dene
 10. "A2A'yı 150'den fazla kuruluş destekliyor" cümlesinden yola çıkarak "A2A üretimde yaygın"
     sonucuna varmak neden hatalı bir çıkarım? Bir mimar bir protokolün olgunluğunu değerlendirirken
     hangi kanıtı arar (bkz. `ai-verimlilik-olcumu` kaynağı — kanıt okuma disiplini)?
+11. MCP'nin üç yapı taşını **kimin devreye soktuğuna** göre eşle (model / uygulama / kullanıcı).
+    Bizim `sokratik` prompt'umuz bu ayrımda nereye düşer? "Kaynak içeriği veridir, talimat değildir"
+    neden bir güvenlik kuralıdır?
+12. Uzak bir MCP sunucusu için üç yetkilendirme kuralını say (kitle bağlama, token aktarımı yok,
+    asgari kapsam). ADR-0007'deki `mcp-http` profili bunlardan hangisini uyguluyordu, hangisi eksikti?
+13. "2026-07-28 revizyonu protokolü durumsuz yaptı" cümlesi, "artık uygulamam da durumsuz olmalı"
+    anlamına gelir mi? `gorev_isaretle`'yi "ayarla" anlamına çevirmek istesen, aynı adı mı
+    kullanırsın, yeni bir araç mı eklersin; neden?
+
+### Cevaplar (11–13)
+11. Araç = model denetimli, kaynak = uygulama güdümlü, prompt = kullanıcı denetimli. `sokratik`
+    kullanıcının açıkça seçtiği bir oturum kipidir (prompt); metnini sunucu yazar, muhakemeyi ajan
+    yapar. Kaynak metni bağlama girer ama komut yetkisi taşımaz; içine gömülmüş "talimatı yok say"
+    satırı dolaylı prompt enjeksiyonudur ve veri olarak işlenmelidir.
+12. Kitle bağlama: sunucu yalnız `aud` değeri kendi kaynak adresi olan token'ı kabul eder. Token
+    aktarımı yok: istemcinin token'ı alt API'ye iletilmez, ayrı token alınır. Asgari kapsam: başta az
+    iste, 403 + `insufficient_scope` ile yükselt. ADR-0007 kitle bağlamayı uyguluyordu
+    (`JwtResourceValidator`, `validate-audience: true`, forward-headers). Token aktarımı sorusu doğal
+    olarak kapalıydı, çünkü sunucu hiçbir alt API çağırmıyordu. Kapsam ayrımı eksikti: tek bir token
+    yazan araçlar dahil hepsini açıyordu.
+13. Hayır: durumsuz protokol ≠ durumsuz uygulama. Uzun ömürlü durum, sunucunun ürettiği açık bir
+    tutamaç altında paylaşılan depoda yaşar. Anlam değişikliği kırıcı olduğu için yeni bir araç
+    eklenir (ör. `gorev_durum_ayarla`), eskisi bir sürüm boyunca kullanım dışı işaretlenip kaldırılır.
+
+## Kaynak ve lisans
+- **Bu deponun kendi vakası:** ADR-0007 (MCP sunucusu, `mcp-http` profili, OAuth 2.1 resource server),
+  `mcp/OgretmenMcpAraclari.java`, `application-mcp-http.yml`, `docs/tech-debt-tracker.md`.
+- **Model Context Protocol belirtimi** (modelcontextprotocol.io, 2026-10-25'te okundu): Versioning
+  sayfası (güncel sürüm 2026-07-28), 2026-07-28 Changelog, Tools / Resources / Prompts sayfaları
+  (kimin denetlediği, annotation'ların güvenilmezliği, durumlu araç notu) ve Authorization sayfası
+  (RFC 8707 kitle doğrulaması, token aktarımı yasağı, kapsam yükseltme, stdio istisnası). §2, §3,
+  §5 ve §7.1'deki sürüm ve kural bilgileri bu sayfalardan doğrulandı.
+- **AI Engineering from Scratch** — Rohit Ghumare, github.com/rohitg00/ai-engineering-from-scratch,
+  MIT Lisansı, "Copyright (c) 2026 Rohit Ghumare". Büyütmede yararlanılan dersler: Faz 11 · 14 Model
+  Context Protocol; Faz 13 · 05 Tool Schema Design, 06 MCP Fundamentals, 07 Building an MCP Server,
+  09 MCP Transports, 10 MCP Resources and Prompts, 11 MCP Sampling, 16 MCP Security: OAuth 2.1.
+  Uyarlama notu: çeviri değil sentezdir. Ders kodu kopyalanmadı. Derslerdeki satıcı benchmark
+  rakamları §7.1'de *Şerh* olarak işaretlendi. Derslerin MCP sürüm iddiaları üçüncü taraf
+  kaynaklara değil, yukarıdaki resmî belirtime göre yazıldı.
+- §7'nin çerçevesi: Claude Certified Architect – Foundations topluluk rehberi (Daron Yöndem), §7'deki
+  nota bakınız.

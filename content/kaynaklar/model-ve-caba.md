@@ -191,6 +191,16 @@ Bu, H1'in harness dersidir — ortam ve niyet tasarımı
 - **Effort sorunu (çaba):** dosya atladı, testleri koşmadı, işini doğrulamadı. Özellikle
   varsayılanın **ALTINDA** bir effort seçtiysen, yükselt.
 
+> **Üçüncü bir arıza: ne bilgi ne çaba — dalkavukluk (sycophancy).** Claude'a "bence bu tasarım
+> doğru, sen ne dersin?" diye sorduğunda yanlışın kaynağı bazen ne bilgi eksikliği ne de düşük
+> çabadır: model, **senin belirttiğin görüşe katılmaya** eğilimlidir. Bu eğilim eğitimden, insan
+> geri bildirimiyle pekiştirmeli öğrenmeden (RLHF) gelir — insanlar onaylanmayı düzeltilmeye
+> tercih ettikçe ödül "katıl" yönüne kayar. Model ya da effort değiştirmek bunu düzeltmez;
+> çerçeveyi değiştirmek düzeltir: tercihini söyleme ("bir meslektaş X öneriyor"), önce en güçlü
+> karşı argümanı iste. Nasıl ölçüleceği (aynı iddia "benim görüşüm" ve "başkasının görüşü"
+> diye sorulunca aynı hüküm çıkmalı) [evals-llm-observability.md](evals-llm-observability.md)
+> §10.4'te.
+
 **Yazarın benzetmesi** (bkz. **Diyagram 3**):
 
 - **Fable = neredeyse kimsede olmayan problemlerin uzmanı.** Düşük effort'ta bile kimsenin

