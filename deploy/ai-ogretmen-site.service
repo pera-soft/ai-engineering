@@ -1,9 +1,10 @@
-# AI Öğretmen — çok kullanıcılı site (Faz 9d, ADR-0012/0014). Kurulum: docs/kurulum-site.md
+# AI Öğretmen — girişsiz çok ziyaretçili site (Faz 9d/10, ADR-0014/0017). Kurulum: docs/kurulum-site.md
 #   sudo cp deploy/ai-ogretmen-site.service /etc/systemd/system/
 #   sudo systemctl daemon-reload && sudo systemctl enable --now ai-ogretmen-site
 #
 # Uygulama YALNIZ 127.0.0.1:8090'a bağlanır (application.yml server.address); dışarıya nginx/TLS açılır.
 # Sırlar bu dosyada DEĞİL: /etc/ai-ogretmen/site.env (sahibi root, izin 0640, grup ai-ogretmen).
+# TEK örnek çalıştır: hız sınırları JVM belleğinde, gece 03:30 temizliği kilitsiz (ShedLock yok, ADR-0017).
 
 [Unit]
 Description=AI Ogretmen - cok kullanicili egitim sitesi
@@ -18,7 +19,7 @@ Group=ai-ogretmen
 # content/ ve prompts/ ile data/ bu dizine GÖRELİ okunur (./content, ./prompts, ./data)
 WorkingDirectory=/opt/ai-ogretmen
 EnvironmentFile=/etc/ai-ogretmen/site.env
-# Bellek: 60 kullanıcı, tek örnek. Sunucunun RAM'ine göre -Xmx'i ayarla (en az 512m önerilir).
+# Bellek: tek örnek. Sunucunun RAM'ine göre -Xmx'i ayarla (en az 512m önerilir).
 ExecStart=/usr/bin/java -Xms256m -Xmx768m -XX:+UseG1GC -XX:+ExitOnOutOfMemoryError \
   -Djava.security.egd=file:/dev/urandom -Dfile.encoding=UTF-8 \
   -Dspring.profiles.active=site \
@@ -26,7 +27,7 @@ ExecStart=/usr/bin/java -Xms256m -Xmx768m -XX:+UseG1GC -XX:+ExitOnOutOfMemoryErr
 SuccessExitStatus=143
 Restart=on-failure
 RestartSec=10
-# kuyruktaki e-postalar için kapanışta en çok ~10 sn beklenir (ADR-0013)
+# kapanışta süren istekler (ör. ziyaretçinin uzun AI sohbet çağrısı) bitebilsin diye pay
 TimeoutStopSec=30
 
 # --- Sertleştirme ---

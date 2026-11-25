@@ -27,6 +27,17 @@ types → config → repo → service → ai → web
 - Müfredat: `content/hafta-NN/{hafta.md, gun-N.md}` — frontmatter'lı markdown, açılışta belleğe yüklenir.
 - Öğrenci hafızası (Faz 2): `data/hafiza/` markdown ağacı — AI öğretmen yazar, prompt'lara enjekte edilir.
 
+## Çalışma modları (profiller)
+- **Yerel** (profil yok): tek kullanıcı (`yerel`), kimlik yok; tüm AI özellikleri sunucu anahtarıyla
+  (`OPENROUTER_API_KEY`).
+- **`site`** (ADR-0017): girişsiz, çok ziyaretçili. Kimlik = `aio_ziyaretci` çerezi → `kullanici_id` `z-<kimlik>`
+  (`config.ZiyaretciKullaniciBaglami`, fail-closed); hesap/e-posta yok. AI yalnız sohbet ve **ziyaretçinin kendi
+  anahtarıyla** (`X-OpenRouter-Anahtar` → `config.BaslikAiAnahtarBaglami` → `ai.ZiyaretciChatModelKaynagi`,
+  istek başına; sunucu anahtarı okunmaz, anahtar hiçbir yerde saklanmaz). Sohbet dışı AI uçları
+  `@Profile("!site")`. IP/ziyaretçi hız sınırları (`web.HizSiniriInterceptor`), 180 gün temizliği
+  (`service.ZiyaretciTemizlikService`).
+- **`mcp` / `mcp-http`** (ADR-0007/0008): MCP sunucusu; `mcp-http` JWT kimlikli.
+
 ## Doğrulama
 Bu kurallar `src/test/java/tr/velzon/aiogretmen/MimariTestleri.java` (ArchUnit) ile
 CI'da bloklayıcı olarak test edilir. Kural ihlali = build kırmızı.

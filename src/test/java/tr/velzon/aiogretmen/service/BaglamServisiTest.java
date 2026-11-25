@@ -70,7 +70,7 @@ class BaglamServisiTest {
     @Test
     void siteModundaKitapBaglamiEnjekteEdilmez() {
         BaglamServisi site = new BaglamServisi(contentRepo, ilerlemeRepo, quizSonucRepo,
-                promptFactory, hafizaService, kitapService, kaynakService, () -> "a@pera.software",
+                promptFactory, hafizaService, kitapService, kaynakService, () -> "a@ornek.com",
                 CalismaModu.siteIcin());
         when(ilerlemeRepo.findByKullaniciIdAndHafta(anyString(), anyInt())).thenReturn(List.of());
         when(quizSonucRepo.findByKullaniciIdAndHaftaOrderByTarihDesc(anyString(), anyInt())).thenReturn(List.of());

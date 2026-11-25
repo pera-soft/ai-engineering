@@ -75,7 +75,7 @@ class AiOgretmenApplicationTest {
         HttpHeaders basliklar = new HttpHeaders();
         basliklar.add("Content-Type", "application/json");
         ResponseEntity<String> kayit = rest.postForEntity("/api/kimlik/kayit",
-                new HttpEntity<>("{\"email\":\"x@pera.software\",\"sifre\":\"0123456789ab\"}", basliklar),
+                new HttpEntity<>("{\"email\":\"x@ornek.com\",\"sifre\":\"0123456789ab\"}", basliklar),
                 String.class);
         assertThat(kayit.getStatusCode().value()).isEqualTo(404);
     }

@@ -6,7 +6,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import tr.velzon.aiogretmen.service.DegerlendirmeService;
 import tr.velzon.aiogretmen.service.KullanimService;
 import tr.velzon.aiogretmen.service.SohbetService;
 import tr.velzon.aiogretmen.types.SohbetMesaji;
@@ -14,35 +13,26 @@ import tr.velzon.aiogretmen.types.SohbetMesaji;
 import java.util.List;
 import java.util.Map;
 
-/** AI öğretmen uçları (brief §8): değerlendirme, sohbet, kullanım istatistiği. */
+/**
+ * AI öğretmen uçları (brief §8): sohbet, sohbet geçmişi, kullanım istatistiği. Sitede de açık.
+ * Değerlendirme/örnek/açıklama/quiz üretimi/rapor → {@link OgretmenAiOzellikController} (yalnız !site, Faz 10).
+ */
 @RestController
 @RequestMapping("/api")
 public class OgretmenController {
 
-    private final DegerlendirmeService degerlendirmeService;
     private final SohbetService sohbetService;
     private final KullanimService kullanimService;
-    private final tr.velzon.aiogretmen.service.QuizUretimService quizUretimService;
-    private final tr.velzon.aiogretmen.service.RaporService raporService;
-    private final tr.velzon.aiogretmen.service.OrnekService ornekService;
 
-    public OgretmenController(DegerlendirmeService degerlendirmeService,
-                              SohbetService sohbetService, KullanimService kullanimService,
-                              tr.velzon.aiogretmen.service.QuizUretimService quizUretimService,
-                              tr.velzon.aiogretmen.service.RaporService raporService,
-                              tr.velzon.aiogretmen.service.OrnekService ornekService) {
-        this.degerlendirmeService = degerlendirmeService;
+    public OgretmenController(SohbetService sohbetService, KullanimService kullanimService) {
         this.sohbetService = sohbetService;
         this.kullanimService = kullanimService;
-        this.quizUretimService = quizUretimService;
-        this.raporService = raporService;
-        this.ornekService = ornekService;
     }
 
     /** Girdi üst sınırı (inceleme bulgusu): dev yapıştırma → context aşımı → anlamsız 500 olmasın. */
     static final int MAX_GIRDI = 20_000;
 
-    private static String sinirla(String alanAdi, String deger) {
+    static String sinirla(String alanAdi, String deger) {
         if (deger == null || deger.isBlank()) {
             throw new IllegalArgumentException(alanAdi + " boş olamaz");
         }
@@ -58,23 +48,11 @@ public class OgretmenController {
      * Hafta alanı zorunlu: eksik/null gelirse primitive int sessizce 0 olurdu (ana sayfadan sohbet hatası).
      * Var olmayan hafta numarası (0, 13…) servis katmanında BulunamadiException → 404 olur.
      */
-    private static int haftaGerekli(Integer hafta) {
+    static int haftaGerekli(Integer hafta) {
         if (hafta == null) {
             throw new IllegalArgumentException("hafta alanı eksik — önce bir hafta seç.");
         }
         return hafta;
-    }
-
-    /** gorevMetni opsiyoneldir (geriye-uyumlu): gelmezse null olur, eski davranış korunur. */
-    public record DegerlendirIstek(Integer hafta, Integer gun, String tur, String icerik, String gorevMetni) {
-    }
-
-    @PostMapping("/degerlendir")
-    public Map<String, Object> degerlendir(@RequestBody DegerlendirIstek istek) {
-        String tur = istek.tur() == null || istek.tur().isBlank() ? "OZET" : istek.tur();
-        var sonuc = degerlendirmeService.degerlendir(haftaGerekli(istek.hafta()), istek.gun(), tur,
-                sinirla("icerik", istek.icerik()), istek.gorevMetni());
-        return Map.of("gonderimId", sonuc.gonderimId(), "degerlendirme", sonuc.degerlendirme());
     }
 
     public record SohbetIstek(Integer hafta, Integer gun, String mesaj) {
@@ -90,44 +68,8 @@ public class OgretmenController {
         return sohbetService.gecmis(hafta);
     }
 
-    public record OrnekIstek(Integer hafta, Integer gun, String gorevMetni) {
-    }
-
-    /** "Örnek göster": Sokratik sohbetten AYRI — reddetmez, görev için somut örnek taslak verir. */
-    @PostMapping("/ornek")
-    public Map<String, Object> ornek(@RequestBody OrnekIstek istek) {
-        return Map.of("ornek", ornekService.ornekUret(haftaGerekli(istek.hafta()), istek.gun(),
-                sinirla("gorevMetni", istek.gorevMetni())));
-    }
-
-    /** "Soruyu aç": görevi sade Türkçeyle açar + terimleri tanımlar (CEVAP/ÖRNEK vermez). */
-    @PostMapping("/aciklama")
-    public Map<String, Object> aciklama(@RequestBody OrnekIstek istek) {
-        return Map.of("aciklama", ornekService.aciklaUret(haftaGerekli(istek.hafta()), istek.gun(),
-                sinirla("gorevMetni", istek.gorevMetni())));
-    }
-
     @GetMapping("/kullanim")
     public Map<String, Object> kullanim() {
         return kullanimService.istatistik();
-    }
-
-    public record QuizUretIstek(Integer hafta, Integer adet) {
-    }
-
-    @PostMapping("/quiz/uret")
-    public tr.velzon.aiogretmen.types.UretilenQuiz quizUret(@RequestBody QuizUretIstek istek) {
-        return quizUretimService.uret(haftaGerekli(istek.hafta()), istek.adet());
-    }
-
-    /** GET yalnızca okur/ilk üretir; YENİLEME yan etkili olduğu için POST (inceleme bulgusu #3). */
-    @GetMapping("/rapor/{hafta}")
-    public tr.velzon.aiogretmen.service.RaporService.Rapor rapor(@PathVariable int hafta) {
-        return raporService.rapor(hafta, false);
-    }
-
-    @PostMapping("/rapor/{hafta}/yenile")
-    public tr.velzon.aiogretmen.service.RaporService.Rapor raporYenile(@PathVariable int hafta) {
-        return raporService.rapor(hafta, true);
     }
 }

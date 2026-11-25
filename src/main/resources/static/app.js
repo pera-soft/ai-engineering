@@ -13,7 +13,8 @@ const durum = {
   sohbetDetay: null,
   quizSecimleri: {},
   quizBitti: false,
-  aiAktif: false,
+  sunucuAi: false,  // GET /api/ozellikler → sunucuAi: sunucu anahtarlı AI (rapor, AI quiz, değerlendirme, örnek/açıklama)
+  sohbetAcik: false, // sohbet + öğretmen kapısı: yerelde = sunucuAi; sitede = tarayıcıda ziyaretçi anahtarı var mı
   kaynaklar: [],    // GET /api/kaynaklar (bir kez yüklenir)
   aktifGorev: null, // {gun, index, metin, tip, kutu, satir, stat, g} — panelde işlenen görev
   okunanGorev: null,// okuma yan-sayfası açık görev bağlamı
@@ -23,11 +24,49 @@ const durum = {
   atolye: null,     // GET /api/atolye (bir kez yüklenir, cache)
   atolyeKat: 0,     // seçili atölye kategorisi (sekme) indeksi
   mulakatEtkin: false, // GET /api/ozellikler → mulakat (ADR-0011; varsayılan KAPALI — bölüm/kart gizli)
-  site: false,      // GET /api/ozellikler → site (ADR-0012): çok kullanıcılı sitede AI-kapalı metni öğrenciye göre
+  site: false,      // GET /api/ozellikler → site (ADR-0017): girişsiz site — anahtar kartı, ilerleme kodu, site metinleri
 };
 
-/** AI kapalıyken görev düğmeleri: kutucuk elle işaretlenebildiği için "AI gerekir" DEMEZ. */
-const AI_KAPALI_GOREV = "AI öğretmen şu an kapalı — görevi kendin yapıp kutucuğu işaretleyebilirsin.";
+// ---------- ziyaretçinin OpenRouter anahtarı (yalnız site; ADR-0017) ----------
+// Anahtar YALNIZ bu tarayıcıda durur ("Bu cihazda hatırla" → localStorage, değilse sekme ömürlü sessionStorage)
+// ve YALNIZ sohbet isteğine başlıkla eklenir (gonder). Hiçbir yere loglanmaz.
+const ANAHTAR_YERI = "aio.openrouter";
+const ANAHTAR_BICIMI = /^sk-or-[A-Za-z0-9_-]{10,200}$/; // sunucudaki biçim kontrolünün aynısı (erken geri bildirim)
+
+function depo(ad) { // depo erişimi gizli pencerede/engelli site verisinde hata fırlatabilir
+  try { return window[ad]; } catch (e) { return null; }
+}
+function anahtarOku() {
+  for (const ad of ["sessionStorage", "localStorage"]) {
+    try { const d = depo(ad); const a = d && d.getItem(ANAHTAR_YERI); if (a) return a; } catch (e) { /* erişilemez */ }
+  }
+  return null;
+}
+function anahtarSil() {
+  for (const ad of ["sessionStorage", "localStorage"]) {
+    try { const d = depo(ad); if (d) d.removeItem(ANAHTAR_YERI); } catch (e) { /* erişilemez */ }
+  }
+}
+/** Kaydedebildiyse true. Önce iki depodan da silinir — eski kopya diğer depoda kalmasın. */
+function anahtarKaydet(anahtar, hatirla) {
+  anahtarSil();
+  try {
+    const d = depo(hatirla ? "localStorage" : "sessionStorage");
+    if (!d) return false;
+    d.setItem(ANAHTAR_YERI, anahtar);
+    return true;
+  } catch (e) { return false; }
+}
+function sohbetAcikHesapla() {
+  return durum.site ? !!anahtarOku() : durum.sunucuAi;
+}
+/** Görev "kendin işaretle" ile mi biter? Yaz: değerlendirme yalnız sunucu AI'da; oku/tartış: sohbet kapalıysa. */
+function kendinIsaretler(tip) {
+  return tip === "yaz" ? !durum.sunucuAi : !durum.sohbetAcik;
+}
+/** Sunucunun anahtar yok/biçimsiz 400'lerinde döndürdüğü kararlı kodlar (HataYonetimi). */
+const ANAHTAR_400_NEDENLERI = ["ANAHTAR_GEREKLI", "ANAHTAR_BICIMI"];
+const ISARETLE_METNI = { oku: "Okudum ✓", yaz: "Yaptım ✓", tartis: "Tartıştım ✓" };
 
 // ---------- görev tipi türetici (saf frontend; veriyi değiştirmez) ----------
 const GOREV_TIPLERI = {
@@ -70,15 +109,11 @@ async function api(yol, secenekler = {}, timeoutMs = 180000) {
   } finally {
     clearTimeout(zamanlayici);
   }
-  if (yanit.status === 401) {
-    // site profili: oturum yok/bitmiş → giriş sayfası (yerel modda 401 oluşmaz)
-    location.href = "/giris.html";
-    throw new Error("Oturum gerekli — giriş sayfasına yönlendiriliyorsun.");
-  }
   if (!yanit.ok) {
     const govde = await yanit.json().catch(() => ({}));
     const hata = new Error(govde.detay || govde.hata || `HTTP ${yanit.status}`);
-    hata.status = yanit.status; // çağıran HTTP durumuna göre dallanabilsin (ör. 503 = AI kapalı)
+    hata.status = yanit.status; // çağıran HTTP durumuna göre dallanabilsin (ör. 401 = ziyaretçi anahtarı geçersiz)
+    hata.neden = govde.neden;   // kararlı hata kodu (ör. ANAHTAR_GECERSIZ, ANAHTAR_GEREKLI), varsa
     throw hata;
   }
   return yanit.json();
@@ -153,7 +188,7 @@ function haftaCiz() {
 
   const bas = el("div", "week-head");
   bas.append(el("span", "tag", "Hafta " + d.no), el("h2", null, d.baslik));
-  if (durum.aiAktif && !haftaKilitli) { // rapor yalnız açık haftada anlamlı
+  if (durum.sunucuAi && !haftaKilitli) { // rapor yalnız açık haftada anlamlı (sitede yok)
     const raporBtn = el("button", "btn btn-ikincil", "Haftalık Rapor");
     raporBtn.addEventListener("click", () => raporGoster(d.no, raporBtn));
     bas.appendChild(raporBtn);
@@ -190,7 +225,7 @@ function haftaCiz() {
   panel.appendChild(kaynakBolumu(d.no)); // kaynaklar görevlerin ALTINDA + katlı — okuma HER zaman açık
   panel.appendChild(quizCiz(d, "STATIK", haftaKilitli || !gunlerBitti, haftaKilitli)); // hafta kilitli VEYA günler bitmedi → quiz kilitli
 
-  if (durum.aiAktif && gunlerBitti) panel.appendChild(aiQuizBolumu(d.no)); // AI quiz de günler bitince
+  if (durum.sunucuAi && gunlerBitti) panel.appendChild(aiQuizBolumu(d.no)); // AI quiz de günler bitince
 
   gorevBariGuncelle(); // sohbet panelindeki dinamik "görevi bitir" barını her çizimde tazele (tek güvenli nokta)
 }
@@ -346,7 +381,7 @@ function kaynakSecimDraweri() {
   okumaDraweriGoster();
 }
 
-/** "✓ Okudum": okuma görevini öğretmen-kapısına BAĞLAR (doğrudan bitirmez). AI kapalıysa doğrudan tamamlar. */
+/** "✓ Okudum": okuma görevini öğretmen-kapısına BAĞLAR (doğrudan bitirmez). Sohbet kapalıysa doğrudan tamamlar. */
 async function okudumTamamla() {
   const gv = durum.okunanGorev;
   const baslikEl = document.querySelector("#oku-drawer .oku-drawer-baslik");
@@ -355,7 +390,7 @@ async function okudumTamamla() {
   durum.okunanGorev = null;
   if (!gv) return; // göreve bağlı olmayan okuma (browse) — tamamlanacak görev yok
   const gun = gv.g.gun;
-  if (!durum.aiAktif) { // yumuşak kapı için AI şart — AI kapalıysa eskisi gibi doğrudan tamamla
+  if (!durum.sohbetAcik) { // yumuşak kapı için sohbet şart — kapalıysa (anahtarsız) doğrudan tamamla
     if (await gorevTamamla(gv.g.gun, gv.t.index)) haftaCiz();
     return;
   }
@@ -479,7 +514,10 @@ function gunCiz(g, kilitli = false, haftaKilitli = false) {
     liste.innerHTML = "";
     liste.appendChild(el("div", "ipucu", haftaKilitli
         ? "👁 Bu hafta henüz açık değil — görevleri okuyup inceleyebilirsin ama YAPAMAZSIN. Kaynakları aşağıdan okuyabilirsin."
-        : "💡 Görevleri SIRAYLA yap — birini bitirince sıradaki açılır. Sağdaki butona bas; kutucuğu sistem doldurur."));
+        : durum.sunucuAi
+          ? "💡 Görevleri SIRAYLA yap — birini bitirince sıradaki açılır. Sağdaki butona bas; kutucuğu sistem doldurur."
+          : "💡 Görevleri SIRAYLA yap — birini bitirince sıradaki açılır. Bitirdiğin görevi ✓ düğmesiyle kendin işaretle."
+            + (durum.sohbetAcik ? " Oku ve tartış görevlerini istersen AI öğretmenle de geçebilirsin." : "")));
     const aktifIdx = g.gorevler.findIndex((t) => !t.tamamlandi);
     g.gorevler.forEach((t, i) => {
       const tip = gorevTipiCikar(t.metin);
@@ -491,7 +529,9 @@ function gunCiz(g, kilitli = false, haftaKilitli = false) {
       const kutu = document.createElement("input");
       kutu.type = "checkbox";
       kutu.checked = t.tamamlandi;
-      kutu.disabled = haftaKilitli || kilitli || durum.aiAktif; // kilitli hafta → tamamlanamaz
+      // kilitli hafta → tamamlanamaz; AI kapısının işaretlediği görevde (sohbet açıkken oku/tartış, sunucu AI'da yaz)
+      // kutu salt-durum. Kendin işaretlenen görev (ör. sitede anahtarla "yaz") geri alınabilsin.
+      kutu.disabled = haftaKilitli || kilitli || (durum.sohbetAcik && !kendinIsaretler(tip));
       kutu.addEventListener("change", async () => {
         // haftaCiz: yalnız tasklistCiz değil — günün son görevi bitince SONRAKİ GÜN kilidi de kalksın (#r5)
         // kutu.checked = tıklamadan SONRAKİ (istenen) durum — sunucuya hedef olarak gider (idempotent)
@@ -500,19 +540,38 @@ function gunCiz(g, kilitli = false, haftaKilitli = false) {
       const rozet = el("span", "tip-rozet " + meta.sinif, kilitli ? "🔒" : meta.ikon);
       rozet.title = kilitli ? "Önce sıradaki görevi bitir" : meta.etiket;
       const metinEl = el("span", "task-metin", t.metin); // el() → textContent (XSS-güvenli)
-      const aksiyon = el("button", "task-aksiyon " + meta.sinif, meta.btn);
+      // Kendin işaretlenen yaz/tartış görevinde ana düğme doğrudan "Yaptım ✓"/"Tartıştım ✓" olur (bitince gizli);
+      // oku görevinde ana düğme yazıyı açar, aktif satıra ayrıca "Okudum ✓" eklenir.
+      const kendin = kendinIsaretler(tip);
+      const isaretDugmesi = kendin && tip !== "oku";
+      const aksiyon = el("button", "task-aksiyon " + meta.sinif + (isaretDugmesi ? " task-isaretle" : ""),
+          isaretDugmesi ? ISARETLE_METNI[tip] : meta.btn);
       aksiyon.type = "button";
       aksiyon.disabled = haftaKilitli || kilitli; // kilitli hafta → görev eylemi yok
       aksiyon.addEventListener("click", () => gorevAksiyon(tip, g, t, kutu, satir, stat));
       satir.append(kutu, rozet, metinEl);
       if (aktif) satir.appendChild(el("span", "simdi-rozet", "şimdi sende"));
-      satir.appendChild(aksiyon);
+      if (!(isaretDugmesi && t.tamamlandi)) satir.appendChild(aksiyon);
+      if (kendin && tip === "oku" && aktif) {
+        const okudum = el("button", "task-aksiyon task-isaretle", ISARETLE_METNI.oku);
+        okudum.type = "button";
+        okudum.title = "Yazıyı okuduysan kendin işaretle";
+        okudum.addEventListener("click", () => kendinIsaretle(g, t, kutu, satir, stat, okudum));
+        satir.appendChild(okudum);
+      }
       liste.appendChild(satir);
     });
   }
   tasklistCiz();
   gun.append(bas, govde);
   return gun;
+}
+
+/** "Okudum ✓ / Yaptım ✓ / Tartıştım ✓": görevi doğrudan tamamlar (AI kapısı yok) ve paneli yeniden çizer. */
+async function kendinIsaretle(g, t, kutu, satir, stat, btn) {
+  if (btn) btn.disabled = true; // çift tık: gereksiz ikinci POST atılmasın (uç zaten idempotent)
+  if (await gorevDurumuGonder(g.gun, t.index, true, satir, kutu, stat, g)) haftaCiz();
+  else if (btn) btn.disabled = false;
 }
 
 /** Görevi istenen duruma (hedef) ayarlar — idempotent uç. Başarılıysa true, hata olursa false döner
@@ -684,13 +743,24 @@ function gorevBariGuncelle() {
     return;
   }
 
+  // Kendin işaretlenen yaz/tartış görevi: bar doğrudan "Yaptım ✓"/"Tartıştım ✓" (oku: yazıyı açar, orada "✓ Okudum").
+  if (tip !== "oku" && kendinIsaretler(tip)) {
+    const isaret = el("button", "gorev-bar-btn", ISARETLE_METNI[tip]);
+    isaret.type = "button";
+    isaret.addEventListener("click", async () => {
+      isaret.disabled = true;
+      if (await gorevTamamla(g.gun, t.index)) haftaCiz(); else isaret.disabled = false;
+    });
+    bar.appendChild(isaret);
+    return;
+  }
+
   // Yüzeyinde DEĞİLSİN → fırlatıcı (launcher). Tamamlama öğretmen kapısında (oku/tartış)
   // ya da değerlendirmede (yaz) olur; bar düz "bitir" YAPMAZ.
   const btn = el("button", "gorev-bar-btn", `→ ${g.gun}. gün ${N}. göreve geç`);
   btn.type = "button";
   btn.addEventListener("click", () => {
     if (tip === "yaz") {
-      if (!durum.aiAktif) { alert(AI_KAPALI_GOREV); return; }
       // DOM-bağımsız aktif görev bağlamı kur; orta kolonda çalışma kartını aç. Görev, yazılıp
       // /api/degerlendir başarıyla dönünce tamamlanır (calismaDegerlendir).
       durum.aktifGorev = { gun: g.gun, index: t.index, metin: t.metin, tip: "yaz", g, kutu: null, satir: null, stat: null };
@@ -702,7 +772,6 @@ function gorevBariGuncelle() {
       return;
     }
     // tartis: sohbete odaklan + tartış görevini öğretmen kapısına bağla (açılış sorusu + gorevBekleyen)
-    if (!durum.aiAktif) { alert(AI_KAPALI_GOREV); return; }
     durum.aktifGorev = { gun: g.gun, index: t.index, metin: t.metin, tip: "tartis", g, kutu: null, satir: null, stat: null };
     aktifGorevKartiCiz();
     tartisBaslat(g, t);
@@ -744,11 +813,10 @@ function tartisBaslat(g, t) {
 function gorevAksiyon(tip, g, t, kutu, satir, stat) {
   if (tip === "oku") { okuAksiyonu(g, t, kutu, satir, stat); return; }
 
+  // AI yolu kapalı (anahtarsız sohbet / sitede yaz) → "Yaptım ✓"/"Tartıştım ✓": doğrudan tamamla
+  if (kendinIsaretler(tip)) { kendinIsaretle(g, t, kutu, satir, stat); return; }
+
   // yaz / tartis: AI paneliyle entegre
-  if (!durum.aiAktif) {
-    alert(AI_KAPALI_GOREV);
-    return;
-  }
   durum.aktifGorev = { gun: g.gun, index: t.index, metin: t.metin, tip, kutu, satir, stat, g };
 
   if (tip === "yaz") {
@@ -982,7 +1050,7 @@ function aktifGorevKartiCiz() {
       el("span", "aktif-gorev-metin", gv.metin)); // el() → textContent
 
   const arac = el("div", "aktif-gorev-arac");
-  if (gv.tip === "yaz") {
+  if (gv.tip === "yaz" && durum.sunucuAi) { // /api/ornek sunucu AI'ı ister (sitede kapalı)
     const ornek = el("button", "aktif-gorev-ornek", "💡 Örnek iste");
     ornek.type = "button";
     ornek.addEventListener("click", ornekIste);
@@ -1141,7 +1209,7 @@ async function haftaSec(no) {
   haritaCiz();
   haftaCiz(); // haftaCiz açık haftada sohbet* bağlamını senkronlar
   chatDurumYaz();
-  if (acik && durum.aiAktif) await sohbetGecmisiYukle(nesil); // kilitli önizlemede sohbet YENİDEN yüklenmez
+  if (acik && durum.sohbetAcik) await sohbetGecmisiYukle(nesil); // kilitli önizlemede sohbet YENİDEN yüklenmez
 }
 
 // ---------- orta panel: Prompt Atölyesi görünümü ----------
@@ -1274,8 +1342,8 @@ function atolyeKartCiz(a) {
   });
   kart.append(cozumBtn, cozum);
 
-  // AI değerlendir — HER alıştırmada (AI aktifken); kullanıcı isteği: her prompt'un altında olsun
-  if (durum.aiAktif) {
+  // AI değerlendir — HER alıştırmada (sunucu AI aktifken; sitede yok); kullanıcı isteği: her prompt'un altında olsun
+  if (durum.sunucuAi) {
     const aiBtn = el("button", "btn atolye-ai-btn", "🤖 AI Öğretmen değerlendirsin");
     aiBtn.type = "button";
     const aiSonuc = el("div", "atolye-ai-sonuc");
@@ -1335,8 +1403,9 @@ function sohbetHaftasi() {
 function chatDurumYaz() {
   const gunEki = durum.sohbetGun ? ` · GÜN ${durum.sohbetGun}` : "";
   document.getElementById("chat-durum").textContent =
-      `HAFTA ${sohbetHaftasi()}${gunEki}` + (durum.aiAktif ? "" : " · AI KAPALI");
-  if (durum.aiAktif) panelOdakGuncelle();
+      `HAFTA ${sohbetHaftasi()}${gunEki}` + (durum.sohbetAcik ? "" : durum.site ? " · ANAHTARSIZ" : " · AI KAPALI");
+  if (durum.sohbetAcik) panelOdakGuncelle();
+  else { const odak = document.getElementById("panel-odak"); if (odak) odak.hidden = true; }
 }
 
 function mesajEkle(sinif, metin) {
@@ -1362,33 +1431,135 @@ function panelOdakGuncelle() {
   else { e.hidden = true; }
 }
 
+/** Paneli bir kez kurar (dinleyiciler) ve ilk durumu çizer. */
 function aiPaneliKur() {
-  document.getElementById("chat-dot").classList.toggle("aktif", durum.aiAktif);
-  chatDurumYaz();
-
-  if (!durum.aiAktif) {
-    const bilgi = el("div", "chat-bilgi");
-    if (durum.site) { // çok kullanıcılı site: öğrenciye yönelik dil (ortam değişkeni anlatılmaz)
-      bilgi.textContent = "AI öğretmen henüz açılmadı (OpenRouter anahtarı bekleniyor). Dersleri okuyup "
-          + "görevlerini işaretleyebilirsin; AI açılınca sohbet burada çalışacak.";
-      chatGirdi().placeholder = "AI henüz açılmadı";
-    } else { // yerel mod: geliştirici yönergesi
-      bilgi.innerHTML = "<b>AI öğretmen şu an kapalı.</b><br>Uygulamayı <span class='mono'>OPENROUTER_API_KEY</span> ortam değişkeniyle başlatınca sohbet burada aktifleşir.";
-      chatGirdi().placeholder = "AI şu an kapalı";
-    }
-    chatMesajlar().appendChild(bilgi);
-    return;
-  }
-
-  chatGirdi().disabled = false;
-  chatGonderBtn().disabled = false;
-  chatGirdi().placeholder = "Soru sor ya da 'ben şunu yaptım' de… (Enter = gönder)";
-  sohbetGecmisiYukle();
-
+  if (durum.site) anahtarKaldirDugmesiEkle();
   chatGonderBtn().addEventListener("click", gonder);
   chatGirdi().addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); gonder(); }
   });
+  sohbetPaneliCiz();
+}
+
+/** Panelin sohbet durumunu (açık/kapalı/anahtar kartı) çizer. hataMetni: anahtar kartında gösterilecek uyarı. */
+function sohbetPaneliCiz(hataMetni) {
+  const acik = durum.sohbetAcik;
+  document.getElementById("chat-dot").classList.toggle("aktif", acik);
+  chatDurumYaz();
+  const kaldir = document.getElementById("anahtar-kaldir");
+  if (kaldir) kaldir.hidden = !(durum.site && acik);
+  chatGirdi().disabled = !acik;
+  chatGonderBtn().disabled = !acik;
+  // Sitede anahtarsız: mesaj kutusu yerine kart (giriş alanı gizli; görev barı görünür kalır)
+  chatGirdi().hidden = durum.site && !acik;
+  chatGonderBtn().hidden = durum.site && !acik;
+  chatMesajlar().innerHTML = "";
+
+  if (acik) {
+    chatGirdi().placeholder = "Soru sor ya da 'ben şunu yaptım' de… (Enter = gönder)";
+    sohbetGecmisiYukle();
+    return;
+  }
+  if (durum.site) {
+    chatMesajlar().appendChild(anahtarKartiCiz(hataMetni));
+    return;
+  }
+  // yerel mod: geliştirici yönergesi
+  const bilgi = el("div", "chat-bilgi");
+  bilgi.innerHTML = "<b>AI öğretmen şu an kapalı.</b><br>Uygulamayı <span class='mono'>OPENROUTER_API_KEY</span> ortam değişkeniyle başlatınca sohbet burada aktifleşir.";
+  chatGirdi().placeholder = "AI şu an kapalı";
+  chatMesajlar().appendChild(bilgi);
+}
+
+/** Sitede anahtarsız sohbet paneli: isteğe bağlı OpenRouter anahtarı kartı (CSP-temiz; tüm metin textContent). */
+function anahtarKartiCiz(hataMetni) {
+  const kart = el("div", "anahtar-kart");
+  kart.appendChild(el("h3", "anahtar-baslik", "AI öğretmenle sohbet (isteğe bağlı)"));
+  kart.appendChild(el("p", "anahtar-ozet", "Dersleri okuyup görevlerini kendin işaretleyebilirsin — sohbet şart değil. "
+      + "AI öğretmenle konuşmak istersen kendi OpenRouter anahtarını ekle."));
+  if (hataMetni) {
+    const hata = el("p", "anahtar-hata", hataMetni);
+    hata.setAttribute("role", "alert");
+    kart.appendChild(hata);
+  }
+
+  const form = el("form", "anahtar-form");
+  form.noValidate = true;
+  const etiket = el("label", "anahtar-etiket", "OpenRouter anahtarın");
+  const girdi = el("input", "anahtar-girdi");
+  girdi.type = "password";
+  girdi.id = "anahtar-girdi";
+  girdi.autocomplete = "off";
+  girdi.setAttribute("autocomplete", "off");
+  girdi.spellcheck = false;
+  girdi.placeholder = "sk-or-…";
+  etiket.htmlFor = "anahtar-girdi";
+  const hatirlaEtiket = el("label", "anahtar-hatirla");
+  const hatirla = el("input");
+  hatirla.type = "checkbox";
+  hatirlaEtiket.append(hatirla, el("span", null, "Bu cihazda hatırla"));
+  hatirlaEtiket.title = "İşaretlemezsen anahtar bu sekme kapanınca silinir";
+  const kaydet = el("button", "btn anahtar-kaydet", "Kaydet");
+  kaydet.type = "submit";
+  form.append(etiket, girdi, hatirlaEtiket, kaydet);
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const anahtar = girdi.value.trim();
+    girdi.value = ""; // anahtar DOM'da beklemesin
+    if (!ANAHTAR_BICIMI.test(anahtar)) {
+      sohbetPaneliCiz("Bu bir OpenRouter anahtarına benzemiyor — 'sk-or-' ile başlamalı. OpenRouter'da Keys sayfasından kopyala.");
+      return;
+    }
+    if (!anahtarKaydet(anahtar, hatirla.checked)) {
+      sohbetPaneliCiz("Tarayıcın anahtarı saklamaya izin vermedi (gizli pencere ya da site verisi engelli olabilir).");
+      return;
+    }
+    anahtarDegisti();
+  });
+  kart.appendChild(form);
+
+  const yardim = el("details", "anahtar-yardim");
+  yardim.appendChild(el("summary", null, "Anahtarı nasıl alırım?"));
+  const adimlar = el("ol");
+  const adim1 = el("li");
+  adim1.append(el("strong", null, "openrouter.ai"), el("span", null, "'de hesap aç."));
+  const adim2 = el("li");
+  adim2.append(el("strong", null, "Keys → Create Key"), el("span", null, " ile yeni bir anahtar oluştur."));
+  const adim3 = el("li");
+  adim3.append(el("strong", null, "Credit limit koy"), el("span", null, " (harcama limiti, ör. 5 $) — anahtar bu tutarı aşamaz."));
+  const adim4 = el("li");
+  adim4.append(el("span", null, "“sk-or-…” ile başlayan anahtarı buraya yapıştır ve "), el("strong", null, "Kaydet"), el("span", null, "e bas."));
+  adimlar.append(adim1, adim2, adim3, adim4);
+  yardim.appendChild(adimlar);
+  kart.appendChild(yardim);
+
+  kart.appendChild(el("p", "anahtar-not",
+      "Ücret OpenRouter hesabına yazılır; anahtarın yalnız bu tarayıcıda durur, sunucumuz kaydetmez."));
+  return kart;
+}
+
+/** Sohbet başlığına "Anahtarı kaldır" (yalnız site; anahtar varken görünür). */
+function anahtarKaldirDugmesiEkle() {
+  if (document.getElementById("anahtar-kaldir")) return;
+  const btn = el("button", "anahtar-kaldir", "Anahtarı kaldır");
+  btn.id = "anahtar-kaldir";
+  btn.type = "button";
+  btn.hidden = true;
+  btn.title = "OpenRouter anahtarını bu tarayıcıdan sil";
+  btn.addEventListener("click", () => { anahtarSil(); anahtarDegisti(); });
+  document.querySelector(".chat-head").appendChild(btn);
+}
+
+/** Anahtar eklendi/silindi/geçersiz çıktı: bayrağı yeniden hesapla, paneli ve görev düğmelerini yeniden çiz. */
+function anahtarDegisti(hataMetni) {
+  durum.sohbetAcik = sohbetAcikHesapla();
+  if (!durum.sohbetAcik) { // öğretmen kapısı artık kapanamaz — bekleyen kapıyı bırak; görev kendin işaretlenir
+    durum.gorevBekleyen = null;
+    aktifGorevTemizle();
+  }
+  sohbetPaneliCiz(hataMetni);
+  if (durum.gorunum === "program" && durum.detay) haftaCiz(); // görev düğmeleri (Okudum ✓ …) yeni duruma göre
+  else gorevBariGuncelle();
 }
 
 async function sohbetGecmisiYukle(nesil = haftaSecNesli) {
@@ -1429,9 +1600,12 @@ async function gonder() {
   mesajEkle("user", metin);
   const bekleyen = mesajEkle("asistan bekliyor", "düşünüyor…");
 
+  // Gönderim anındaki anahtar — geç dönen 401 yalnız BU anahtarı silebilir (compare-and-clear; aşağıda)
+  const anahtar = durum.site ? anahtarOku() : null; // ziyaretçi anahtarı YALNIZ bu istekte gider
   try {
+    const basliklar = { "Content-Type": "application/json" };
     const yanit = await api("/api/sohbet", {
-      method: "POST", headers: { "Content-Type": "application/json" },
+      method: "POST", headers: anahtar ? { ...basliklar, "X-OpenRouter-Anahtar": anahtar } : basliklar,
       body: JSON.stringify({ hafta: sohbetHaftasi(), gun: durum.sohbetGun, mesaj: metin }),
     });
     if (nesil !== haftaSecNesli) { bekleyen.remove(); return; } // hafta değişti — bayat yanıtı basma (#race)
@@ -1460,10 +1634,24 @@ async function gonder() {
       }
     }
   } catch (h) {
+    // Sitede 401 = OpenRouter anahtarı reddetti; 400 + neden ANAHTAR_GEREKLI/ANAHTAR_BICIMI = anahtar yok/biçimsiz
+    // (metne değil sunucunun kararlı koduna bakılır). Giriş YOK —
+    // anahtar silinir, kart hata metniyle yeniden açılır. (429/402 yalnız mesaj: anahtar geçerli.)
+    // Compare-and-clear: istek beklerken anahtar değiştirildiyse (yeni anahtar kaydedildi/kaldırıldı) eski
+    // isteğin 401'i YENİ anahtarı silmez — yalnız hata gösterilir.
+    if (durum.site && (h.status === 401 || (h.status === 400 && ANAHTAR_400_NEDENLERI.includes(h.neden)))) {
+      if (anahtarOku() === anahtar) {
+        anahtarSil();
+        anahtarDegisti(h.status === 401 ? h.message + " Yeni bir anahtar oluşturup buraya ekle." : h.message);
+        return;
+      }
+      bekleyen.textContent = "Hata (önceki anahtarla gönderilen mesaj): " + h.message;
+      return;
+    }
     bekleyen.textContent = "Hata: " + h.message;
   } finally {
-    chatGonderBtn().disabled = false;
-    chatGirdi().focus();
+    chatGonderBtn().disabled = !durum.sohbetAcik;
+    if (durum.sohbetAcik) chatGirdi().focus();
   }
 }
 
@@ -1516,6 +1704,94 @@ function sifirlaButonuEkle() {
   kilavuz.parentNode.insertBefore(btn, kilavuz);
 }
 
+// ---------- ilerleme kodu (yalnız site; ADR-0017) ----------
+/** Üst bara "İlerleme kodum" + "Geri yükle" düğmelerini ekler; ikisi de #kod-dialog'un ilgili bölümünü açar. */
+function ilerlemeKoduKur() {
+  const dlg = document.getElementById("kod-dialog");
+  const kilavuz = document.getElementById("kilavuz-ac");
+  if (!dlg || !kilavuz || document.getElementById("kod-ac")) return;
+  const kodBolum = document.getElementById("kod-bolum");
+  const geriBolum = document.getElementById("geri-bolum");
+  const kodDeger = document.getElementById("kod-deger");
+  const kodMesaj = document.getElementById("kod-mesaj");
+  const geriGirdi = document.getElementById("geri-kod");
+  const geriMesaj = document.getElementById("geri-mesaj");
+  const geriBtn = document.getElementById("geri-yukle-btn");
+
+  const mesaj = (e, metin, tur) => {
+    e.textContent = metin || "";
+    e.hidden = !metin;
+    e.classList.toggle("hata", tur === "hata");
+  };
+  const ac = (bolum) => {
+    kodBolum.hidden = bolum !== "kod";
+    geriBolum.hidden = bolum !== "geri";
+    mesaj(kodMesaj, "");
+    mesaj(geriMesaj, "");
+    dlg.showModal();
+  };
+
+  const kodBtn = el("button", "sifirla-btn kod-btn", "🔑 İlerleme kodum");
+  kodBtn.id = "kod-ac";
+  kodBtn.type = "button";
+  kodBtn.title = "Başka tarayıcıda devam etmek için ilerleme kodunu gör";
+  kodBtn.addEventListener("click", async () => {
+    kodDeger.value = "yükleniyor…";
+    ac("kod");
+    try {
+      const y = await api("/api/ziyaretci/kod");
+      kodDeger.value = y.kod;
+    } catch (h) {
+      kodDeger.value = "";
+      mesaj(kodMesaj, "Kod alınamadı: " + h.message, "hata");
+    }
+  });
+
+  const geriAcBtn = el("button", "sifirla-btn kod-btn", "↩ Geri yükle");
+  geriAcBtn.id = "geri-ac";
+  geriAcBtn.type = "button";
+  geriAcBtn.title = "Başka tarayıcıdaki ilerlemeni koduyla buraya getir";
+  geriAcBtn.addEventListener("click", () => { geriGirdi.value = ""; ac("geri"); geriGirdi.focus(); });
+
+  document.getElementById("kod-kopyala").addEventListener("click", async () => {
+    if (!kodDeger.value || kodDeger.value === "yükleniyor…") return;
+    try {
+      await navigator.clipboard.writeText(kodDeger.value);
+      mesaj(kodMesaj, "Kopyalandı ✓");
+    } catch (e) { // pano izni yoksa: metni seçili bırak, kullanıcı kendisi kopyalasın
+      kodDeger.select();
+      mesaj(kodMesaj, "Otomatik kopyalanamadı — kod seçildi, Ctrl+C (Mac'te ⌘+C) ile kopyala.", "hata");
+    }
+  });
+
+  document.getElementById("geri-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const kod = geriGirdi.value.trim();
+    if (!kod) { mesaj(geriMesaj, "Önce ilerleme kodunu yapıştır.", "hata"); return; }
+    if (!confirm("Bu tarayıcıdaki ilerleme bu kodla değişecek — buradaki mevcut ilerleme bu tarayıcıda görünmez olur.\nDevam edilsin mi?")) return;
+    geriBtn.disabled = true;
+    try {
+      await api("/api/ziyaretci/geri-yukle", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kod }),
+      });
+      location.reload(); // yeni çerezle her şey baştan yüklenir
+    } catch (h) {
+      mesaj(geriMesaj, h.status === 400 ? "Bu bir ilerleme kodu değil — kodu eksiksiz yapıştırdığından emin ol." : h.message, "hata");
+      geriBtn.disabled = false;
+    }
+  });
+
+  document.querySelectorAll("[data-kod-kapat]").forEach((b) => b.addEventListener("click", () => dlg.close()));
+  kilavuz.parentNode.insertBefore(kodBtn, kilavuz);
+  kilavuz.parentNode.insertBefore(geriAcBtn, kilavuz);
+}
+
+/** Kılavuzdaki moda özgü paragraflar: sitede yerel-mod metni (rapor, AI değerlendirme) gizlenir, site metni açılır. */
+function moduMetinleriUygula(site) {
+  document.querySelectorAll("[data-yalniz-yerel]").forEach((e) => { e.hidden = site; });
+  document.querySelectorAll("[data-yalniz-site]").forEach((e) => { e.hidden = !site; });
+}
+
 /** Açılış karşılama/bilgilendirme sayfası — Hafta 1 otomatik yüklenmez; kullanıcı buradan seçer.
  *  Butonlar mevcut akışı çağırır (haftaSec / mulakatAlanSec) — görev/sohbet mekanizmasına dokunmaz. */
 function karsilamaCiz(ilkAcik) {
@@ -1538,7 +1814,9 @@ function karsilamaCiz(ilkAcik) {
   const egKart = el("div", "karsilama-kart");
   egKart.append(el("div", "kk-ikon", "📚"), el("h3", null, "Eğitim Programı"),
       el("p", null, "12 haftada AI çağı yazılım mimarlığı — haftalık dersler, günlük görevler, "
-          + "AI öğretmenle üstünden geçme ve haftalık quizler."));
+          + (durum.site
+            ? "haftalık quizler; istersen kendi anahtarınla AI öğretmenle sohbet."
+            : "AI öğretmenle üstünden geçme ve haftalık quizler.")));
   const egBtn = el("button", "btn",
       ilkAcik ? `Hafta ${ilkAcik.no}'e devam et` : "Programa başla");
   egBtn.addEventListener("click", () => haftaSec(ilkAcik ? ilkAcik.no : 1));
@@ -1566,41 +1844,20 @@ function karsilamaCiz(ilkAcik) {
  *  Hata durumunda güvenli varsayılan: mülakat KAPALI. */
 const ozellikler = api("/api/ozellikler").catch(() => ({ mulakat: false }));
 
-/** site profili (ADR-0012): üst barda oturumdaki e-posta + "Çıkış". Yerel modda hiçbir şey eklenmez. */
-function oturumAlaniKur(oz) {
-  if (!oz.site || !oz.kullanici) return;
-  const hwrap = document.querySelector("header .hwrap");
-  if (!hwrap || document.getElementById("oturum")) return;
-  const kutu = el("div", "oturum");
-  kutu.id = "oturum";
-  const cikis = el("button", "btn btn-ikincil", "Çıkış");
-  cikis.type = "button";
-  cikis.addEventListener("click", async () => {
-    cikis.disabled = true;
-    try {
-      await fetch("/api/kimlik/cikis", { method: "POST", headers: { "X-XSRF-TOKEN": csrfToken() } });
-    } finally {
-      location.href = "/giris.html?cikis";
-    }
-  });
-  kutu.append(el("span", "eposta", oz.kullanici), cikis);
-  hwrap.appendChild(kutu);
-}
-
 (async function basla() {
   try {
     const oz = await ozellikler;
     durum.mulakatEtkin = !!oz.mulakat;
     durum.site = !!oz.site;
-    oturumAlaniKur(oz);
-    const kullanim = await api("/api/kullanim").catch(() => ({ aiAktif: false }));
-    durum.aiAktif = !!kullanim.aiAktif;
+    durum.sunucuAi = !!oz.sunucuAi; // sitede hep false
+    durum.sohbetAcik = sohbetAcikHesapla();
     durum.kaynaklar = await api("/api/kaynaklar").catch(() => []);
     await ozetYenile();
     // kaldığın yerden devam: %100 olmayan ilk hafta (karşılamadaki butona yansır)
     const ilkAcik = durum.ozetler.find((h) => h.ilerlemeYuzde < 100);
     aiPaneliKur();
     sifirlaButonuEkle();
+    if (durum.site) ilerlemeKoduKur();
     karsilamaCiz(ilkAcik); // Hafta 1 otomatik açılmaz — genel karşılama sayfası
   } catch (h) {
     document.getElementById("hafta-paneli").textContent = "Yüklenemedi: " + h.message;
@@ -1615,10 +1872,14 @@ function oturumAlaniKur(oz) {
   if (!dlg || !ac || !kapat) return;
   ac.addEventListener('click', () => dlg.showModal());
   kapat.addEventListener('click', () => dlg.close());
-  try {
-    if (!localStorage.getItem('kilavuzGoruldu')) {
-      dlg.showModal();
-      localStorage.setItem('kilavuzGoruldu', '1');
-    }
-  } catch (e) { /* localStorage kapalıysa sessizce geç */ }
+  // Metin moda göre seçilsin diye ilk açılış özellik bayraklarını bekler (sitede rapor paragrafı görünmesin)
+  ozellikler.then((oz) => {
+    moduMetinleriUygula(!!oz.site);
+    try {
+      if (!localStorage.getItem('kilavuzGoruldu')) {
+        dlg.showModal();
+        localStorage.setItem('kilavuzGoruldu', '1');
+      }
+    } catch (e) { /* localStorage kapalıysa sessizce geç */ }
+  });
 })();

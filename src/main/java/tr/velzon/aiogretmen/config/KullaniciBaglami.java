@@ -9,8 +9,8 @@ package tr.velzon.aiogretmen.config;
  *       {@link YerelKullaniciBaglami} sabit {@link #YEREL} döndürür.</li>
  *   <li><strong>mcp-http</strong> (JWT): çok kullanıcı → {@link JwtKullaniciBaglami} doğrulanmış
  *       token'ın email/sub kimliğini döndürür.</li>
- *   <li><strong>site</strong> (form/oturum login, ADR-0012): çok kullanıcı → {@link OturumKullaniciBaglami}
- *       oturumdaki {@code @pera.software} e-postasını döndürür.</li>
+ *   <li><strong>site</strong> (girişsiz, ADR-0017): çok kullanıcı → {@link ZiyaretciKullaniciBaglami}
+ *       {@code aio_ziyaretci} çerezindeki ziyaretçi kimliğini {@code "z-"} önekiyle döndürür.</li>
  * </ul>
  *
  * <p><strong>Katman/ArchUnit:</strong> {@code config} katmanındadır; repo/service/ai/web/mcp

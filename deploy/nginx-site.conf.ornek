@@ -3,8 +3,8 @@
 #   sudo ln -s /etc/nginx/sites-available/ai-ogretmen-site.conf /etc/nginx/sites-enabled/
 #   sudo nginx -t && sudo systemctl reload nginx
 #
-# egitim.pera.software = ÖRNEK alan adı (DNS'i pera açar). Sertifika yolları certbot'un varsayılanıdır:
-#   sudo certbot certonly --webroot -w /var/www/certbot -d egitim.pera.software
+# egitim.ornek.com = ÖRNEK alan adı (kendi alan adınla değiştir). Sertifika yolları certbot'un varsayılanıdır:
+#   sudo certbot certonly --webroot -w /var/www/certbot -d egitim.ornek.com
 # Uygulama yalnız 127.0.0.1:8090'da dinler; TLS burada sonlanır, uygulamaya http ile iletilir ve
 # X-Forwarded-Proto/Host eklenir (uygulama: server.forward-headers-strategy=native — yalnız 127.0.0.1'e güvenir).
 
@@ -12,7 +12,7 @@
 server {
     listen 80;
     listen [::]:80;
-    server_name egitim.pera.software;
+    server_name egitim.ornek.com;
 
     location /.well-known/acme-challenge/ {
         root /var/www/certbot;
@@ -28,10 +28,10 @@ server {
     listen 443 ssl;
     listen [::]:443 ssl;
     http2 on;            # nginx < 1.25.1 ise bu satırı sil, "listen 443 ssl http2;" yaz
-    server_name egitim.pera.software;
+    server_name egitim.ornek.com;
 
-    ssl_certificate     /etc/letsencrypt/live/egitim.pera.software/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/egitim.pera.software/privkey.pem;
+    ssl_certificate     /etc/letsencrypt/live/egitim.ornek.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/egitim.ornek.com/privkey.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_prefer_server_ciphers off;
     ssl_session_timeout 1d;
@@ -64,7 +64,7 @@ server {
         proxy_set_header X-Forwarded-Port  $server_port;
         proxy_set_header Connection        "";
 
-        # AI çağrıları (değerlendirme, rapor, sohbet) ~150 sn sürebilir → okuma zaman aşımı geniş.
+        # AI çağrısı (sitede yalnız sohbet) ~150 sn sürebilir → okuma zaman aşımı geniş.
         proxy_connect_timeout 10s;
         proxy_send_timeout    180s;
         proxy_read_timeout    180s;

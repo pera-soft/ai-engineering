@@ -20,7 +20,6 @@ class SiteVeritabaniTest {
     private static ConfigurableApplicationContext ac(String profil, String... ek) {
         List<String> arg = new ArrayList<>(List.of("--server.port=0",
                 "--spring.ai.openai.api-key=",
-                "--app.site.eposta-zorunlu=false", "--app.site.kayit=eposta",
                 "--app.hafiza-dir=target/test-hafiza-sitedb",
                 "--app.rapor-dir=target/test-raporlar-sitedb"));
         arg.addAll(List.of(ek));
@@ -41,7 +40,7 @@ class SiteVeritabaniTest {
     void siteAcikH2UrlIleAcilirSurucuUrldenCikarilir() {
         try (ConfigurableApplicationContext c = ac("site",
                 "--spring.datasource.url=jdbc:h2:mem:sitedbacik;DB_CLOSE_DELAY=-1")) {
-            assertThat(c.getBean(JdbcTemplate.class).queryForObject("SELECT COUNT(*) FROM kullanici", Integer.class))
+            assertThat(c.getBean(JdbcTemplate.class).queryForObject("SELECT COUNT(*) FROM gorev_ilerleme", Integer.class))
                     .isZero();
         }
     }

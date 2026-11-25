@@ -33,8 +33,8 @@ class AiKullanimGocTest {
         }
 
         assertThat(jdbc.queryForObject("SELECT kullanici_id FROM ai_kullanim", String.class)).isEqualTo("yerel");
-        jdbc.update("INSERT INTO ai_kullanim (kullanici_id, islem, model) VALUES ('a@pera.software','RAPOR','m')");
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM ai_kullanim WHERE kullanici_id='a@pera.software'",
+        jdbc.update("INSERT INTO ai_kullanim (kullanici_id, islem, model) VALUES ('a@ornek.com','RAPOR','m')");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM ai_kullanim WHERE kullanici_id='a@ornek.com'",
                 Integer.class)).isEqualTo(1);
 
         // 2026-10-26 (ADR-0016): süre + cevaptaki model — eklemeli, eski satırlar NULL kalır

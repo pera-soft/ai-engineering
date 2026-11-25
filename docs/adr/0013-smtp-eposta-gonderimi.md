@@ -1,5 +1,8 @@
 # ADR-0013 — SMTP ile e-posta gönderimi: `spring-boot-starter-mail` (Faz 9c)
 
+> **Değişiklik notu (2026-11-25, ADR-0017):** bu ADR **geçersiz**. Site girişsiz oldu; e-posta gönderimi,
+> SMTP ayarları ve `spring-boot-starter-mail` bağımlılığı kaldırıldı. Aşağıdaki metin tarihsel kayıttır.
+
 - **Durum:** Kabul edildi
 - **Tarih:** 2026-10-22
 - **Bağlam sahibi:** kullanıcı kararı (bağımlılık onayı 2026-10-22, pera'nın 3 mail hesabından biri

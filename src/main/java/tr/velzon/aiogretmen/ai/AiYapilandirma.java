@@ -3,6 +3,8 @@ package tr.velzon.aiogretmen.ai;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.document.MetadataMode;
+import org.springframework.ai.model.ApiKey;
+import org.springframework.ai.model.SimpleApiKey;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiEmbeddingModel;
 import org.springframework.ai.openai.OpenAiEmbeddingOptions;
@@ -11,6 +13,8 @@ import org.springframework.ai.vectorstore.SimpleVectorStore;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
+import tr.velzon.aiogretmen.config.AiAnahtarBaglami;
 import tr.velzon.aiogretmen.config.AppProperties;
 import tr.velzon.aiogretmen.config.CalismaModu;
 import tr.velzon.aiogretmen.config.KullaniciBaglami;
@@ -46,13 +50,30 @@ public class AiYapilandirma {
 
     private static final Logger log = LoggerFactory.getLogger(AiYapilandirma.class);
 
+    /**
+     * Faz 10 (ADR-0017): {@code site} profilinde AI istemcisi ziyaretçinin kendi anahtarıyla (istek başına,
+     * {@code X-OpenRouter-Anahtar}) çalışır; sunucu anahtarı ({@code spring.ai.openai.api-key}) sitede
+     * HİÇ OKUNMAZ — ortamda dolu olsa bile. Yerel/MCP modları değişmedi: anahtar boşsa devre dışı taslak,
+     * doluysa açılışta kurulan tek model.
+     */
     @Bean
     public OgretmenAiClient ogretmenAiClient(
-            @Value("${spring.ai.openai.api-key:}") String apiKey,
+            Environment ortam,
             @Value("${spring.ai.openai.base-url:https://openrouter.ai/api}") String baseUrl,
-            AppProperties props, KullanimRepo kullanimRepo, KullaniciBaglami kullaniciBaglami) {
+            AppProperties props, KullanimRepo kullanimRepo, KullaniciBaglami kullaniciBaglami,
+            CalismaModu calismaModu, AiAnahtarBaglami anahtarBaglami) {
 
-        if (apiKey == null || apiKey.isBlank()) {
+        if (calismaModu.siteMi()) {
+            log.info("site profili — AI ziyaretçinin kendi OpenRouter anahtarıyla (istek başına); sunucu anahtarı "
+                    + "kullanılmaz. sağlayıcı={} guclu={} hizli={}",
+                    baseUrl, props.ai().model().guclu(), props.ai().model().hizli());
+            return new SpringAiOgretmenClient(
+                    new ZiyaretciChatModelKaynagi(anahtarBaglami, baseUrl, denemeSayisi(props)),
+                    props, kullanimRepo, kullaniciBaglami);
+        }
+
+        String apiKey = ortam.getProperty("spring.ai.openai.api-key", "");
+        if (apiKey.isBlank()) {
             log.warn("OPENROUTER_API_KEY tanımlı değil — AI özellikleri devre dışı; müfredat+ilerleme çalışıyor.");
             return new OgretmenAiClient() {
                 @Override
@@ -73,12 +94,7 @@ public class AiYapilandirma {
             };
         }
 
-        OpenAiApi api = OpenAiApi.builder()
-                .baseUrl(baseUrl)
-                .apiKey(apiKey)
-                .restClientBuilder(org.springframework.web.client.RestClient.builder()
-                        .requestFactory(zamanAsimliFabrika()))
-                .build();
+        OpenAiApi api = sohbetApisi(baseUrl, new SimpleApiKey(apiKey));
         int deneme = denemeSayisi(props);
         OpenAiChatModel chatModel = sohbetModeli(api, yenidenDenemeSablonu(deneme, YENIDEN_DENEME_PENCERESI, ILK_BEKLEME));
         log.info("AI öğretmen aktif — sağlayıcı={} guclu={} hizli={} deneme={} okumaZamanAsimi={}sn",
@@ -184,6 +200,16 @@ public class AiYapilandirma {
             }
         });
         return sablon;
+    }
+
+    /** Zaman aşımlı sohbet API istemcisi — yerel (sunucu anahtarı) ve site (ziyaretçi anahtarı) ortak. */
+    static OpenAiApi sohbetApisi(String baseUrl, ApiKey anahtar) {
+        return OpenAiApi.builder()
+                .baseUrl(baseUrl)
+                .apiKey(anahtar)
+                .restClientBuilder(org.springframework.web.client.RestClient.builder()
+                        .requestFactory(zamanAsimliFabrika()))
+                .build();
     }
 
     /** Sohbet modeli — test, gerçek modelin bu şablonla yeniden denediğini buradan doğrular. */

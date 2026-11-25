@@ -52,9 +52,9 @@ class SifirlamaServiceTest {
 
     @Test
     void acikKimlikleYalnizOKullaniciyiTemizler() {
-        servis.sifirla("a@pera.software");
-        verify(ilerlemeRepo).deleteByKullaniciId("a@pera.software");
-        verify(hafizaService).ogrenciNotlariniSil("a@pera.software");
-        verify(raporService).raporOnbeleginiSil("a@pera.software");
+        servis.sifirla("a@ornek.com");
+        verify(ilerlemeRepo).deleteByKullaniciId("a@ornek.com");
+        verify(hafizaService).ogrenciNotlariniSil("a@ornek.com");
+        verify(raporService).raporOnbeleginiSil("a@ornek.com");
     }
 }

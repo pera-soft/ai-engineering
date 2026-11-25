@@ -19,9 +19,9 @@ import java.util.HexFormat;
  * <ul>
  *   <li>{@link KullaniciBaglami#YEREL} → kökün KENDİSİ ({@code data/hafiza/OGRENCI.md},
  *       {@code data/raporlar/hafta-NN.md}): tek kişilik yerel modun mevcut verisi taşınmadan aynen kullanılır.</li>
- *   <li>diğer kimlikler → {@code <kök>/kullanicilar/<sha256-hex(kimlik)>/}. Kimlik (e-posta) dosya sistemine
+ *   <li>diğer kimlikler → {@code <kök>/kullanicilar/<sha256-hex(kimlik)>/}. Kimlik dosya sistemine
  *       düz YAZILMAZ: özet sabit 64 hex karakterdir → yol gezintisi ({@code ../}), ayırıcı, büyük/küçük harf
- *       veya ayrılmış ad ({@code kitaplar}) sorunu yapısal olarak imkânsız; e-posta dizin listesinde görünmez.</li>
+ *       veya ayrılmış ad ({@code kitaplar}) sorunu yapısal olarak imkânsız; kimlik dizin listesinde görünmez.</li>
  * </ul>
  * {@code kullanicilar/} yerel kökün ALTINDA olduğundan yerel sıfırlama yalnız {@code OGRENCI.md} ve
  * {@code hafta-*} adlarını hedefler — bu dizine dokunmaz.

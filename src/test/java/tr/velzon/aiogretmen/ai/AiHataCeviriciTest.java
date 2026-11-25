@@ -37,7 +37,7 @@ class AiHataCeviriciTest {
     KullanimRepo kullanimRepo = mock(KullanimRepo.class);
     AppProperties props = new AppProperties(null, null, null, null, null,
             new AppProperties.Ai(new AppProperties.Model("guclu-m", "hizli-m", null)), null);
-    SpringAiOgretmenClient client = new SpringAiOgretmenClient(chatModel, props, kullanimRepo, () -> "a@pera.software");
+    SpringAiOgretmenClient client = new SpringAiOgretmenClient(chatModel, props, kullanimRepo, () -> "a@ornek.com");
 
     private AiSaglayiciException cagirVeYakala(RuntimeException saglayiciHatasi) {
         when(chatModel.call(any(Prompt.class))).thenThrow(saglayiciHatasi);
@@ -94,5 +94,46 @@ class AiHataCeviriciTest {
                 OgretmenAiClient.AiIstek.tekSeferlik(OgretmenAiClient.Islem.SOHBET,
                         OgretmenAiClient.ModelTuru.GUCLU, "s", "m", 10)));
         assertThat(e).hasMessage("başka");
+    }
+
+    /** Faz 10: ziyaretçinin kendi anahtarı — mesaj "site sorumlusuna" değil, ziyaretçinin anahtarına göre. */
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+            "401| ANAHTAR_GECERSIZ| OpenRouter anahtarın geçersiz ya da iptal edilmiş.",
+            "403| ANAHTAR_GECERSIZ| OpenRouter anahtarın geçersiz ya da iptal edilmiş.",
+            "402| KREDI_BITTI| OpenRouter kredin bitti ya da anahtarının harcama limitine ulaştın.",
+            "429| YOGUN| OpenRouter çok fazla istek dedi, biraz bekleyip tekrar dene.",
+            "400| ISTEK_REDDEDILDI| AI isteği kabul etmedi — tekrar dene; sürerse site sorumlusuna haber ver.",
+    })
+    void ziyaretciAnahtarindaMesajlarZiyaretciye(int kod, Neden beklenen, String mesaj) {
+        ChatModelKaynagi ziyaretciKaynagi = new ChatModelKaynagi() {
+            @Override public boolean hazir() { return true; }
+            @Override public ChatModel model() { return chatModel; }
+            @Override public boolean ziyaretciAnahtari() { return true; }
+        };
+        var ziyaretciClient = new SpringAiOgretmenClient(ziyaretciKaynagi, props, kullanimRepo, () -> "z-x");
+        when(chatModel.call(any(Prompt.class))).thenThrow(new NonTransientAiException(kod + " - " + HAM_GOVDE));
+
+        AiSaglayiciException e = catchThrowableOfType(AiSaglayiciException.class, () -> ziyaretciClient.cagir(
+                OgretmenAiClient.AiIstek.tekSeferlik(OgretmenAiClient.Islem.SOHBET,
+                        OgretmenAiClient.ModelTuru.GUCLU, "s", "m", 10)));
+
+        assertThat(e.neden()).isEqualTo(beklenen);
+        assertThat(e.ziyaretciAnahtari()).isTrue();
+        assertThat(e.getMessage()).isEqualTo(mesaj).doesNotContain("sk-or");
+        // ham sağlayıcı gövdesi (anahtarı yansıtabilir) istisna zincirinde TAŞINMAZ — yalnız HTTP kodu kalır
+        for (Throwable t = e; t != null; t = t.getCause() == t ? null : t.getCause()) {
+            assertThat(String.valueOf(t.getMessage())).as(t.getClass().getName()).doesNotContain("sk-or-");
+            assertThat(t.toString()).doesNotContain("sk-or-");
+        }
+    }
+
+    /** Yerel mod (sunucu anahtarı) değişmedi: teşhis için asıl sağlayıcı istisnası cause olarak kalır. */
+    @Test
+    void yerelModdaAsilHataCauseOlarakKalir() {
+        NonTransientAiException asil = new NonTransientAiException("401 - " + HAM_GOVDE);
+        AiSaglayiciException e = cagirVeYakala(asil);
+        assertThat(e.ziyaretciAnahtari()).isFalse();
+        assertThat(e.getCause()).isSameAs(asil);
     }
 }

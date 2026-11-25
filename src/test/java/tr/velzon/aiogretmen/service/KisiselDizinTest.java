@@ -20,7 +20,7 @@ class KisiselDizinTest {
 
     @Test
     void epostaKullanicisiKullanicilarAltindaOzetDizinineGider() {
-        Path d = KisiselDizin.coz(kok, "ali@pera.software");
+        Path d = KisiselDizin.coz(kok, "ali@ornek.com");
         assertThat(d.getParent()).isEqualTo(kok.resolve("kullanicilar"));
         assertThat(d.getFileName().toString()).matches("[0-9a-f]{64}");
         // e-posta dosya sistemine düz yazılmaz (KVKK minimizasyonu + yol güvenliği)
@@ -29,9 +29,9 @@ class KisiselDizinTest {
 
     @Test
     void ayniKimlikHepAyniDizinFarkliKimlikFarkliDizin() {
-        assertThat(KisiselDizin.coz(kok, "ali@pera.software"))
-                .isEqualTo(KisiselDizin.coz(kok, "ali@pera.software"))
-                .isNotEqualTo(KisiselDizin.coz(kok, "veli@pera.software"));
+        assertThat(KisiselDizin.coz(kok, "ali@ornek.com"))
+                .isEqualTo(KisiselDizin.coz(kok, "ali@ornek.com"))
+                .isNotEqualTo(KisiselDizin.coz(kok, "veli@ornek.com"));
     }
 
     @Test

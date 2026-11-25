@@ -36,14 +36,14 @@ class SpringAiOgretmenClientTest {
         when(chatModel.call(any(Prompt.class))).thenReturn(new ChatResponse(
                 List.of(new Generation(new AssistantMessage("cevap"))),
                 ChatResponseMetadata.builder().usage(new DefaultUsage(10, 5)).build()));
-        var client = new SpringAiOgretmenClient(chatModel, props, kullanimRepo, () -> "a@pera.software");
+        var client = new SpringAiOgretmenClient(chatModel, props, kullanimRepo, () -> "a@ornek.com");
 
         client.cagir(OgretmenAiClient.AiIstek.tekSeferlik(OgretmenAiClient.Islem.SOHBET,
                 OgretmenAiClient.ModelTuru.HIZLI, "sistem", "mesaj", 100));
 
         ArgumentCaptor<AiKullanim> kayit = ArgumentCaptor.forClass(AiKullanim.class);
         verify(kullanimRepo).save(kayit.capture());
-        assertThat(kayit.getValue().kullaniciId()).isEqualTo("a@pera.software");
+        assertThat(kayit.getValue().kullaniciId()).isEqualTo("a@ornek.com");
         assertThat(kayit.getValue().inputTokens()).isEqualTo(10);
         assertThat(kayit.getValue().model()).isEqualTo("hizli-m");
     }

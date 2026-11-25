@@ -1,36 +1,29 @@
 package tr.velzon.aiogretmen.web;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.net.URI;
-import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Türkçe hata sayfaları (static/error/*.html) site profilinde, Spring Security zinciriyle GERÇEK
- * Tomcat'te: oturumlu kullanıcı olmayan sayfada 404 sayfası, bayat/eksik CSRF token'lı form
- * gönderiminde 403 sayfası görür (Whitelabel değil); /api/** JSON kalır.
+ * Tomcat'te: ziyaretçi olmayan sayfada 404 sayfası, bayat/eksik CSRF token'lı form gönderiminde 403
+ * sayfası görür (Whitelabel değil); /api/** JSON kalır. Girişsiz site (ADR-0017): kimlik
+ * {@code aio_ziyaretci} çereziyle.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
         "spring.datasource.url=jdbc:h2:mem:sitehatasayfa;DB_CLOSE_DELAY=-1",
         "spring.ai.openai.api-key=",
         "app.hafiza-dir=target/test-hafiza-site",
         "app.rapor-dir=target/test-raporlar-site",
-        "app.site.eposta-zorunlu=false",
-        "app.site.kayit=eposta",
-        "app.site.guvenli-cerez=false",
-        "server.servlet.session.cookie.secure=false"
+        "app.site.guvenli-cerez=false"
 })
 @ActiveProfiles("site")
 class SiteHataSayfalariTest {
@@ -39,12 +32,6 @@ class SiteHataSayfalariTest {
 
     @LocalServerPort
     int port;
-
-    @Autowired
-    JdbcTemplate jdbc;
-
-    @Autowired
-    PasswordEncoder sifreKodlayici;
 
     private final HttpClient istemci = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NEVER).build();
 
@@ -58,26 +45,17 @@ class SiteHataSayfalariTest {
                 .orElseThrow(() -> new AssertionError(ad + " çerezi yok"));
     }
 
-    /** Giriş yapar; oturum çerezi başlığını ("JSESSIONID=...; XSRF-TOKEN=...") döner. */
-    private String girisYap(String email) throws Exception {
-        jdbc.update("INSERT INTO kullanici (email, sifre_hash, dogrulandi) VALUES (?, ?, TRUE)",
-                email, sifreKodlayici.encode("cok-gizli-sifre-123"));
-        HttpResponse<String> sayfa = istemci.send(HttpRequest.newBuilder(uri("/giris.html")).build(),
+    /** Ana sayfayı açar (tarayıcı gibi); ziyaretçi + CSRF çerez başlığını ("aio_ziyaretci=...; XSRF-TOKEN=...") döner. */
+    private String ziyaretciOl() throws Exception {
+        HttpResponse<String> sayfa = istemci.send(HttpRequest.newBuilder(uri("/")).build(),
                 HttpResponse.BodyHandlers.ofString());
-        String token = cerezDegeri(sayfa, "XSRF-TOKEN");
-        String govde = "email=" + URLEncoder.encode(email, StandardCharsets.UTF_8) + "&sifre=cok-gizli-sifre-123&_csrf="
-                + URLEncoder.encode(token, StandardCharsets.UTF_8);
-        HttpResponse<String> giris = istemci.send(HttpRequest.newBuilder(uri("/api/kimlik/giris"))
-                .header("Content-Type", "application/x-www-form-urlencoded")
-                .header("Cookie", "XSRF-TOKEN=" + token)
-                .POST(HttpRequest.BodyPublishers.ofString(govde)).build(), HttpResponse.BodyHandlers.ofString());
-        assertThat(giris.statusCode()).isEqualTo(302);
-        return "JSESSIONID=" + cerezDegeri(giris, "JSESSIONID") + "; XSRF-TOKEN=" + token;
+        assertThat(sayfa.statusCode()).isEqualTo(200);
+        return "aio_ziyaretci=" + cerezDegeri(sayfa, "aio_ziyaretci") + "; XSRF-TOKEN=" + cerezDegeri(sayfa, "XSRF-TOKEN");
     }
 
     @Test
-    void oturumluKullaniciOlmayanSayfadaTurkce404Gorur() throws Exception {
-        String cerez = girisYap("hata404@pera.software");
+    void ziyaretciOlmayanSayfadaTurkce404Gorur() throws Exception {
+        String cerez = ziyaretciOl();
 
         HttpResponse<String> yanit = istemci.send(HttpRequest.newBuilder(uri("/boyle/bir-sayfa-yok"))
                 .header("Accept", TARAYICI_KABUL).header("Cookie", cerez).build(), HttpResponse.BodyHandlers.ofString());
@@ -85,15 +63,15 @@ class SiteHataSayfalariTest {
         assertThat(yanit.statusCode()).isEqualTo(404);
         assertThat(yanit.body()).contains("Sayfa bulunamadı").contains("href=\"/\"").doesNotContain("Whitelabel");
 
-        // sayfanın stil dosyası (mutlak yol) aynı oturumla yüklenebilir
+        // sayfanın stil dosyası (mutlak yol) yüklenebilir
         HttpResponse<String> stil = istemci.send(HttpRequest.newBuilder(uri("/style.css")).build(),
                 HttpResponse.BodyHandlers.ofString());
         assertThat(stil.statusCode()).isEqualTo(200);
     }
 
     @Test
-    void oturumluApiIstegiJson404Alir() throws Exception {
-        String cerez = girisYap("hataapi@pera.software");
+    void apiIstegiJson404Alir() throws Exception {
+        String cerez = ziyaretciOl();
 
         HttpResponse<String> yanit = istemci.send(HttpRequest.newBuilder(uri("/api/boyle-bir-uc-yok"))
                 .header("Cookie", cerez).build(), HttpResponse.BodyHandlers.ofString());
@@ -105,22 +83,25 @@ class SiteHataSayfalariTest {
 
     @Test
     void bayatCsrfTokenliFormTurkce403SayfasiGorur() throws Exception {
-        // giriş formu eski sekmede kalmış: çerezdeki token ile formdaki uyuşmuyor → Spring Security 403
-        HttpResponse<String> yanit = istemci.send(HttpRequest.newBuilder(uri("/api/kimlik/giris"))
+        // form eski sekmede kalmış: çerezdeki token ile formdaki uyuşmuyor → Spring Security 403
+        HttpResponse<String> yanit = istemci.send(HttpRequest.newBuilder(uri("/api/sifirla"))
                 .header("Accept", TARAYICI_KABUL)
                 .header("Content-Type", "application/x-www-form-urlencoded")
                 .header("Cookie", "XSRF-TOKEN=yeni-token")
-                .POST(HttpRequest.BodyPublishers.ofString("email=a%40pera.software&sifre=x&_csrf=eski-token")).build(),
+                .POST(HttpRequest.BodyPublishers.ofString("_csrf=eski-token")).build(),
                 HttpResponse.BodyHandlers.ofString());
 
         assertThat(yanit.statusCode()).isEqualTo(403);
         assertThat(yanit.body()).contains("Bu işlem için yetkin yok").contains("yenile").contains("Ana sayfaya dön");
     }
 
-    /** Sitede anahtarsız AI ucu: geliştirici yönergesi (ortam değişkeni) yerine öğrenciye yönelik metin. */
+    /**
+     * Sitede anahtarsız sohbet (Faz 10, ADR-0017): geliştirici yönergesi (ortam değişkeni) yerine öğrenciye
+     * yönelik "kendi anahtarını ekle" metni, 400.
+     */
     @Test
     void sitedeAiKapaliMesajiOgrenciDilinde() throws Exception {
-        String cerez = girisYap("aikapali@pera.software");
+        String cerez = ziyaretciOl();
         String token = cerez.substring(cerez.indexOf("XSRF-TOKEN=") + "XSRF-TOKEN=".length());
 
         HttpResponse<String> yanit = istemci.send(HttpRequest.newBuilder(uri("/api/sohbet"))
@@ -128,7 +109,7 @@ class SiteHataSayfalariTest {
                 .POST(HttpRequest.BodyPublishers.ofString("{\"hafta\":1,\"mesaj\":\"selam\"}")).build(),
                 HttpResponse.BodyHandlers.ofString());
 
-        assertThat(yanit.statusCode()).isEqualTo(503);
-        assertThat(yanit.body()).contains("AI öğretmen henüz açılmadı").doesNotContain("OPENROUTER_API_KEY");
+        assertThat(yanit.statusCode()).isEqualTo(400);
+        assertThat(yanit.body()).contains("kendi OpenRouter anahtarını eklemelisin").doesNotContain("OPENROUTER_API_KEY");
     }
 }

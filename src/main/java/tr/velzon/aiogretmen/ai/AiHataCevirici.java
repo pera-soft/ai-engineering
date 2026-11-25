@@ -37,10 +37,12 @@ final class AiHataCevirici {
     }
 
     /**
+     * @param ziyaretciAnahtari çağrı ziyaretçinin kendi anahtarıyla mı (site, Faz 10)? Mesajlar ona göre;
+     *                          yerel (sunucu anahtarı) mesajları değişmez
      * @return tanınan bir sağlayıcı hatasıysa {@link AiSaglayiciException}; değilse {@code hata}nın kendisi
      */
-    static RuntimeException cevir(RuntimeException hata, String islem) {
-        AiSaglayiciException cevrilen = bul(hata);
+    static RuntimeException cevir(RuntimeException hata, String islem, boolean ziyaretciAnahtari) {
+        AiSaglayiciException cevrilen = bul(hata, ziyaretciAnahtari);
         if (cevrilen == null) {
             return hata;
         }
@@ -50,7 +52,7 @@ final class AiHataCevirici {
         return cevrilen;
     }
 
-    private static AiSaglayiciException bul(Throwable hata) {
+    private static AiSaglayiciException bul(Throwable hata, boolean z) {
         // sarmalanmış olabilir (ör. RuntimeException(cause)) — zincirde ilk tanıdığımızı ara
         for (Throwable t = hata; t != null; t = t.getCause() == t ? null : t.getCause()) {
             if (t instanceof AiSaglayiciException zaten) {
@@ -58,18 +60,18 @@ final class AiHataCevirici {
             }
             if (t instanceof NonTransientAiException) {
                 Integer kod = kodOku(t.getMessage());
-                return new AiSaglayiciException(kod == null ? Neden.ISTEK_REDDEDILDI : kodaGore(kod), kod, hata);
+                return new AiSaglayiciException(kod == null ? Neden.ISTEK_REDDEDILDI : kodaGore(kod), kod, hata, z);
             }
             if (t instanceof TransientAiException) {
                 Integer kod = kodOku(t.getMessage());
-                return new AiSaglayiciException(kod == null ? Neden.YANIT_YOK : kodaGore(kod), kod, hata);
+                return new AiSaglayiciException(kod == null ? Neden.YANIT_YOK : kodaGore(kod), kod, hata, z);
             }
             if (t instanceof RestClientResponseException r) {
                 int kod = r.getStatusCode().value();
-                return new AiSaglayiciException(kodaGore(kod), kod, hata);
+                return new AiSaglayiciException(kodaGore(kod), kod, hata, z);
             }
             if (t instanceof ResourceAccessException) {
-                return new AiSaglayiciException(Neden.YANIT_YOK, null, hata);
+                return new AiSaglayiciException(Neden.YANIT_YOK, null, hata, z);
             }
         }
         return null;

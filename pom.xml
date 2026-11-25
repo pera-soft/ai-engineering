@@ -93,12 +93,6 @@
             <artifactId>spring-boot-starter-data-jdbc</artifactId>
         </dependency>
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-mail</artifactId>
-            <!-- Faz 9c: site profilinde doğrulama + şifre sıfırlama e-postaları (SMTP, ADR-0013).
-                 Sürüm Spring Boot parent'tan; spring.mail.host yoksa JavaMailSender kurulmaz. -->
-        </dependency>
-        <dependency>
             <groupId>com.h2database</groupId>
             <artifactId>h2</artifactId>
             <scope>runtime</scope>

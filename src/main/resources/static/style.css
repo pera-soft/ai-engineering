@@ -550,38 +550,62 @@ details.mulakat-soru > .q { padding: 14px 16px 8px; margin-bottom: 0; }
 .karsilama-kart .btn { margin-top: 10px; align-self: flex-start; }
 @media (max-width: 640px) { .karsilama-kartlar { grid-template-columns: 1fr; } }
 
-/* ---------- Faz 9a: site profili kimlik sayfaları (giriş/kayıt/doğrulama — ADR-0012) ---------- */
+/* ---------- Hata sayfaları (static/error/*.html) — ortalanmış tek kart ---------- */
 .kimlik-sayfa { display: flex; align-items: center; justify-content: center; padding: 48px 16px; min-height: 100vh; }
 .kimlik-kart { width: 100%; max-width: 420px; background: var(--ink-2); border: 1px solid var(--line);
   border-radius: var(--radius-lg); box-shadow: var(--shadow-md); padding: 32px 28px; }
 .kimlik-kart .eyebrow { font-size: 12px; font-weight: 600; letter-spacing: .05em; color: var(--cyan); text-transform: uppercase; }
 .kimlik-kart h1 { font-size: 22px; font-weight: 700; margin: 4px 0 18px; }
 .kimlik-kart p { font-size: 14px; color: var(--muted); margin-bottom: 14px; }
-.kimlik-form { display: flex; flex-direction: column; gap: 14px; }
-.kimlik-form label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; }
-.kimlik-form input { font: inherit; font-weight: 400; font-size: 14px; color: var(--paper); background: var(--ink-2);
-  border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; }
-.kimlik-form input:focus { outline: none; border-color: var(--primary); box-shadow: var(--focus); }
-.kimlik-form .ipucu { font-size: 12px; font-weight: 400; color: var(--muted); }
-/* Göz düğmeli alan (ekip kodu): düğme input'un sağ içinde; input sağda düğmeye yer bırakır */
-.goz-kutusu { position: relative; display: flex; }
-.goz-kutusu input { flex: 1; min-width: 0; padding-right: 42px; }
-.goz-btn { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); display: flex; align-items: center;
-  justify-content: center; width: 34px; height: 34px; border: 0; border-radius: var(--radius-sm); background: transparent;
-  color: var(--muted); cursor: pointer; }
-.goz-btn:hover { color: var(--paper); }
-.goz-btn:focus-visible { outline: none; box-shadow: var(--focus); color: var(--paper); }
-.goz-btn [hidden] { display: none; }
-.kimlik-form .btn { margin-top: 4px; }
-.kimlik-mesaj { font-size: 13.5px; border-radius: var(--radius-sm); padding: 10px 12px; margin-bottom: 14px; }
-.kimlik-mesaj.hata { color: var(--red); background: rgba(190,68,51,.07); border: 1px solid rgba(190,68,51,.3); }
-.kimlik-mesaj.bilgi { color: var(--green); background: rgba(37,128,76,.07); border: 1px solid rgba(37,128,76,.3); }
-.kimlik-alt { font-size: 13px; color: var(--muted); margin-top: 18px; text-align: center; }
-.kimlik-alt a { color: var(--cyan); }
 /* Hata sayfaları (static/error/*.html): bağlantı görünümlü tam genişlik düğme */
 .btn-blok { display: block; text-align: center; text-decoration: none; margin-top: 6px; }
-.kimlik-kvkk { font-size: 11.5px; color: var(--muted); border-top: 1px solid var(--line-soft); padding-top: 12px; margin-top: 18px; line-height: 1.5; }
-/* Ana uygulama üst barı: oturumdaki kullanıcı + Çıkış (yalnız site modunda görünür) */
-.oturum { display: flex; align-items: center; gap: 10px; }
-.oturum .eposta { font-family: var(--mono); font-size: 12px; color: var(--muted); }
-.oturum .btn-ikincil { margin-left: 0; }
+
+/* ---------- Faz 10 (ADR-0017): isteğe bağlı anahtar kartı + kendin işaretle + ilerleme kodu ---------- */
+.anahtar-kart { border: 1px solid var(--line); border-radius: var(--radius); background: var(--ink-2);
+  padding: 16px; display: flex; flex-direction: column; gap: 12px; box-shadow: var(--shadow-sm); }
+.anahtar-baslik { font-size: 15px; font-weight: 700; line-height: 1.3; }
+.anahtar-ozet { font-size: 13px; color: var(--muted); line-height: 1.5; }
+.anahtar-hata { font-size: 13px; line-height: 1.5; color: var(--red); background: rgba(190,68,51,.07);
+  border: 1px solid rgba(190,68,51,.3); border-radius: var(--radius-sm); padding: 8px 12px; }
+.anahtar-form { display: flex; flex-direction: column; gap: 8px; }
+.anahtar-etiket { font-size: 12px; font-weight: 600; color: var(--paper); }
+.anahtar-girdi, .kod-deger { font: inherit; font-size: 14px; color: var(--paper); background: var(--ink-2);
+  border: 1px solid var(--line); border-radius: var(--radius); padding: 8px 12px; min-height: 40px; width: 100%; min-width: 0; }
+.anahtar-girdi:focus, .kod-deger:focus { outline: none; border-color: var(--primary); box-shadow: var(--focus); }
+.anahtar-hatirla { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--paper); cursor: pointer; }
+.anahtar-hatirla input { accent-color: var(--primary); width: 16px; height: 16px; }
+.anahtar-kaydet { width: 100%; }
+.anahtar-yardim { font-size: 13px; border-top: 1px solid var(--line-soft); padding-top: 8px; }
+.anahtar-yardim summary { cursor: pointer; color: var(--cyan); font-weight: 600; }
+.anahtar-yardim ol { margin: 8px 0 0 20px; display: flex; flex-direction: column; gap: 4px; line-height: 1.5; }
+.anahtar-not { font-size: 12px; color: var(--muted); line-height: 1.5; background: var(--ink);
+  border-radius: var(--radius-sm); padding: 8px 12px; }
+.anahtar-kaldir { font-family: var(--sans); font-size: 12px; color: var(--muted); background: transparent; border: 0;
+  border-radius: var(--radius-sm); padding: 4px 8px; cursor: pointer; white-space: nowrap; }
+.anahtar-kaldir:hover { color: var(--red); background: rgba(190,68,51,.07); }
+.anahtar-kaldir:focus-visible { outline: none; box-shadow: var(--focus); }
+
+/* "Okudum ✓ / Yaptım ✓ / Tartıştım ✓": görevi kendin işaretleme düğmesi (tamamlanma rengi) */
+.task-aksiyon.task-isaretle { background: var(--ink-2); color: var(--green); border-color: var(--green); }
+.task-aksiyon.task-isaretle:hover { background: rgba(37,128,76,.08); opacity: 1; }
+
+/* İlerleme kodu penceresi (kılavuz penceresiyle aynı dil) */
+.kod-btn { white-space: nowrap; }
+.kod-btn:hover { color: var(--cyan); border-color: var(--cyan); }
+.kod-dialog { margin: auto; border: none; border-radius: var(--radius-lg); box-shadow: 0 20px 60px rgba(15,30,60,.25);
+  max-width: 520px; width: calc(100% - 32px); padding: 0; color: var(--paper); }
+.kod-dialog::backdrop { background: rgba(15,30,60,.45); }
+.kod-icerik { padding: 24px; display: flex; flex-direction: column; gap: 12px; max-height: 85vh; overflow-y: auto; }
+.kod-icerik section { display: flex; flex-direction: column; gap: 12px; }
+.kod-icerik section[hidden] { display: none; }
+.kod-icerik h2 { font-size: 18px; font-weight: 700; }
+.kod-icerik p { font-size: 13.5px; line-height: 1.55; color: var(--muted); }
+.kod-satir { display: flex; gap: 8px; align-items: stretch; }
+.kod-satir .btn { white-space: nowrap; }
+.kod-mesaj { font-size: 13px; color: var(--green); }
+.kod-mesaj.hata { color: var(--red); }
+.kod-icerik .kod-uyari { color: #8a5a00; background: rgba(168,99,0,.07); border: 1px solid rgba(168,99,0,.25);
+  border-radius: var(--radius-sm); padding: 8px 12px; }
+.kod-icerik .kod-not { font-size: 12px; }
+.kod-kapat { margin-left: 0; align-self: flex-end; }
+@media (max-width: 520px) { .kod-satir { flex-direction: column; } }

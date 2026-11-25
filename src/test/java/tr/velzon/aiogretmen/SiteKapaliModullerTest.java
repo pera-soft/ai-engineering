@@ -5,17 +5,17 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationContext;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import tr.velzon.aiogretmen.ai.AnlamArama;
+import tr.velzon.aiogretmen.config.ZiyaretciCerezi;
 import tr.velzon.aiogretmen.repo.MulakatRepo;
 import tr.velzon.aiogretmen.service.MulakatService;
 import tr.velzon.aiogretmen.web.KitapController;
 import tr.velzon.aiogretmen.web.MulakatController;
 import tr.velzon.aiogretmen.web.OzellikController;
-
-import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -29,9 +29,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
         "spring.ai.openai.api-key=sahte-anahtar-ag-cagrisi-yok", // anahtar VARKEN bile vektör deposu kapalı
         "app.mulakat.etkin=true",   // birisi APP_MULAKAT_ETKIN=true verse bile
         "app.hafiza-dir=target/test-hafiza-sitekapali",
-        "app.rapor-dir=target/test-raporlar-sitekapali",
-        "app.site.eposta-zorunlu=false",  // SMTP yok → log gönderici (ADR-0013)
-        "app.site.kayit=eposta"
+        "app.rapor-dir=target/test-raporlar-sitekapali"
 })
 @ActiveProfiles("site")
 class SiteKapaliModullerTest {
@@ -50,12 +48,13 @@ class SiteKapaliModullerTest {
         assertThat(ctx.getBeansOfType(MulakatController.class)).isEmpty();
         assertThat(ctx.getBeansOfType(MulakatService.class)).isEmpty();
         assertThat(ctx.getBeansOfType(MulakatRepo.class)).isEmpty();
+        MockHttpServletRequest istek = new MockHttpServletRequest();
+        istek.setAttribute(ZiyaretciCerezi.ISTEK_OZNITELIGI, ZiyaretciCerezi.yeniKimlik());
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(istek));
         try {
-            SecurityContextHolder.getContext().setAuthentication(
-                    UsernamePasswordAuthenticationToken.authenticated("x@pera.software", null, List.of()));
             assertThat(ozellikController.ozellikler()).containsEntry("mulakat", false);
         } finally {
-            SecurityContextHolder.clearContext();
+            RequestContextHolder.resetRequestAttributes();
         }
     }
 
@@ -73,7 +72,6 @@ class SiteKapaliModullerTest {
                 .run("--server.port=0",
                         "--spring.datasource.url=jdbc:h2:mem:sitemcp;DB_CLOSE_DELAY=-1",
                         "--spring.ai.openai.api-key=",
-                        "--app.site.eposta-zorunlu=false", "--app.site.kayit=eposta",
                         "--spring.ai.mcp.server.enabled=true").close())
                 .hasStackTraceContaining("MCP");
     }

@@ -19,7 +19,7 @@ import org.springframework.security.web.SecurityFilterChain;
  * POST'ları 403'lerdi. httpBasic/formLogin de kapalı — permitAll'da tetiklenmez, temizlik için kapatıldı.
  *
  * <p>Auth SADECE {@code mcp-http} profilinde {@code /mcp} için ({@link McpHttpGuvenlikYapilandirma}) ve
- * çok kullanıcılı {@code site} profilinde form/oturum login ile ({@link SiteGuvenlikYapilandirma}, ADR-0012).
+ * girişsiz {@code site} profilinde ziyaretçi çerezi + CSRF ile ({@link SiteGuvenlikYapilandirma}, ADR-0017).
  */
 @Configuration
 @Profile("!mcp-http & !site")

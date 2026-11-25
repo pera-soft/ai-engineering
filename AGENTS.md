@@ -5,17 +5,15 @@
 - Derle+test: `./mvnw verify`
 - Çalıştır: `OPENROUTER_API_KEY=... ./mvnw spring-boot:run`  (http://127.0.0.1:8090; sağlayıcı: OpenRouter, ADR-0004)
   - Mülakat modülü varsayılan KAPALI; açmak için başına `APP_MULAKAT_ETKIN=true` ekle (ADR-0011)
-  - Çok kullanıcılı site: `--spring.profiles.active=site` (ADR-0012). Kayıt ekip koduyla (ADR-0015, varsayılan):
-    `APP_SITE_EKIP_KODU` ŞART (≥12 karakter, `openssl rand -base64 18`), yoksa açılmaz; e-posta/SMTP YOK.
-    E-postalı kayıt yalnız `APP_SITE_KAYIT=eposta` ile — o modda SMTP ŞART (ADR-0013): `SPRING_MAIL_HOST`,
-    `SPRING_MAIL_PORT`, `SPRING_MAIL_USERNAME`, `SPRING_MAIL_PASSWORD` (+ `APP_SITE_GONDERICI`); yerel deneme
-    `APP_SITE_EPOSTA_ZORUNLU=false` (bağlantılar loga). Yerel http denemesi: `APP_SITE_GUVENLI_CEREZ=false`
-  - Şifre sıfırlama bağlantısı (işletmen, ekip kodu modu): `bash tools/sifre-baglantisi.sh <email> [site.env]`
-    (psql + `SPRING_DATASOURCE_*` + `APP_SITE_TEMEL_URL`; uygulamayla aynı sunucuda)
+  - Girişsiz çok ziyaretçili site (ADR-0017): `--spring.profiles.active=site` + `SPRING_DATASOURCE_URL`
+    (yerelde: `SPRING_DATASOURCE_URL=... ./mvnw spring-boot:run -Dspring-boot.run.profiles=site`). Giriş/kayıt/
+    e-posta YOK; ziyaretçi `aio_ziyaretci` çereziyle tanınır. Sitede `OPENROUTER_API_KEY` GEREKMEZ (verilse de
+    kullanılmaz) — sohbeti ziyaretçi kendi anahtarıyla yapar; sohbet dışı AI uçları sitede kapalı.
+    Yerel http denemesi: `APP_SITE_GUVENLI_CEREZ=false`
   - Site veritabanı (ADR-0014): `SPRING_DATASOURCE_URL` (+ `_USERNAME`, `_PASSWORD`) ŞART — canlıda
     PostgreSQL; yoksa açılmaz. Yerel deneme: `SPRING_DATASOURCE_URL='jdbc:h2:file:./data/site-deneme'`
   - Site dağıtımı/işletmesi: `docs/kurulum-site.md` (runbook) + `deploy/` (systemd, nginx, env, PostgreSQL
-    şablonları — gerçek host/IP/sır YOK); nginx arkasında `APP_SITE_IZINLI_ORIGINLER`, `APP_SITE_TEMEL_URL`
+    şablonları — gerçek host/IP/sır YOK); nginx arkasında `APP_SITE_IZINLI_ORIGINLER`
 - PostgreSQL uyumluluk testi (opt-in, atılabilir DB ile): `PG_TEST_URL=jdbc:postgresql://localhost:5432/<db>
   PG_TEST_USERNAME=... ./mvnw -Dtest=SitePostgresEntegrasyonTest test` (değişken yoksa atlanır)
 - Sadece mimari testleri: `./mvnw -Dtest=MimariTestleri test`

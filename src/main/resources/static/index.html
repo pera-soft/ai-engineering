@@ -27,8 +27,13 @@
 <dialog id="kilavuz">
   <div class="kilavuz-icerik">
     <h2>📖 Bu sayfa nasıl kullanılır?</h2>
-    <p class="kilavuz-ozet">Kısa özet: <strong>Dersi oku → Görevi AI öğretmenle üstünden geç
+    <!-- Moda özgü metin (Faz 10, ADR-0017): data-yalniz-yerel sitede gizlenir, data-yalniz-site yalnız sitede
+         açılır (app.js moduMetinleriUygula). -->
+    <p class="kilavuz-ozet" data-yalniz-yerel>Kısa özet: <strong>Dersi oku → Görevi AI öğretmenle üstünden geç
       (öğretmen “geçtin” deyince sistem işaretler) → Takılınca Sohbet'te sor → Hafta bitince quiz + rapor</strong></p>
+    <p class="kilavuz-ozet" data-yalniz-site hidden>Kısa özet: <strong>Dersi oku → Görevi yap ve ✓ düğmesiyle kendin
+      işaretle → Hafta bitince quiz → sonraki hafta açılır.</strong> AI öğretmen isteğe bağlı: kendi OpenRouter
+      anahtarınla sohbet edebilirsin.</p>
 
     <h3>Ekranda ne ne demek?</h3>
     <p><strong>Hafta başlığı ve altındaki cümle</strong> → o haftanın hedefi: hafta bitince
@@ -49,37 +54,91 @@
       Gün kartına tıkla — ders metni açılır. Yazıların tamamı Türkçe.</p>
 
     <h3>2 · Görevleri sırayla yap</h3>
-    <p><strong>📖 Oku görevi:</strong> “Oku” butonuna bas, yazı sayfada açılır. Okuyunca
+    <p data-yalniz-yerel><strong>📖 Oku görevi:</strong> “Oku” butonuna bas, yazı sayfada açılır. Okuyunca
       <em>“✓ Okudum”</em>a bas — sonra AI öğretmen kısaca üstünden geçmen için bir soru sorar;
       en kritik 1-2 noktayı kendi cümlelerinle yazınca öğretmen görevi geçirir.</p>
-    <p><strong>✍️ Yaz görevi:</strong> “Yaz” butonuna bas, ferah bir çalışma alanı açılır.
+    <p data-yalniz-yerel><strong>✍️ Yaz görevi:</strong> “Yaz” butonuna bas, ferah bir çalışma alanı açılır.
       Cevabını yaz, <em>“Cevabımı AI öğretmene değerlendirt”</em>e bas. Öğretmen 100 üzerinden
       puanlar; doğru noktalarını, eksiklerini ve sonraki adımını söyler — görev otomatik işaretlenir.
       Takılırsan aynı ekranda <em>🔍 Soruyu aç</em> ve <em>💡 Örnek cevap göster</em> var.</p>
-    <p>Not: Kutucukları <strong>sen doldurmuyorsun</strong>. Görevleri AI öğretmenle üstünden
+    <p data-yalniz-yerel>Not: Kutucukları <strong>sen doldurmuyorsun</strong>. Görevleri AI öğretmenle üstünden
       geçerek tamamlarsın (Okudum → kısa cevap · yazıyı değerlendirt · tartış); öğretmen “geçtin”
       deyince sistem işaretler ve sıradaki görev açılır. İlerleme sol menüye ve üst bara yansır.</p>
+    <p data-yalniz-site hidden><strong>📖 Oku görevi:</strong> “Oku” butonuna bas, yazı sayfada açılır. Okuyunca
+      <em>“Okudum ✓”</em>a bas — görev işaretlenir. (Sohbete anahtarını eklediysen öğretmen önce kısa bir soru
+      sorar; kendi cümlelerinle cevaplayınca görev geçer.)</p>
+    <p data-yalniz-site hidden><strong>✍️ Yaz görevi:</strong> Görevi kendi defterinde ya da bir dosyada yap;
+      bitirince <em>“Yaptım ✓”</em>a bas.</p>
+    <p data-yalniz-site hidden><strong>💬 Tartış görevi:</strong> Konuyu düşün; anahtarın varsa AI öğretmenle
+      sohbette tartış, yoksa <em>“Tartıştım ✓”</em> ile işaretle.</p>
+    <p data-yalniz-site hidden>Not: <strong>Kutucukları kendin de işaretleyebilirsin</strong> — bitirdiğin görevi
+      ✓ düğmesiyle işaretle, sıradaki görev açılır. İlerleme sol menüye ve üst bara yansır.</p>
 
     <h3>3 · Takıldığında sohbette sor</h3>
-    <p>Sağdaki <strong>AI Öğretmen</strong> paneline yaz. Öğretmen hazır cevap vermez;
+    <p data-yalniz-yerel>Sağdaki <strong>AI Öğretmen</strong> paneline yaz. Öğretmen hazır cevap vermez;
       sorularla seni cevaba yürütür. “Ben şunu yaptım / şunu anlamadım” demek de serbest —
       seni hatırlar, sonraki konuşmalarda buna göre davranır.</p>
-    <p><strong>“Gönder”in üstündeki görev barı</strong> → sohbette hep o an yapman gereken
+    <p data-yalniz-yerel><strong>“Gönder”in üstündeki görev barı</strong> → sohbette hep o an yapman gereken
       görevi ve <em>“→ göreve geç”</em> butonunu gösterir. Butona bas: oku için yazı açılır,
       yaz için çalışma alanı, tartış için sohbet — görevi hep AI öğretmenle üstünden geçerek
       tamamlarsın.</p>
+    <p data-yalniz-site hidden><strong>AI öğretmen isteğe bağlı, kendi anahtarınla:</strong> sağdaki panele kendi
+      OpenRouter anahtarını eklersen öğretmenle sohbet edebilirsin. Öğretmen hazır cevap vermez; sorularla seni
+      cevaba yürütür. Ücret senin OpenRouter hesabına yazılır; anahtarın yalnız bu tarayıcıda durur, sunucumuz
+      kaydetmez. Anahtar eklemezsen de program eksiksiz çalışır.</p>
+    <p data-yalniz-site hidden><strong>Görev barı</strong> → sağ panelde hep o an yapman gereken görevi gösterir;
+      butonla göreve geçer ya da bitirdiğin görevi işaretlersin.</p>
 
-    <h3>4 · Haftayı kapat: quiz + rapor</h3>
-    <p>Haftanın tüm günlerini bitirince haftalık quiz açılır — çöz (geçme eşiği %60).
+    <h3 data-yalniz-yerel>4 · Haftayı kapat: quiz + rapor</h3>
+    <h3 data-yalniz-site hidden>4 · Haftayı kapat: quiz</h3>
+    <p data-yalniz-yerel>Haftanın tüm günlerini bitirince haftalık quiz açılır — çöz (geçme eşiği %60).
       İstersen <em>“AI'dan yeni sorular”</em> ile taze sorular al. Sonra <strong>Haftalık Rapor</strong>
       düğmesiyle öğretmenden hafta özetini iste: neredesin, neyi tekrar etmelisin.
       Quiz'i %60+ geçince bir sonraki hafta açılır.</p>
+    <p data-yalniz-site hidden>Haftanın tüm günlerini bitirince haftalık quiz açılır — çöz (geçme eşiği %60).
+      Quiz'i %60+ geçince bir sonraki hafta açılır.</p>
+
+    <h3 data-yalniz-site hidden>5 · İlerlemen bu tarayıcıda</h3>
+    <p data-yalniz-site hidden>Giriş yok: ilerlemen bu tarayıcıda tutulur. Üstteki <strong>🔑 İlerleme kodum</strong>
+      ile kodunu al; başka bir tarayıcıda <strong>↩ Geri yükle</strong>'ye yapıştırınca kaldığın yerden devam
+      edersin. Kodu şifre gibi sakla.</p>
 
     <p class="kilavuz-ritim">💡 Önerilen ritim: her sabah e-postadan önce 20 dakika
       (Richards &amp; Ford'un “20 dakika kuralı”) — bir günü bitirmek zorunda değilsin,
       kaldığın yerden devam et.</p>
 
     <button class="btn" id="kilavuz-kapat">Anladım, başlayalım</button>
+  </div>
+</dialog>
+
+<!-- İlerleme kodu (yalnız site, ADR-0017): app.js ilerlemeKoduKur üst bar düğmelerini ekler ve bir bölümü açar. -->
+<dialog id="kod-dialog" class="kod-dialog" aria-labelledby="kod-baslik">
+  <div class="kod-icerik">
+    <section id="kod-bolum" hidden>
+      <h2 id="kod-baslik">🔑 İlerleme kodun</h2>
+      <p>Bu tarayıcıdaki ilerlemen (görevler, quizler, sohbet) bu koda bağlı. Başka bir tarayıcıda ya da cihazda
+        devam etmek için kodu kopyala, orada <strong>↩ Geri yükle</strong>'ye yapıştır.</p>
+      <div class="kod-satir">
+        <input id="kod-deger" class="kod-deger mono" type="text" readonly spellcheck="false" aria-label="İlerleme kodun">
+        <button class="btn" id="kod-kopyala" type="button">Kopyala</button>
+      </div>
+      <p class="kod-mesaj" id="kod-mesaj" role="status" hidden></p>
+      <p class="kod-uyari">⚠️ Bu kod şifre gibidir; kim bilirse ilerlemeni görür. Kimseyle paylaşma. Başka
+        tarayıcıda devam etmek için orada 'Geri yükle'ye yapıştır.</p>
+      <p class="kod-not">Kodun, ilk ilerlemeni kaydettikten sonra başka tarayıcıda işe yarar.</p>
+    </section>
+    <section id="geri-bolum" hidden>
+      <h2>↩ İlerlemeni geri yükle</h2>
+      <p>Başka bir tarayıcıda aldığın ilerleme kodunu yapıştır. Bu tarayıcı o ilerlemeye geçer.</p>
+      <form id="geri-form" class="kod-satir" novalidate>
+        <input id="geri-kod" class="kod-deger mono" type="text" autocomplete="off" spellcheck="false"
+               placeholder="İlerleme kodun" aria-label="İlerleme kodu">
+        <button class="btn" id="geri-yukle-btn" type="submit">Geri yükle</button>
+      </form>
+      <p class="kod-mesaj" id="geri-mesaj" role="alert" hidden></p>
+      <p class="kod-uyari">⚠️ Bu tarayıcıdaki ilerleme bu kodla değişecek — buradaki mevcut ilerleme birleştirilmez.</p>
+    </section>
+    <button class="btn btn-ikincil kod-kapat" type="button" data-kod-kapat>Kapat</button>
   </div>
 </dialog>
 

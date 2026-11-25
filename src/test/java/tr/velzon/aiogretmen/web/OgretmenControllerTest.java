@@ -28,7 +28,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @Import(VarsayilanGuvenlikYapilandirma.class)
-@WebMvcTest(OgretmenController.class)
+@WebMvcTest({OgretmenController.class, OgretmenAiOzellikController.class})
 class OgretmenControllerTest {
 
     @Autowired

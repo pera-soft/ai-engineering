@@ -1,5 +1,11 @@
 # ADR-0012 — Çok kullanıcılı eğitim sitesi: `site` profili ve kimlik (Faz 9a)
 
+> **Değişiklik notu (2026-11-25, ADR-0017):** site artık **girişsiz** ve herkese açık. Bu ADR'deki kimlik
+> sistemi (e-posta + şifre, kayıt, `@pera.software` kısıtı, oturum, `kullanici`/`kullanici_token` tabloları,
+> şirketin tek OpenRouter anahtarı) **geçersiz**; ziyaretçi rastgele çerezle (`aio_ziyaretci`, `kullanici_id`
+> = `z-…`) tanınır, sohbet ziyaretçinin kendi anahtarıyla yapılır. `site` profili, 127.0.0.1 bağlanma, CSRF ve
+> `kullanici_id` izolasyonu geçerli kalır. Aşağıdaki metin tarihsel kayıttır, silinmedi.
+
 - **Durum:** Kabul edildi (9a + 9b + 9c + 9d uygulandı — 9c e-posta: ADR-0013, 9d PostgreSQL: ADR-0014; 9e açık — bkz.
   `docs/exec-plans/active/faz-9-cok-kullanicili-site.md`). 2026-10-22 güncellemesi: self-servis hesap silme
   KALDIRILDI (§9, §10).

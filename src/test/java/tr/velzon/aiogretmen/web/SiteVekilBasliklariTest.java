@@ -15,19 +15,19 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Faz 9d (deploy/nginx-site.conf.ornek): nginx TLS'i sonlandırıp uygulamaya http ile gelir ve
  * {@code X-Forwarded-Proto/Host} başlıklarını ekler. {@code server.forward-headers-strategy: native}
- * (Tomcat RemoteIpValve, yalnız 127.0.0.1 gibi iç vekillere güvenir) bunları onurlandırmalı: giriş
- * yönlendirmesi {@code https://<alan-adı>/...} olur ve oturum çerezi — ayar kapalı olsa bile — istek
- * güvenli sayıldığı için Secure alır. GERÇEK Tomcat (MockMvc valve'leri çalıştırmaz).
+ * (Tomcat RemoteIpValve, yalnız 127.0.0.1 gibi iç vekillere güvenir) bunları onurlandırmalı: istek güvenli
+ * sayılır → çerezler — {@code guvenli-cerez} kapalı olsa bile — {@code Secure} alır. GERÇEK Tomcat (MockMvc
+ * valve'leri çalıştırmaz, çerez niteliklerini tam yansıtmaz).
+ *
+ * <p>Girişsiz site (ADR-0017): yönlendirme yok; ziyaretçi çerezi {@code HttpOnly}, XSRF çerezi DEĞİL (statik ön yüz
+ * okuyup başlığa koyar); ikisi de {@code SameSite=Lax}.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
         "spring.datasource.url=jdbc:h2:mem:sitevekil;DB_CLOSE_DELAY=-1",
         "spring.ai.openai.api-key=",
         "app.hafiza-dir=target/test-hafiza-site",
         "app.rapor-dir=target/test-raporlar-site",
-        "app.site.eposta-zorunlu=false",
-        "app.site.kayit=eposta",
-        "app.site.guvenli-cerez=false",
-        "server.servlet.session.cookie.secure=false"
+        "app.site.guvenli-cerez=false"
 })
 @ActiveProfiles("site")
 class SiteVekilBasliklariTest {
@@ -41,50 +41,42 @@ class SiteVekilBasliklariTest {
         HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + "/"));
         if (vekilArkasinda) {
             b.header("X-Forwarded-Proto", "https")
-                    .header("X-Forwarded-Host", "egitim.pera.software")
+                    .header("X-Forwarded-Host", "egitim.ornek.com")
                     .header("X-Forwarded-Port", "443")
                     .header("X-Forwarded-For", "10.20.30.40");
         }
         return istemci.send(b.build(), HttpResponse.BodyHandlers.ofString());
     }
 
-    @Test
-    void vekilBasliklariylaYonlendirmeHttpsVeAlanAdiKullanir() throws Exception {
-        HttpResponse<String> yanit = anaSayfa(true);
-        assertThat(yanit.statusCode()).isEqualTo(302);
-        assertThat(yanit.headers().firstValue("Location"))
-                .hasValue("https://egitim.pera.software/giris.html");
+    private static String cerez(HttpResponse<?> yanit, String ad) {
+        return yanit.headers().allValues("Set-Cookie").stream().filter(c -> c.startsWith(ad + "="))
+                .findFirst().orElseThrow(() -> new AssertionError(ad + " yok: " + yanit.headers()));
     }
 
     @Test
-    void vekilsizDogrudanHttpIstegiHttpKalir() throws Exception {
-        HttpResponse<String> yanit = anaSayfa(false);
-        assertThat(yanit.statusCode()).isEqualTo(302);
-        assertThat(yanit.headers().firstValue("Location")).hasValueSatisfying(l ->
-                assertThat(l).startsWith("http://127.0.0.1:" + port));
+    void anaSayfaYonlendirmesizAcilir() throws Exception {
+        assertThat(anaSayfa(true).statusCode()).isEqualTo(200);
+        assertThat(anaSayfa(false).statusCode()).isEqualTo(200);
     }
 
     @Test
-    void vekilArkasindaXsrfCereziSecureOlur() throws Exception {
+    void vekilArkasindaCerezlerSecureOlur() throws Exception {
         // guvenli-cerez=false olsa da https istek (X-Forwarded-Proto) Secure çerez almalı;
         // aksi halde canlıda ayar unutulursa çerezler düz kalırdı
-        String vekil = cerez(anaSayfaGiris(true));
-        String dogrudan = cerez(anaSayfaGiris(false));
-        assertThat(vekil).contains("Secure");
-        assertThat(dogrudan).doesNotContain("Secure");
-    }
-
-    private HttpResponse<String> anaSayfaGiris(boolean vekilArkasinda) throws Exception {
-        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + "/giris.html"));
-        if (vekilArkasinda) {
-            b.header("X-Forwarded-Proto", "https").header("X-Forwarded-Host", "egitim.pera.software")
-                    .header("X-Forwarded-Port", "443");
+        HttpResponse<String> vekil = anaSayfa(true);
+        HttpResponse<String> dogrudan = anaSayfa(false);
+        for (String ad : new String[]{"XSRF-TOKEN", "aio_ziyaretci"}) {
+            assertThat(cerez(vekil, ad)).contains("Secure");
+            assertThat(cerez(dogrudan, ad)).doesNotContain("Secure");
         }
-        return istemci.send(b.build(), HttpResponse.BodyHandlers.ofString());
     }
 
-    private static String cerez(HttpResponse<?> yanit) {
-        return yanit.headers().allValues("Set-Cookie").stream().filter(c -> c.startsWith("XSRF-TOKEN="))
-                .findFirst().orElseThrow(() -> new AssertionError("XSRF-TOKEN yok: " + yanit.headers()));
+    @Test
+    void cerezNitelikleri() throws Exception {
+        HttpResponse<String> yanit = anaSayfa(true);
+        assertThat(cerez(yanit, "aio_ziyaretci")).contains("HttpOnly").containsIgnoringCase("SameSite=Lax")
+                .contains("Max-Age=31536000").contains("Path=/");
+        assertThat(cerez(yanit, "XSRF-TOKEN")).containsIgnoringCase("SameSite=Lax").doesNotContainIgnoringCase("HttpOnly");
+        assertThat(yanit.headers().allValues("Set-Cookie")).noneMatch(c -> c.startsWith("JSESSIONID="));
     }
 }

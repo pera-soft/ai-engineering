@@ -1,5 +1,9 @@
 # ADR-0015 — E-posta yerine ortak ekip kodu ile kayıt (Faz 9, 9e öncesi)
 
+> **Değişiklik notu (2026-11-25, ADR-0017):** bu ADR **geçersiz**. Site girişsiz oldu; kayıt, ekip kodu
+> (`APP_SITE_EKIP_KODU`, `APP_SITE_KAYIT`) ve `tools/sifre-baglantisi.sh` kaldırıldı. Aşağıdaki metin tarihsel
+> kayıttır.
+
 - **Durum:** Kabul edildi
 - **Tarih:** 2026-10-22
 - **Bağlam sahibi:** kullanıcı kararı (pera ekibi e-posta gönderimini istemedi) + uygulayıcı kararları

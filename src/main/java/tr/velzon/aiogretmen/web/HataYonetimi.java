@@ -4,7 +4,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.core.env.Environment;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
@@ -17,7 +16,11 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import tr.velzon.aiogretmen.types.AiCiktisiBozukException;
 import tr.velzon.aiogretmen.types.AiDevreDisiException;
 import tr.velzon.aiogretmen.types.AiSaglayiciException;
+import tr.velzon.aiogretmen.types.AnahtarBicimiException;
+import tr.velzon.aiogretmen.types.AnahtarGerekliException;
 import tr.velzon.aiogretmen.types.BulunamadiException;
+import tr.velzon.aiogretmen.types.HizSiniriAsildiException;
+import tr.velzon.aiogretmen.types.IlerlemeKoduBulunamadiException;
 
 import java.io.IOException;
 import java.util.LinkedHashMap;
@@ -38,19 +41,24 @@ public class HataYonetimi {
     private static final Logger log = LoggerFactory.getLogger(HataYonetimi.class);
 
     static final String BEKLENMEYEN_DETAY = "Beklenmeyen bir hata oluştu. Tekrar dene; sürerse site sorumlusuna bildir.";
-    static final String AI_KAPALI_SITE = "AI öğretmen henüz açılmadı (OpenRouter anahtarı bekleniyor). "
-            + "Dersleri okuyup görevlerini işaretleyebilirsin; AI açılınca burada çalışacak.";
-
-    private final boolean site;
-
-    public HataYonetimi(Environment ortam) {
-        this.site = ortam.matchesProfiles("site");
-    }
-
     @ExceptionHandler(BulunamadiException.class)
     @ResponseStatus(HttpStatus.NOT_FOUND)
     public Map<String, String> bulunamadi(BulunamadiException e) {
         return Map.of("hata", "Kayıt bulunamadı", "detay", e.getMessage());
+    }
+
+    /** Biçimce geçerli ama kayıtsız ilerleme kodu (Faz 10, ADR-0017): istek doğru, veritabanı durumu reddediyor. */
+    @ExceptionHandler(IlerlemeKoduBulunamadiException.class)
+    @ResponseStatus(HttpStatus.UNPROCESSABLE_ENTITY)
+    public Map<String, String> ilerlemeKoduBulunamadi(IlerlemeKoduBulunamadiException e) {
+        return Map.of("hata", e.getMessage());
+    }
+
+    /** Girişsiz sitede IP/ziyaretçi hız sınırı aşıldı (Faz 10, ADR-0017). */
+    @ExceptionHandler(HizSiniriAsildiException.class)
+    @ResponseStatus(HttpStatus.TOO_MANY_REQUESTS)
+    public Map<String, String> hizSiniriAsildi(HizSiniriAsildiException e) {
+        return Map.of("hata", e.getMessage());
     }
 
     /** Jackson'ın ham mesajı Java sınıf adları taşır — kullanıcıya sabit Türkçe metin, ayrıntı logda. */
@@ -69,25 +77,62 @@ public class HataYonetimi {
         return Map.of("hata", "Geçersiz istek", "detay", "'" + e.getName() + "' değeri geçersiz.");
     }
 
-    /** Anahtarsız açılış. Sitede geliştirici yönergesi (ortam değişkeni) yerine kullanıcı dili. */
+    /**
+     * Anahtarsız yerel açılış (geliştirici yönergesi). Sitede oluşmaz: site AI istemcisi sunucu anahtarı
+     * kullanmaz, ziyaretçi anahtarı yoksa {@link AnahtarGerekliException} (400) fırlatır (Faz 10, ADR-0017).
+     */
     @ExceptionHandler(AiDevreDisiException.class)
     @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
     public Map<String, String> aiDevreDisi(AiDevreDisiException e) {
-        return Map.of("hata", "AI özellikleri devre dışı", "detay", site ? AI_KAPALI_SITE : e.getMessage());
+        return Map.of("hata", "AI özellikleri devre dışı", "detay", e.getMessage());
+    }
+
+    /**
+     * Sitede ziyaretçinin kendi anahtarı yok (Faz 10, ADR-0017) — sabit Türkçe metin, anahtar içermez.
+     * {@code neden} kararlıdır: ön yüz metne değil koda göre dallanır (anahtar kartını yeniden açar).
+     */
+    @ExceptionHandler(AnahtarGerekliException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public Map<String, String> anahtarGerekli(AnahtarGerekliException e) {
+        Map<String, String> govde = new LinkedHashMap<>();
+        govde.put("hata", e.getMessage());
+        govde.put("neden", "ANAHTAR_GEREKLI");
+        return govde;
+    }
+
+    /** {@code X-OpenRouter-Anahtar} biçimsiz (Faz 10, ADR-0017) — mesaj anahtarı içermez; kararlı {@code neden}. */
+    @ExceptionHandler(AnahtarBicimiException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public Map<String, String> anahtarBicimi(AnahtarBicimiException e) {
+        Map<String, String> govde = new LinkedHashMap<>();
+        govde.put("hata", "Geçersiz istek");
+        govde.put("detay", e.getMessage());
+        govde.put("neden", "ANAHTAR_BICIMI");
+        return govde;
     }
 
     /**
      * Sağlayıcı (OpenRouter) hatası — ai/ katmanında kategoriye çevrildi (AiHataCevirici; log orada).
-     * Hepsi 503 (servis şu an kullanılamıyor); yalnız sağlayıcının reddettiği istek 502.
+     * Sunucu anahtarıyla: hepsi 503 (servis şu an kullanılamıyor); yalnız sağlayıcının reddettiği istek 502.
+     * Ziyaretçinin kendi anahtarıyla (site, Faz 10): anahtar geçersiz 401, kredi/limit 402, çok istek 429 —
+     * ön yüz anahtar kartını yeniden açabilsin; diğerleri aynı.
      * Gövde: {@code {"hata": "AI servisi kullanılamıyor", "detay": <Türkçe mesaj>, "neden": <kategori>}}.
      */
     @ExceptionHandler(AiSaglayiciException.class)
     public ResponseEntity<Map<String, String>> aiSaglayiciHatasi(AiSaglayiciException e) {
         HttpStatus durum = e.neden() == AiSaglayiciException.Neden.ISTEK_REDDEDILDI
                 ? HttpStatus.BAD_GATEWAY : HttpStatus.SERVICE_UNAVAILABLE;
+        if (e.ziyaretciAnahtari()) {
+            durum = switch (e.neden()) {
+                case ANAHTAR_GECERSIZ -> HttpStatus.UNAUTHORIZED;
+                case KREDI_BITTI -> HttpStatus.PAYMENT_REQUIRED;
+                case YOGUN -> HttpStatus.TOO_MANY_REQUESTS;
+                default -> durum;
+            };
+        }
         Map<String, String> govde = new LinkedHashMap<>();
         govde.put("hata", "AI servisi kullanılamıyor");
-        govde.put("detay", e.neden().mesaj());
+        govde.put("detay", e.getMessage());
         govde.put("neden", e.neden().name());
         return ResponseEntity.status(durum).body(govde);
     }

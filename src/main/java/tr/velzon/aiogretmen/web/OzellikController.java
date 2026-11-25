@@ -5,16 +5,15 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import tr.velzon.aiogretmen.config.AppProperties;
-import tr.velzon.aiogretmen.config.KullaniciBaglami;
+import tr.velzon.aiogretmen.service.KullanimService;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
  * Arayüzün açılışta okuduğu özellik bayrakları (ADR-0011):
- *  - GET /api/ozellikler → {@code {"mulakat": false, "site": false}}
- *  - {@code site} profilinde (ADR-0012) ayrıca oturumdaki kullanıcı: {@code "kullanici": "x@pera.software"}
- *    → arayüz e-postayı ve "Çıkış" düğmesini gösterir.
+ *  - GET /api/ozellikler → {@code {"mulakat": false, "site": false, "sunucuAi": true}}
+ *  - Ziyaretçi kimliği (HttpOnly çerez) ASLA dönmez (Faz 10); {@code sunucuAi} = !site && sunucu anahtarı var.
  * Statik index.html sunucuda işlenmez (CSP: yalnız 'self' betik); hangi bölümün gösterileceğini
  * frontend bu uçtan öğrenir. Mülakat kapalıyken mulakat.js hiçbir /api/mulakat isteği atmaz.
  */
@@ -23,12 +22,12 @@ import java.util.Map;
 public class OzellikController {
 
     private final AppProperties props;
-    private final KullaniciBaglami kullaniciBaglami;
+    private final KullanimService kullanimService;
     private final boolean site;
 
-    public OzellikController(AppProperties props, KullaniciBaglami kullaniciBaglami, Environment ortam) {
+    public OzellikController(AppProperties props, KullanimService kullanimService, Environment ortam) {
         this.props = props;
-        this.kullaniciBaglami = kullaniciBaglami;
+        this.kullanimService = kullanimService;
         this.site = ortam.matchesProfiles("site");
     }
 
@@ -37,9 +36,8 @@ public class OzellikController {
         Map<String, Object> ozellik = new LinkedHashMap<>();
         ozellik.put("mulakat", props.mulakatEtkin() && !site); // sitede zorla kapalı (MulakatEtkin, Faz 9b)
         ozellik.put("site", site);
-        if (site) {
-            ozellik.put("kullanici", kullaniciBaglami.aktifKullanici());
-        }
+        // sunucu anahtarıyla çalışan AI düğmeleri (rapor/değerlendirme/AI quiz): yalnız yerelde ve anahtar varsa
+        ozellik.put("sunucuAi", !site && kullanimService.aiAktif());
         return ozellik;
     }
 }

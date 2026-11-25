@@ -112,17 +112,17 @@ class RaporServiceTest {
 
     @Test
     void birKullanicininRaporuDigerineOnbellektenGitmez() {
-        aktif = "a@pera.software";
+        aktif = "a@ornek.com";
         when(aiClient.cagir(any())).thenReturn(new AiYanit("# A RAPORU", 1, 1, "m"));
         assertThat(servis.rapor(1, false).markdown()).contains("A RAPORU");
 
-        aktif = "b@pera.software";
+        aktif = "b@ornek.com";
         when(aiClient.cagir(any())).thenReturn(new AiYanit("# B RAPORU", 1, 1, "m"));
         var b = servis.rapor(1, false);
         assertThat(b.cacheden()).isFalse();
         assertThat(b.markdown()).contains("B RAPORU").doesNotContain("A RAPORU");
 
-        aktif = "a@pera.software";
+        aktif = "a@ornek.com";
         var a = servis.rapor(1, false);
         assertThat(a.cacheden()).isTrue();
         assertThat(a.markdown()).contains("A RAPORU");
@@ -133,19 +133,19 @@ class RaporServiceTest {
     void onbellekSilmeYalnizVerilenKullaniciyiEtkiler() throws Exception {
         Files.createDirectories(tempDir.resolve("raporlar"));
         Files.writeString(tempDir.resolve("raporlar/hafta-02.md"), "yerel rapor");
-        aktif = "a@pera.software";
+        aktif = "a@ornek.com";
         servis.rapor(1, false);
-        aktif = "b@pera.software";
+        aktif = "b@ornek.com";
         servis.rapor(1, false);
 
-        servis.raporOnbeleginiSil("b@pera.software");
-        assertThat(KisiselDizin.coz(tempDir.resolve("raporlar"), "b@pera.software")).doesNotExist();
-        assertThat(KisiselDizin.coz(tempDir.resolve("raporlar"), "a@pera.software").resolve("hafta-01.md")).exists();
+        servis.raporOnbeleginiSil("b@ornek.com");
+        assertThat(KisiselDizin.coz(tempDir.resolve("raporlar"), "b@ornek.com")).doesNotExist();
+        assertThat(KisiselDizin.coz(tempDir.resolve("raporlar"), "a@ornek.com").resolve("hafta-01.md")).exists();
         assertThat(tempDir.resolve("raporlar/hafta-02.md")).exists();
 
         servis.raporOnbeleginiSil("yerel");
         assertThat(tempDir.resolve("raporlar/hafta-02.md")).doesNotExist();
-        assertThat(KisiselDizin.coz(tempDir.resolve("raporlar"), "a@pera.software").resolve("hafta-01.md")).exists();
+        assertThat(KisiselDizin.coz(tempDir.resolve("raporlar"), "a@ornek.com").resolve("hafta-01.md")).exists();
     }
 
     @Test

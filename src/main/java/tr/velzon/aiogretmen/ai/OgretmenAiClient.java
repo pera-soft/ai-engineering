@@ -8,6 +8,7 @@ import java.util.List;
  */
 public interface OgretmenAiClient {
 
+    /** Bu istekte AI çağrısı yapılabilir mi? Yerelde: sunucu anahtarı var; sitede: bu istek geçerli bir ziyaretçi anahtarı taşıyor. */
     boolean aktif();
 
     /**

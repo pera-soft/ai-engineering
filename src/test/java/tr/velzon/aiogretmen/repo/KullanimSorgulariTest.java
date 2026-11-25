@@ -64,15 +64,15 @@ class KullanimSorgulariTest {
     /** Faz 9b: /api/kullanim yalnız aktif kullanıcının çağrılarını sayar. */
     @Test
     void toplamYalnizVerilenKullanicininSatirlariniSayar() {
-        kullanimRepo.save(AiKullanim.kayit("a@pera.software", "SOHBET", "m", 100, 50, null, null));
-        kullanimRepo.save(AiKullanim.kayit("a@pera.software", "RAPOR", "m", 10, 5, null, null));
-        kullanimRepo.save(AiKullanim.kayit("b@pera.software", "SOHBET", "m", 7, 3, null, null));
+        kullanimRepo.save(AiKullanim.kayit("a@ornek.com", "SOHBET", "m", 100, 50, null, null));
+        kullanimRepo.save(AiKullanim.kayit("a@ornek.com", "RAPOR", "m", 10, 5, null, null));
+        kullanimRepo.save(AiKullanim.kayit("b@ornek.com", "SOHBET", "m", 7, 3, null, null));
 
-        List<Map<String, Object>> b = sorgular.islemBazindaToplam("b@pera.software");
+        List<Map<String, Object>> b = sorgular.islemBazindaToplam("b@ornek.com");
         assertThat(b).hasSize(1);
         assertThat(((Number) b.get(0).get("cagri")).longValue()).isEqualTo(1);
         assertThat(((Number) b.get(0).get("input_tokens")).longValue()).isEqualTo(7);
-        assertThat(sorgular.islemBazindaToplam("a@pera.software")).hasSize(2);
+        assertThat(sorgular.islemBazindaToplam("a@ornek.com")).hasSize(2);
         assertThat(sorgular.islemBazindaToplam("yerel")).isEmpty();
     }
 }

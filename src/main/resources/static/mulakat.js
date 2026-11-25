@@ -377,7 +377,7 @@ function mulakatAiNedenBtn(soruId, secilenIndex) {
   const kutu = el("div", "calisma-ornek");
   kutu.hidden = true;
   btn.addEventListener("click", async () => {
-    if (!durum.aiAktif) { // AI kapalıyken (anahtarsız boot) doğrudan bilgilendir — 503 beklemeden
+    if (!durum.sunucuAi) { // sunucu AI kapalıyken (anahtarsız boot) doğrudan bilgilendir — 503 beklemeden
       kutu.hidden = false;
       kutu.innerHTML = "";
       kutu.appendChild(el("p", "ipucu", "AI öğretmen devre dışı — yukarıdaki açıklama yeterli."));

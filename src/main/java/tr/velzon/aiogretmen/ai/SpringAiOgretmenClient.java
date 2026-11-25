@@ -23,6 +23,10 @@ import java.util.List;
  * Her çağrının token kullanımını ai_kullanim'a yazar (brief 7.6) — Faz 9b: çağıran kullanıcının
  * kimliğiyle. Kimlik çağrıdan ÖNCE çözülür: site profilinde oturumsuz bir yol varsa model HİÇ
  * çağrılmaz (fail-closed; kimliksiz harcama yok).
+ *
+ * <p>Faz 10 (ADR-0017): model her çağrıda {@link ChatModelKaynagi}'ndan alınır — yerelde açılışta kurulan tek
+ * model, sitede ziyaretçinin o istekteki anahtarıyla kurulan model. {@link #aktif()} = "bu istekte çağrı
+ * yapılabilir mi". Anahtar ne loglanır ne {@code ai_kullanim}'a yazılır.
  */
 public class SpringAiOgretmenClient implements OgretmenAiClient {
 
@@ -30,14 +34,20 @@ public class SpringAiOgretmenClient implements OgretmenAiClient {
     /** schema.sql: ai_kullanim.yanit_model VARCHAR(100). */
     private static final int YANIT_MODEL_SINIRI = 100;
 
-    private final ChatModel chatModel;
+    private final ChatModelKaynagi kaynak;
     private final AppProperties props;
     private final KullanimRepo kullanimRepo;
     private final KullaniciBaglami kullaniciBaglami;
 
+    /** Açılışta kurulmuş tek model (yerel mod, sunucu anahtarı). */
     public SpringAiOgretmenClient(ChatModel chatModel, AppProperties props, KullanimRepo kullanimRepo,
                                   KullaniciBaglami kullaniciBaglami) {
-        this.chatModel = chatModel;
+        this(ChatModelKaynagi.sabit(chatModel), props, kullanimRepo, kullaniciBaglami);
+    }
+
+    SpringAiOgretmenClient(ChatModelKaynagi kaynak, AppProperties props, KullanimRepo kullanimRepo,
+                           KullaniciBaglami kullaniciBaglami) {
+        this.kaynak = kaynak;
         this.props = props;
         this.kullanimRepo = kullanimRepo;
         this.kullaniciBaglami = kullaniciBaglami;
@@ -45,7 +55,7 @@ public class SpringAiOgretmenClient implements OgretmenAiClient {
 
     @Override
     public boolean aktif() {
-        return true;
+        return kaynak.hazir();
     }
 
     @Override
@@ -78,6 +88,7 @@ public class SpringAiOgretmenClient implements OgretmenAiClient {
 
     private AiYanit calistir(Islem islem, String model, List<Message> mesajlar, int maxTokens) {
         String kullaniciId = kullaniciBaglami.aktifKullanici(); // çağrıdan ÖNCE: kimliksiz çağrı para harcamasın
+        ChatModel chatModel = kaynak.model(); // sitede anahtar yoksa AnahtarGerekliException — çağrı yapılmaz
         OpenAiChatOptions secenekler = OpenAiChatOptions.builder()
                 .model(model)
                 .maxTokens(maxTokens)
@@ -92,7 +103,7 @@ public class SpringAiOgretmenClient implements OgretmenAiClient {
             yanit = chatModel.call(new Prompt(mesajlar, secenekler));
         } catch (RuntimeException e) {
             // 401/402/429/5xx/zaman aşımı → AiSaglayiciException (Türkçe, ham gövdesiz); tüm AI uçları buradan geçer
-            throw AiHataCevirici.cevir(e, islem.name());
+            throw AiHataCevirici.cevir(e, islem.name(), kaynak.ziyaretciAnahtari());
         }
 
         // İnceleme 2. tur: content-filter/boş completion durumlarında result/output null

@@ -44,7 +44,7 @@ public class KullanimService {
         }
 
         Map<String, Object> sonuc = new LinkedHashMap<>();
-        sonuc.put("aiAktif", aiClient.aktif());
+        sonuc.put("aiAktif", aiAktif());
         sonuc.put("toplamCagri", toplamCagri);
         sonuc.put("toplamInputToken", toplamInput);
         sonuc.put("toplamOutputToken", toplamOutput);
@@ -54,5 +54,10 @@ public class KullanimService {
 
     private static long sayi(Object o) {
         return o instanceof Number n ? n.longValue() : 0;
+    }
+
+    /** Sunucu AI anahtarı tanımlı mı (web katmanı ai paketine doğrudan erişemez — /api/ozellikler bunu kullanır). */
+    public boolean aiAktif() {
+        return aiClient.aktif();
     }
 }

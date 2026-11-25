@@ -138,23 +138,23 @@ class HafizaServiceTest {
 
     @Test
     void ikiKullanicininHafizasiBirbirineKarismaz() {
-        aktif = "a@pera.software";
+        aktif = "a@ornek.com";
         yanit("A_SIRRI_PROFIL", "A_SIRRI_NOT");
         servis.guncelle(1, "SOHBET", "x");
 
-        aktif = "b@pera.software";
+        aktif = "b@ornek.com";
         assertThat(servis.hafizaBaglami(1)).doesNotContain("A_SIRRI").contains("Henüz gözlem yok");
         yanit("B_PROFIL", "B_NOT");
         servis.guncelle(1, "SOHBET", "x");
         assertThat(servis.hafizaBaglami(1)).contains("B_PROFIL").doesNotContain("A_SIRRI");
 
-        aktif = "a@pera.software";
+        aktif = "a@ornek.com";
         assertThat(servis.hafizaBaglami(1)).contains("A_SIRRI_PROFIL").contains("A_SIRRI_NOT")
                 .doesNotContain("B_PROFIL");
 
         // eski (yerel) kök kirlenmedi; dosyalar kullanicilar/<özet>/ altında
         assertThat(tempDir.resolve("hafiza/OGRENCI.md")).doesNotExist();
-        assertThat(KisiselDizin.coz(tempDir.resolve("hafiza"), "a@pera.software").resolve("OGRENCI.md"))
+        assertThat(KisiselDizin.coz(tempDir.resolve("hafiza"), "a@ornek.com").resolve("OGRENCI.md"))
                 .hasContent("A_SIRRI_PROFIL");
         aktif = "yerel";
         assertThat(servis.hafizaBaglami(1)).doesNotContain("A_SIRRI").doesNotContain("B_PROFIL");
@@ -165,23 +165,23 @@ class HafizaServiceTest {
         Path kok = tempDir.resolve("hafiza");
         Files.createDirectories(kok.resolve("kitaplar"));
         Files.writeString(kok.resolve("OGRENCI.md"), "yerel profil");
-        aktif = "a@pera.software";
+        aktif = "a@ornek.com";
         yanit("A_PROFIL", "A_NOT");
         servis.guncelle(1, "SOHBET", "x");
-        aktif = "b@pera.software";
+        aktif = "b@ornek.com";
         yanit("B_PROFIL", "B_NOT");
         servis.guncelle(1, "SOHBET", "x");
 
-        servis.ogrenciNotlariniSil("b@pera.software");
+        servis.ogrenciNotlariniSil("b@ornek.com");
 
-        assertThat(KisiselDizin.coz(kok, "b@pera.software")).doesNotExist();
-        assertThat(KisiselDizin.coz(kok, "a@pera.software").resolve("OGRENCI.md")).hasContent("A_PROFIL");
+        assertThat(KisiselDizin.coz(kok, "b@ornek.com")).doesNotExist();
+        assertThat(KisiselDizin.coz(kok, "a@ornek.com").resolve("OGRENCI.md")).hasContent("A_PROFIL");
         assertThat(kok.resolve("OGRENCI.md")).hasContent("yerel profil");
         assertThat(kok.resolve("kitaplar")).isDirectory();
 
         // yerel sıfırlama başka kullanıcıların dizinine (kullanicilar/) DOKUNMAZ
         servis.ogrenciNotlariniSil("yerel");
         assertThat(kok.resolve("OGRENCI.md")).doesNotExist();
-        assertThat(KisiselDizin.coz(kok, "a@pera.software").resolve("OGRENCI.md")).hasContent("A_PROFIL");
+        assertThat(KisiselDizin.coz(kok, "a@ornek.com").resolve("OGRENCI.md")).hasContent("A_PROFIL");
     }
 }

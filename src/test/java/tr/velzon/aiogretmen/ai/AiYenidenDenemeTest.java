@@ -36,7 +36,7 @@ class AiYenidenDenemeTest {
     private AiSaglayiciException cagir(int deneme, Duration pencere) {
         var model = AiYapilandirma.sohbetModeli(api,
                 AiYapilandirma.yenidenDenemeSablonu(deneme, pencere, Duration.ofMillis(5)));
-        var client = new SpringAiOgretmenClient(model, props, mock(KullanimRepo.class), () -> "a@pera.software");
+        var client = new SpringAiOgretmenClient(model, props, mock(KullanimRepo.class), () -> "a@ornek.com");
         return catchThrowableOfType(AiSaglayiciException.class, () -> client.cagir(
                 OgretmenAiClient.AiIstek.tekSeferlik(OgretmenAiClient.Islem.SOHBET,
                         OgretmenAiClient.ModelTuru.GUCLU, "sistem", "mesaj", 100)));
