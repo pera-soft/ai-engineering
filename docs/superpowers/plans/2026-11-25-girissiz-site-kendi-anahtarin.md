@@ -1,5 +1,7 @@
 # Girişsiz site + kendi OpenRouter anahtarın — Uygulama Planı
 
+> Durum: tamamlandı (2026-11-25), sapmalar ADR-0017 ve completed/faz-10 belgesinde.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** `site` profilinde giriş/kayıt sistemini kaldırıp ziyaretçiyi rastgele çerezle tanımak; sohbet botunu
@@ -62,20 +64,20 @@ JDBC, H2/PostgreSQL, vanilla JS ön yüz.
   - `static void ZiyaretciCerezi.yaz(HttpServletRequest, HttpServletResponse, String kimlik, boolean guvenliCerez)` — Task 3 geri yüklemede kullanır
   - `ZiyaretciKullaniciBaglami.aktifKullanici()` → `"z-" + kimlik`; `static String ONEK = "z-"`
 
-- [ ] **Step 1: Failing testleri yaz** (`@SpringBootTest` + `@ActiveProfiles("site")` + MockMvc, H2 mem; mevcut `SiteKisiselVeriTest` başlığı örnek)
+- [x] **Step 1: Failing testleri yaz** (`@SpringBootTest` + `@ActiveProfiles("site")` + MockMvc, H2 mem; mevcut `SiteKisiselVeriTest` başlığı örnek)
   - `cerezsizIlkIstekGecerliCerezYazar`: `GET /api/program` → 200, `Set-Cookie` `aio_ziyaretci` değeri `gecerliMi`, `HttpOnly`, `SameSite=Lax`, `Max-Age=31536000`.
   - `gecersizCerezYenisiyleDegisir`: çerez `../../x` → yanıt yeni geçerli çerez yazar.
   - `girisYokTumSayfalarAcik`: `GET /` ve `GET /index.html` → 200 (yönlendirme yok); `JSESSIONID` çerezi yazılmaz.
   - `ayniCerezAyniKullanici`: `POST /api/gorev/durum` (CSRF ile) çerez A → `GET /api/program` aynı çerezle işaretli görevi görür; çerez B görmez.
   - `csrfsizYazmaReddedilir`: `POST /api/gorev/durum` CSRF token'sız → 403.
-- [ ] **Step 2: Çalıştır, FAIL gör:** `./mvnw -Dtest=SiteZiyaretciKimlikTest test`
-- [ ] **Step 3: Uygula**
+- [x] **Step 2: Çalıştır, FAIL gör:** `./mvnw -Dtest=SiteZiyaretciKimlikTest test`
+- [x] **Step 3: Uygula**
   - `ZiyaretciCerezi`: çerezi okur; yok/geçersizse `yeniKimlik()` üretip yazar; kimliği `ISTEK_OZNITELIGI`'ne koyar. Secure kuralı mevcut CSRF çereziyle aynı (`guvenliCerez` true → her zaman; değilse `request.isSecure()`). Her yanıtta ömrü yenilemek için yeniden yazar.
   - `ZiyaretciKullaniciBaglami` (`@Component @Profile("site")`): `RequestContextHolder`'dan özniteliği okur; yoksa `IllegalStateException` (fail-closed, asla `YEREL`).
   - Zincir: `authorizeHttpRequests(anyRequest().permitAll())`, `formLogin`/`logout`/`sessionManagement(maximumSessions)`/`HesapEtkinlikFiltresi`/`SessionRegistry`/`HttpSessionEventPublisher`/`PasswordEncoder` KALKAR; `sessionCreationPolicy(STATELESS)`; CSRF (`CookieCsrfTokenRepository` + `CsrfCerezFiltresi`) aynen; `ZiyaretciCerezi` `CsrfFilter`'dan önce eklenir; `httpBasic` kapalı; `/api/**` için `HttpStatusEntryPoint(401)` artık gereksiz — kaldır. MCP ile birlikte açılmama kontrolü (constructor) kalır.
-- [ ] **Step 4: PASS gör:** `./mvnw -Dtest=SiteZiyaretciKimlikTest test`
-- [ ] **Step 5:** Uygulama bu task sonunda AÇILMALI: kimlik sınıfları (Task 2'de silinecek) hâlâ `PasswordEncoder` ve `SessionRegistry` bean'lerine bağlı → bu iki bean bu task'ta `SiteGuvenlikYapilandirma`'da **kalır** (zincir onları kullanmaz), Task 2 tüketicileriyle birlikte siler. `./mvnw verify` → giriş akışına bağlı eski testler (`SiteKimlikTest`, `SiteSifreSifirlamaTest`, `SiteEkipKoduTest`, `SiteHataSayfalariTest`'in giriş kısımları, `SiteCerezTest`) kırılır — **bu task'ta silinir** (`SiteHataSayfalariTest`'in giriş dışı senaryoları çerezle yeniden yazılır). Kalan suite yeşil.
-- [ ] **Step 6: Commit** — `/commit`: `[faz-10] Site: ziyaretçi çerezi ile girişsiz kimlik (ADR-0017)`
+- [x] **Step 4: PASS gör:** `./mvnw -Dtest=SiteZiyaretciKimlikTest test`
+- [x] **Step 5:** Uygulama bu task sonunda AÇILMALI: kimlik sınıfları (Task 2'de silinecek) hâlâ `PasswordEncoder` ve `SessionRegistry` bean'lerine bağlı → bu iki bean bu task'ta `SiteGuvenlikYapilandirma`'da **kalır** (zincir onları kullanmaz), Task 2 tüketicileriyle birlikte siler. `./mvnw verify` → giriş akışına bağlı eski testler (`SiteKimlikTest`, `SiteSifreSifirlamaTest`, `SiteEkipKoduTest`, `SiteHataSayfalariTest`'in giriş kısımları, `SiteCerezTest`) kırılır — **bu task'ta silinir** (`SiteHataSayfalariTest`'in giriş dışı senaryoları çerezle yeniden yazılır). Kalan suite yeşil.
+- [x] **Step 6: Commit** — `/commit`: `[faz-10] Site: ziyaretçi çerezi ile girişsiz kimlik (ADR-0017)`
 
 ### Task 2: Kimlik sistemini ve Pera izlerini kaldır
 
@@ -90,13 +92,13 @@ JDBC, H2/PostgreSQL, vanilla JS ön yüz.
 - Modify (Pera metni → nötr): kalan testlerde `@pera.software` → `@ornek.com`, `egitim.pera.software` → `egitim.ornek.com` (`CsrfKorumaTest`, `SiteVekilBasliklariTest`, `SitePostgresEntegrasyonTest`, `SiteKisiselVeriTest`, `SiteKapaliModullerTest`, `AiOgretmenApplicationTest`); `SiteAyarlari`/`OzellikController`/`KullaniciBaglami` javadoc'ları.
 - Test: `src/test/java/tr/velzon/aiogretmen/web/SiteKimlikKaldirildiTest.java`
 
-- [ ] **Step 1: Failing test** `SiteKimlikKaldirildiTest`:
+- [x] **Step 1: Failing test** `SiteKimlikKaldirildiTest`:
   - `kimlikUclariYok`: `POST /api/kimlik/kayit`, `POST /api/kimlik/giris`, `GET /api/kimlik/ayarlar` → 404.
   - `kimlikSayfalariYok`: `GET /giris.html`, `/kayit.html`, `/kimlik.js` → 404.
-- [ ] **Step 2: FAIL gör:** `./mvnw -Dtest=SiteKimlikKaldirildiTest test`
-- [ ] **Step 3: Sil/düzenle** (yukarıdaki liste). `SiteKisiselVeriTest`'teki `oturumAc(email)` yardımcıları ziyaretçi çereziyle (`Cookie("aio_ziyaretci", kimlik)`) yeniden yazılır; e-posta kayıt akışına bağlı satırlar gider; izolasyon iddiaları (A'nın hafızası/raporu/kullanımı B'ye görünmez, sıfırlama yalnız sahibini etkiler) aynen kalır.
-- [ ] **Step 4: Doğrula:** `./mvnw verify` yeşil; `grep -rniI 'pera\.software\|AI Öğretmen · pera\|pera ekibi' src deploy tools` → boş (deploy Task 9'da; burada `src`, `tools` boş olmalı).
-- [ ] **Step 5: Commit** — `[faz-10] Kimlik sistemi (kayıt/giriş/e-posta/ekip kodu) ve Pera izleri kaldırıldı`
+- [x] **Step 2: FAIL gör:** `./mvnw -Dtest=SiteKimlikKaldirildiTest test`
+- [x] **Step 3: Sil/düzenle** (yukarıdaki liste). `SiteKisiselVeriTest`'teki `oturumAc(email)` yardımcıları ziyaretçi çereziyle (`Cookie("aio_ziyaretci", kimlik)`) yeniden yazılır; e-posta kayıt akışına bağlı satırlar gider; izolasyon iddiaları (A'nın hafızası/raporu/kullanımı B'ye görünmez, sıfırlama yalnız sahibini etkiler) aynen kalır.
+- [x] **Step 4: Doğrula:** `./mvnw verify` yeşil; `grep -rniI 'pera\.software\|AI Öğretmen · pera\|pera ekibi' src deploy tools` → boş (deploy Task 9'da; burada `src`, `tools` boş olmalı).
+- [x] **Step 5: Commit** — `[faz-10] Kimlik sistemi (kayıt/giriş/e-posta/ekip kodu) ve Pera izleri kaldırıldı`
 
 ### Task 3: Ziyaretçi kaydı + ilerleme kodu
 
@@ -117,13 +119,13 @@ JDBC, H2/PostgreSQL, vanilla JS ön yüz.
   - `ZiyaretciService.dokun(String kullaniciId)`, `ZiyaretciService.varMi(String kullaniciId)`
   - `GET /api/ziyaretci/kod` → `{"kod": "<22 karakter>"}`; `POST /api/ziyaretci/geri-yukle {kod}` → 200 `{"durum":"geri-yuklendi"}` + yeni çerez; geçersiz biçim → 400; kayıtsız → 422 `{"hata":"Bu kodla kayıtlı ilerleme bulunamadı."}`
 
-- [ ] **Step 1: Failing testler**
+- [x] **Step 1: Failing testler**
   - `ZiyaretciServiceTest.ilkDokunmaSatirOlusturur`, `ayniGunIkinciDokunmaYazmaz` (sahte `Clock`), `birGunSonraSonGorulmeGuncellenir`, `esZamanliDokunmaHataVermez` (aynı id, 8 iş parçacığı, hepsi başarılı, tek satır).
   - `SiteIlerlemeKoduTest.salaBakanSatirBirakmaz` (`GET /api/program` → `ziyaretci` boş), `yazmaSatirOlusturur` (`POST /api/gorev/durum` → 1 satır), `kodMevcutKimligiDoner`, `geriYuklemeCereziDegistirir` (A işaretler; B tarayıcısı A'nın koduyla geri yükler → B çereziyle A'nın ilerlemesi görünür), `olmayanKod422`, `bozukKod400`, `geriYukleBoslukKirpilirAyniKodNoOp`.
-- [ ] **Step 2: FAIL gör:** `./mvnw -Dtest='ZiyaretciServiceTest,SiteIlerlemeKoduTest' test`
-- [ ] **Step 3: Uygula.** Interceptor yalnız `POST/PUT/DELETE /api/**` için `dokun` çağırır (`preHandle`). Geri yükleme önce `kod.strip()`, sonra `gecerliMi`, sonra `varMi("z-"+kod)`.
-- [ ] **Step 4: PASS gör** (aynı komut) + `./mvnw -Dtest=SemaTasinabilirlikTest test`
-- [ ] **Step 5: Commit** — `[faz-10] Ziyaretçi kaydı ve ilerleme kodu (kaydet/geri yükle)`
+- [x] **Step 2: FAIL gör:** `./mvnw -Dtest='ZiyaretciServiceTest,SiteIlerlemeKoduTest' test`
+- [x] **Step 3: Uygula.** Interceptor yalnız `POST/PUT/DELETE /api/**` için `dokun` çağırır (`preHandle`). Geri yükleme önce `kod.strip()`, sonra `gecerliMi`, sonra `varMi("z-"+kod)`.
+- [x] **Step 4: PASS gör** (aynı komut) + `./mvnw -Dtest=SemaTasinabilirlikTest test`
+- [x] **Step 5: Commit** — `[faz-10] Ziyaretçi kaydı ve ilerleme kodu (kaydet/geri yükle)`
 
 ### Task 4: Hız sınırları
 
@@ -141,11 +143,11 @@ JDBC, H2/PostgreSQL, vanilla JS ön yüz.
   - `POST /api/ziyaretci/geri-yukle`: IP başına 10 / 1 saat — `"geri|" + ip`
   - yeni ziyaretçi satırı (yazma isteğinde `ziyaretci` kaydı henüz yoksa): IP başına 20 / 1 saat — `"yeni|" + ip`
 
-- [ ] **Step 1: Failing testler** — `HizSiniriTest` (mevcut senaryolar yeni imzayla + `bosKuyrukHaritadanSilinir`); `SiteHizSiniriTest.yazmaSiniri61inci429`, `sohbetSiniri21inci429` (sahte AI), `geriYukle11inci429`, `yeniZiyaretci21inci429` (her istek farklı çerez, aynı `remoteAddr`), `farkliIpEtkilenmez`.
-- [ ] **Step 2: FAIL gör:** `./mvnw -Dtest='HizSiniriTest,SiteHizSiniriTest' test`
-- [ ] **Step 3: Uygula.**
-- [ ] **Step 4: PASS gör.**
-- [ ] **Step 5: Commit** — `[faz-10] Girişsiz site için IP/ziyaretçi hız sınırları`
+- [x] **Step 1: Failing testler** — `HizSiniriTest` (mevcut senaryolar yeni imzayla + `bosKuyrukHaritadanSilinir`); `SiteHizSiniriTest.yazmaSiniri61inci429`, `sohbetSiniri21inci429` (sahte AI), `geriYukle11inci429`, `yeniZiyaretci21inci429` (her istek farklı çerez, aynı `remoteAddr`), `farkliIpEtkilenmez`.
+- [x] **Step 2: FAIL gör:** `./mvnw -Dtest='HizSiniriTest,SiteHizSiniriTest' test`
+- [x] **Step 3: Uygula.**
+- [x] **Step 4: PASS gör.**
+- [x] **Step 5: Commit** — `[faz-10] Girişsiz site için IP/ziyaretçi hız sınırları`
 
 ### Task 5: Sitede sohbet dışı AI uçlarını kapat + özellik bayrakları
 
@@ -157,11 +159,11 @@ JDBC, H2/PostgreSQL, vanilla JS ön yüz.
 **Interfaces:**
 - Produces: `/api/ozellikler` → `{"mulakat": bool, "site": bool, "sunucuAi": bool}`
 
-- [ ] **Step 1: Failing test** `kapaliUclarSitede404` (her uç için 404 + gövdede `hata`), `sohbetGecmisiSitedeAcik` (`GET /api/sohbet/1` → 200), `ozelliklerSitede` (`site=true`, `sunucuAi=false`, `kullanici` yok), `ozelliklerYerelde` (`site=false`).
-- [ ] **Step 2: FAIL gör:** `./mvnw -Dtest=SiteKapaliAiUclariTest test`
-- [ ] **Step 3: Uygula.**
-- [ ] **Step 4: PASS** + `./mvnw -Dtest=OgretmenControllerTest test`
-- [ ] **Step 5: Commit** — `[faz-10] Sitede sohbet dışı AI uçları kapalı; /api/ozellikler sunucuAi bayrağı`
+- [x] **Step 1: Failing test** `kapaliUclarSitede404` (her uç için 404 + gövdede `hata`), `sohbetGecmisiSitedeAcik` (`GET /api/sohbet/1` → 200), `ozelliklerSitede` (`site=true`, `sunucuAi=false`, `kullanici` yok), `ozelliklerYerelde` (`site=false`).
+- [x] **Step 2: FAIL gör:** `./mvnw -Dtest=SiteKapaliAiUclariTest test`
+- [x] **Step 3: Uygula.**
+- [x] **Step 4: PASS** + `./mvnw -Dtest=OgretmenControllerTest test`
+- [x] **Step 5: Commit** — `[faz-10] Sitede sohbet dışı AI uçları kapalı; /api/ozellikler sunucuAi bayrağı`
 
 ### Task 6: Ziyaretçinin kendi anahtarıyla AI istemcisi
 
@@ -181,7 +183,7 @@ JDBC, H2/PostgreSQL, vanilla JS ön yüz.
   - `interface ChatModelKaynagi { boolean hazir(); ChatModel model(); }` — sabit: `hazir()=true`; ziyaretçi: `hazir()=anahtarBaglami.anahtar().isPresent()`, `model()` her çağrıda verilen anahtarla `OpenAiApi` + `OpenAiChatModel` kurar (önbellek YOK), anahtar yoksa `AnahtarGerekliException`.
   - `SpringAiOgretmenClient.aktif()` → `kaynak.hazir()`.
 
-- [ ] **Step 1: Failing testler**
+- [x] **Step 1: Failing testler**
   - `BaslikAiAnahtarBaglamiTest`: `basliksizBos`, `bosluklarKirpilir`, `bozukBicim400VeMesajdaAnahtarYok`.
   - `ZiyaretciChatModelKaynagiTest`: `anahtarYokkenHazirDegil`, `anahtarYokkenModelAnahtarGerekli`.
   - `SiteSohbetAnahtarTest` (OpenRouter yerine yerel sahte HTTP sunucusu: `com.sun.net.httpserver.HttpServer`, `spring.ai.openai.base-url` ona yönlendirilir — yeni bağımlılık yok):
@@ -191,10 +193,10 @@ JDBC, H2/PostgreSQL, vanilla JS ön yüz.
     - `dorduncuMesajdaHafizaZiyaretciAnahtariylaGuncellenir` (4 mesaj → sahte sunucu 5. çağrıyı `hizli` modelle alır; ziyaretçinin `OGRENCI.md`'si oluşur)
     - `ikiZiyaretciAnahtarlariKarismaz` (paralel iki istek, her biri kendi Bearer'ı)
     - `sunucuAnahtariSitedeKullanilmaz` (`OPENROUTER_API_KEY` dolu verilse de başlıksız istek 400)
-- [ ] **Step 2: FAIL gör:** `./mvnw -Dtest='BaslikAiAnahtarBaglamiTest,ZiyaretciChatModelKaynagiTest,SiteSohbetAnahtarTest' test`
-- [ ] **Step 3: Uygula.** `HafizaService.guncelle` içindeki `catch` logu `e.getMessage()` kullanıyor — `AiSaglayiciException` mesajları ham gövdesiz Türkçe olduğundan anahtar içermez; test bunu kanıtlar, kod değişikliği gerekirse yalnız log satırı.
-- [ ] **Step 4: PASS** + `./mvnw -Dtest='SpringAiOgretmenClientTest,AiHataCeviriciTest,AiYenidenDenemeTest,MimariTestleri' test`
-- [ ] **Step 5: Commit** — `[faz-10] Sohbet ziyaretçinin kendi OpenRouter anahtarıyla (X-OpenRouter-Anahtar)`
+- [x] **Step 2: FAIL gör:** `./mvnw -Dtest='BaslikAiAnahtarBaglamiTest,ZiyaretciChatModelKaynagiTest,SiteSohbetAnahtarTest' test`
+- [x] **Step 3: Uygula.** `HafizaService.guncelle` içindeki `catch` logu `e.getMessage()` kullanıyor — `AiSaglayiciException` mesajları ham gövdesiz Türkçe olduğundan anahtar içermez; test bunu kanıtlar, kod değişikliği gerekirse yalnız log satırı.
+- [x] **Step 4: PASS** + `./mvnw -Dtest='SpringAiOgretmenClientTest,AiHataCeviriciTest,AiYenidenDenemeTest,MimariTestleri' test`
+- [x] **Step 5: Commit** — `[faz-10] Sohbet ziyaretçinin kendi OpenRouter anahtarıyla (X-OpenRouter-Anahtar)`
 
 ### Task 7: Terk edilmiş ziyaretçi verisinin temizliği
 
@@ -207,11 +209,11 @@ JDBC, H2/PostgreSQL, vanilla JS ön yüz.
 - Consumes: `ZiyaretciRepo.eskiler(Instant)`, `ZiyaretciRepo.sil(String)` (Task 3); `SifirlamaService.sifirla(String kullaniciId)` (mevcut — tablolar + hafıza/rapor dizinleri)
 - Produces: `int ZiyaretciTemizlikService.temizle()` — silinen ziyaretçi sayısı; `@Scheduled(cron = "0 30 3 * * *")` sarmalayıcı `zamanlanmisTemizlik()`. `ai_kullanim` satırları da silinir (`SifirlamaService` silmiyorsa burada). ShedLock YOK — gerekçe ADR-0017'de (tek JVM, idempotent).
 
-- [ ] **Step 1: Failing test** `eskiZiyaretciTamamenSilinir` (son_gorulme 181 gün önce; görev/sohbet/quiz/ai_kullanim satırları + `KisiselDizin` hafıza dosyası → hepsi gider), `yeniZiyaretciKalir` (179 gün), `ikiKezCalismakZararsiz`.
-- [ ] **Step 2: FAIL gör:** `./mvnw -Dtest=ZiyaretciTemizlikServiceTest test`
-- [ ] **Step 3: Uygula** (sahte `Clock` enjekte edilebilir).
-- [ ] **Step 4: PASS gör.**
-- [ ] **Step 5: Commit** — `[faz-10] 180 gün gelmeyen ziyaretçinin verisi silinir`
+- [x] **Step 1: Failing test** `eskiZiyaretciTamamenSilinir` (son_gorulme 181 gün önce; görev/sohbet/quiz/ai_kullanim satırları + `KisiselDizin` hafıza dosyası → hepsi gider), `yeniZiyaretciKalir` (179 gün), `ikiKezCalismakZararsiz`.
+- [x] **Step 2: FAIL gör:** `./mvnw -Dtest=ZiyaretciTemizlikServiceTest test`
+- [x] **Step 3: Uygula** (sahte `Clock` enjekte edilebilir).
+- [x] **Step 4: PASS gör.**
+- [x] **Step 5: Commit** — `[faz-10] 180 gün gelmeyen ziyaretçinin verisi silinir`
 
 ### Task 8: Ön yüz — anahtar kartı, kendin işaretle, ilerleme kodu
 
@@ -231,13 +233,13 @@ Davranış (spec §6.3, §6.4, §6.2):
 - Üst bar (yalnız site): "İlerleme kodum" → kod + Kopyala + uyarı ("Bu kod şifre gibidir…"); "Geri yükle" → onay ("Bu tarayıcıdaki ilerleme bu kodla değişecek") → `geri-yukle` → sayfa yenilenir.
 - `index.html` "Nasıl çalışırım" §2–4: sitede "kutucukları kendin de işaretleyebilirsin", "AI öğretmen isteğe bağlı, kendi anahtarınla", rapor paragrafı gizli (sitede `data-yalniz-yerel` ile işaretlenip JS gizler).
 
-- [ ] **Step 1: Failing test** `SiteOnYuzIcerikTest`: `app.js` içinde `"X-OpenRouter-Anahtar"` yalnız 1 kez geçer (tek çağrı noktası); `index.html`'de `pera` geçmez; `app.js`'te `/api/kullanim` açılış bağımlılığı yok (`aiAktif` kelimesi yok).
-- [ ] **Step 2: FAIL gör:** `./mvnw -Dtest=SiteOnYuzIcerikTest test`
-- [ ] **Step 3: Uygula.** AwesomeDesign standartları: `/Users/felece/Documents/Obsidian Vault/CLAUDE CODE/AwesomeDesign.md` (mevcut `style.css` dilini koru).
-- [ ] **Step 4: PASS** + elle doğrulama (`run` skill'i ya da puppeteer), site profili H2 ile:
+- [x] **Step 1: Failing test** `SiteOnYuzIcerikTest`: `app.js` içinde `"X-OpenRouter-Anahtar"` yalnız 1 kez geçer (tek çağrı noktası); `index.html`'de `pera` geçmez; `app.js`'te `/api/kullanim` açılış bağımlılığı yok (`aiAktif` kelimesi yok).
+- [x] **Step 2: FAIL gör:** `./mvnw -Dtest=SiteOnYuzIcerikTest test`
+- [x] **Step 3: Uygula.** AwesomeDesign standartları: `/Users/felece/Documents/Obsidian Vault/CLAUDE CODE/AwesomeDesign.md` (mevcut `style.css` dilini koru).
+- [x] **Step 4: PASS** + elle doğrulama (`run` skill'i ya da puppeteer), site profili H2 ile:
   `SPRING_DATASOURCE_URL='jdbc:h2:file:./data/site-deneme' APP_SITE_GUVENLI_CEREZ=false ./mvnw spring-boot:run -Dspring-boot.run.profiles=site`
   Kontrol: anahtarsız → bir günün tüm görevlerini işaretle, sonraki gün açılır; sohbet kartı görünür; geçersiz anahtar → "geçersiz" mesajı; ilerleme kodu → ikinci tarayıcı profilinde geri yükle, ilerleme görünür; rapor/AI quiz düğmeleri yok. Yerel mod (`./mvnw spring-boot:run`, anahtarlı) — rapor/değerlendirme eskisi gibi.
-- [ ] **Step 5: Commit** — `[faz-10] Ön yüz: isteğe bağlı anahtar kartı, kendin işaretle, ilerleme kodu`
+- [x] **Step 5: Commit** — `[faz-10] Ön yüz: isteğe bağlı anahtar kartı, kendin işaretle, ilerleme kodu`
 
 ### Task 9: Belgeler, dağıtım şablonları, son doğrulama
 
@@ -247,8 +249,8 @@ Davranış (spec §6.3, §6.4, §6.2):
 - Modify: `CLAUDE.md` (Komutlar: ekip kodu, SMTP, `sifre-baglantisi.sh`, `APP_SITE_KAYIT` satırları kalkar; site çalıştırma = `--spring.profiles.active=site` + `SPRING_DATASOURCE_URL`; OpenRouter anahtarı sitede gerekmez), `ARCHITECTURE.md`, `docs/kurulum-site.md`, `deploy/site.env.ornek` (OpenRouter ve SMTP blokları çıkar), `deploy/nginx-site.conf.ornek` (`egitim.ornek.com`), `docs/tech-debt-tracker.md` (ilgili kalem varsa kapat).
 - Modify: `SitePostgresEntegrasyonTest` — kimlik/şifre betiği senaryoları çıkar; `ziyaretci` tablosu + izolasyon senaryosu PostgreSQL'de.
 
-- [ ] **Step 1:** Belgeleri yaz.
-- [ ] **Step 2: Doğrula:** `./mvnw verify` yeşil; `grep -rniI 'pera\.software\|ekip-kodu\|EKIP_KODU\|SPRING_MAIL' src deploy tools CLAUDE.md docs/kurulum-site.md` → boş; PostgreSQL varsa `PG_TEST_URL=... ./mvnw -Dtest=SitePostgresEntegrasyonTest test` (yoksa "çalıştırılmadı" diye raporla).
-- [ ] **Step 3:** `qa-code-reviewer` ajanıyla tüm dalı incelet; bulguları aynı turda düzelt.
-- [ ] **Step 4: Commit** — `[faz-10] ADR-0017 + belgeler ve dağıtım şablonları girişsiz siteye göre`
-- [ ] **Step 5:** Obsidian Vault notu (`docs/obsidian-vault-rehberi.md`'yi önce oku; sır yazma).
+- [x] **Step 1:** Belgeleri yaz.
+- [x] **Step 2: Doğrula:** `./mvnw verify` yeşil; `grep -rniI 'pera\.software\|ekip-kodu\|EKIP_KODU\|SPRING_MAIL' src deploy tools CLAUDE.md docs/kurulum-site.md` → boş; PostgreSQL varsa `PG_TEST_URL=... ./mvnw -Dtest=SitePostgresEntegrasyonTest test` (yoksa "çalıştırılmadı" diye raporla).
+- [x] **Step 3:** `qa-code-reviewer` ajanıyla tüm dalı incelet; bulguları aynı turda düzelt.
+- [x] **Step 4: Commit** — `[faz-10] ADR-0017 + belgeler ve dağıtım şablonları girişsiz siteye göre`
+- [x] **Step 5:** Obsidian Vault notu (`docs/obsidian-vault-rehberi.md`'yi önce oku; sır yazma).

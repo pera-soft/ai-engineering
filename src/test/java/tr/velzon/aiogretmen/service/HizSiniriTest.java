@@ -107,4 +107,27 @@ class HizSiniriTest {
         assertThat(sinir.anahtarSayisi()).as("bayat 100 anahtar silindi, canlı kaldı").isEqualTo(1);
         assertThat(sinir.izinVer("canli", 1_000_000, SAAT)).isTrue();
     }
+    /** Tech-debt #15: tüketmeden kontrol — izin varken sıfır, doluyken en eski kaydın pencereden çıkmasına kalan süre. */
+    @Test
+    void beklemeTuketmedenKalanSureyiVerir() {
+        ElleSaat saat = new ElleSaat();
+        HizSiniri sinir = new HizSiniri(saat);
+
+        assertThat(sinir.bekleme("k", 3, SAAT)).isEqualTo(Duration.ZERO);
+        assertThat(sinir.anahtarSayisi()).as("kontrol, bilinmeyen anahtar için kayıt açmaz").isZero();
+
+        sinir.izinVer("k", 3, SAAT);                                   // 10:00
+        saat.simdi = Instant.parse("2026-10-22T10:30:00Z");
+        for (int i = 0; i < 5; i++) {
+            assertThat(sinir.bekleme("k", 3, SAAT)).isEqualTo(Duration.ZERO);   // tüketmez
+        }
+        assertThat(sinir.izinVer("k", 3, SAAT)).isTrue();              // 10:30
+        assertThat(sinir.izinVer("k", 3, SAAT)).isTrue();              // 10:30
+
+        assertThat(sinir.bekleme("k", 3, SAAT)).isEqualTo(Duration.ofMinutes(30));
+        saat.simdi = Instant.parse("2026-10-22T10:59:59.500Z");
+        assertThat(sinir.bekleme("k", 3, SAAT)).isEqualTo(Duration.ofMillis(500));
+        saat.simdi = Instant.parse("2026-10-22T11:00:00Z");
+        assertThat(sinir.bekleme("k", 3, SAAT)).isEqualTo(Duration.ZERO);
+    }
 }

@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.RestController;
 import tr.velzon.aiogretmen.service.AtolyeService;
 import tr.velzon.aiogretmen.types.AtolyeDegerlendirme;
 
-import static tr.velzon.aiogretmen.web.AtolyeController.sinirla;
+import static tr.velzon.aiogretmen.web.GirdiSiniri.sinirla;
 
 /**
  * Prompt Atölyesi'nin sunucu anahtarıyla çalışan ucu: POST /api/atolye/degerlendir.

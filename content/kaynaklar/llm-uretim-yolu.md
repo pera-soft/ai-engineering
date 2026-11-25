@@ -251,8 +251,8 @@ sayesinde servisler değişmez."
 | Yönlendirme (routing) | işe göre model/sağlayıcı seçimi | `ModelTuru` GUCLU/HIZLI, model kimlikleri `application.yml`'de (ADR-0003) |
 | Yedek (fallback) | 429/5xx/kalite hatasında başka yere git | **Uygulamada yok** — tek model (§6). OpenRouter aynı model için sağlayıcılar arası yedeği varsayılan yapar (`allow_fallbacks: true`); model yedeği (`models` dizisi) kullanılmıyor |
 | Yeniden deneme (retry) | sınırlı, geri çekilmeli | 3 deneme, yalnız 5xx/bağlantı hatası, 30 sn pencere (`AiYapilandirma`) |
-| Hız sınırı (rate limit) | kiracı/anahtar/model başına | **Yok** — sitede kota yok kararı (ADR-0012); bkz. [`finops-ai-tokenomics.md`](finops-ai-tokenomics.md) |
-| Sır referansı (secret reference) | anahtarı çalışma anında kasadan çek | Ortam değişkeni `OPENROUTER_API_KEY`; değiştirmek yeniden başlatma ister (`docs/kurulum-site.md` §8.3) |
+| Hız sınırı (rate limit) | kiracı/anahtar/model başına | **Var (site)**: sohbet 20/dk/ziyaretçi, yazma 60/dk/IP, yeni ziyaretçi 20/saat/IP (ADR-0017 §7); kota yok, harcama tavanı ziyaretçinin kendi OpenRouter hesabında; bkz. [`finops-ai-tokenomics.md`](finops-ai-tokenomics.md) |
+| Sır referansı (secret reference) | anahtarı çalışma anında kasadan çek | Yerel modda ortam değişkeni `OPENROUTER_API_KEY`; sitede sunucu anahtarı yok — ziyaretçinin anahtarı istek başına `X-OpenRouter-Anahtar` başlığıyla gelir, hiçbir yere yazılmaz (ADR-0017) |
 | Gözlem (observability) | iz, maliyet, kim/ne | `ai_kullanim`: kullanıcı + işlem + istenen model + token + **süre** (`sure_ms`) + **cevaptaki model** (`yanit_model`) — ADR-0016; pano yok (§2) |
 | Korkuluk (guardrail) | PII, kötüye kullanım, konu filtresi | Kısmi: kimliksiz çağrı yapılmaz (fail-closed), ham sağlayıcı gövdesi kullanıcıya/loga gitmez (`AiHataCevirici`) |
 

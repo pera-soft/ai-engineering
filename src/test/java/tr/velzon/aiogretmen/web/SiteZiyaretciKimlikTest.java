@@ -5,17 +5,26 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import tr.velzon.aiogretmen.config.ZiyaretciCerezi;
 import tr.velzon.aiogretmen.config.ZiyaretciKullaniciBaglami;
+import tr.velzon.aiogretmen.service.ZiyaretciService;
 
+import java.sql.Timestamp;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -42,12 +51,17 @@ class SiteZiyaretciKimlikTest {
     private static final String CEREZ_IZOLE_B = "IIIIIIIIIIIIIIIIIIIIIb";
     private static final String CEREZ_CSRF = "SSSSSSSSSSSSSSSSSSSSSs";
     private static final String CEREZ_C = "CCCCCCCCCCCCCCCCCCCC_-";
+    private static final String CEREZ_OKUYAN = "OOOOOOOOOOOOOOOOOOOOOo";
+    private static final String CEREZ_YOK = "OOOOOOOOOOOOOOOOOOOOOy";
 
     @Autowired
     MockMvc mvc;
 
     @Autowired
     JdbcTemplate jdbc;
+
+    @MockitoSpyBean
+    ZiyaretciService ziyaretciService;
 
     private static List<String> setCookie(MvcResult r, String ad) {
         return r.getResponse().getHeaders("Set-Cookie").stream().filter(c -> c.startsWith(ad + "=")).toList();
@@ -156,6 +170,44 @@ class SiteZiyaretciKimlikTest {
                 .andExpect(status().isForbidden());
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM gorev_ilerleme WHERE kullanici_id = ?",
                 Integer.class, ZiyaretciKullaniciBaglami.ONEK + CEREZ_CSRF)).isZero();
+    }
+
+    /**
+     * Son inceleme #3: "180 gün gelmeyen" gerçekten gelmeyen olsun — yalnız okuyan (GET /api/**) ve satırı OLAN
+     * ziyaretçinin {@code son_gorulme}'si tazelenir; satırı olmayan GET satır açmaz.
+     */
+    @Test
+    void getSatiriOlaninSonGorulmesiniTazelerYeniSatirAcmaz() throws Exception {
+        String okuyan = ZiyaretciKullaniciBaglami.ONEK + CEREZ_OKUYAN;
+        Timestamp eski = Timestamp.from(Instant.now().minus(Duration.ofDays(100)));
+        jdbc.update("INSERT INTO ziyaretci (id, olusturma, son_gorulme) VALUES (?, ?, ?)", okuyan, eski, eski);
+
+        mvc.perform(get("/api/program").with(ip()).cookie(new Cookie(ZiyaretciCerezi.AD, CEREZ_OKUYAN)))
+                .andExpect(status().isOk());
+        mvc.perform(get("/api/program").with(ip()).cookie(new Cookie(ZiyaretciCerezi.AD, CEREZ_YOK)))
+                .andExpect(status().isOk());
+
+        Instant son = jdbc.queryForObject("SELECT son_gorulme FROM ziyaretci WHERE id = ?", Timestamp.class, okuyan)
+                .toInstant();
+        assertThat(son).isAfter(Instant.now().minus(Duration.ofMinutes(5)));
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM ziyaretci WHERE id = ?", Integer.class,
+                ZiyaretciKullaniciBaglami.ONEK + CEREZ_YOK)).as("GET satır açmaz").isZero();
+    }
+
+    /** Kalıntı #3: GET'teki tazeleme bir yan iştir — veritabanı hatası okumayı düşürmez (yazmalar düşürür). */
+    @Test
+    void getTazelemeHatasiOkumayiDusurmez() throws Exception {
+        doThrow(new DataAccessResourceFailureException("db yok")).when(ziyaretciService).tazele(anyString());
+
+        mvc.perform(get("/api/program").with(ip()).cookie(new Cookie(ZiyaretciCerezi.AD, CEREZ_OKUYAN)))
+                .andExpect(status().isOk());
+    }
+
+    private static RequestPostProcessor ip() {
+        return r -> {
+            r.setRemoteAddr("10.0.31.1");
+            return r;
+        };
     }
 
     @Test

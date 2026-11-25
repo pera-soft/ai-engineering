@@ -599,17 +599,20 @@ tarafı dal koruması, ayrı bir CI), ya da değişiklikleri insan incelemesine 
 **Uygulama tarafı (AI Öğretmen).** Uygulama otonom bir ajan değildir: her özellik kodda sayısı sabit, döngüsüz
 LLM çağrısıdır (ana çağrı + bozuk JSON'da en fazla bir düzeltme), MCP sunucusu LLM çağırmaz (ADR-0009, `mcp_llmsiz`). Çağrı başına sınırlar var
 (`AiYapilandirma`'da okuma zaman aşımı ve sınırlı yeniden deneme penceresi, `BaglamKirpici`'de
-bağlam tavanı), görünürlük var (`KullanimService` / `ai_kullanim`). **Tavan** yok. Sitede
-ADR-0012 bilinçli olarak "tek anahtar, kota yok" der. Burada ayrım önemli: hız limiti kota
-**değildir**. Kota adil paylaşım içindir. Hız limiti ise kaçağı durduran bir devre kesicidir;
-örneğin bir betiğin `/api/sohbet`'i döngüde çağırması gibi.
+bağlam tavanı), görünürlük var (`KullanimService` / `ai_kullanim`). **Tavan** yok. Sitede ADR-0012'nin "tek anahtar, kota yok" kararı ADR-0017 ile değişti: sunucu anahtarı
+kalktı, sohbet botunu kullanan ziyaretçi kendi OpenRouter anahtarını getirir; toplam harcama tavanı
+ziyaretçinin hesabındadır ve kill switch'e gerek yoktur (ziyaretçi anahtarını iptal eder). Ayrım yine
+önemli: hız limiti kota **değildir**. Kota adil paylaşım içindir. Hız limiti ise kaçağı durduran bir
+devre kesicidir; örneğin bir betiğin `/api/sohbet`'i döngüde çağırması gibi. Sitede artık vardır:
+sohbet 20/dk/ziyaretçi, yazma 60/dk/IP, yeni ziyaretçi 20/saat/IP (ADR-0017 §7) — sunucunun açık
+vekile dönüşmesini önler.
 
 **LAB (yalnız düşün ve yaz; kod değiştirmeden önce ADR):**
 1. Bu oturumu süren ajan için "ajan `git push --force` ya da `MimariTestleri.java` düzenlemesi
    denerse kim söyler?" sorusunu cevapla. Şu an cevap sınıflandırıcıdır. Deterministik bir
    `deny` kuralı ya da `PreToolUse` kapısı gerekir mi?
 2. `ai_kullanim` verisinden "10 dakikada şu kadar token" eşiği türet. Bunu kotadan ayrı bir
-   **devre kesici** olarak tanımla (ADR-0012'nin "kota yok" kararıyla çelişmeden). Tetiklenince ne
+   **devre kesici** olarak tanımla (kota koymadan; sitedeki hız sınırlarına, ADR-0017 §7, ek bir katman olarak). Tetiklenince ne
    olur, yeniden kim açar?
 3. Bu depo için bir canary tasarla: hiçbir meşru işin dokunmadığı bir dosya ya da sahte anahtar.
    Erişimi neresi kaydeder? O kayıt ajanın yazamadığı yerde mi?

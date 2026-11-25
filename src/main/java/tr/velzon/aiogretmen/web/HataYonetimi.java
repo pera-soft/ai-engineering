@@ -4,6 +4,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
@@ -56,9 +57,10 @@ public class HataYonetimi {
 
     /** Girişsiz sitede IP/ziyaretçi hız sınırı aşıldı (Faz 10, ADR-0017). */
     @ExceptionHandler(HizSiniriAsildiException.class)
-    @ResponseStatus(HttpStatus.TOO_MANY_REQUESTS)
-    public Map<String, String> hizSiniriAsildi(HizSiniriAsildiException e) {
-        return Map.of("hata", e.getMessage());
+    public ResponseEntity<Map<String, String>> hizSiniriAsildi(HizSiniriAsildiException e) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, Long.toString(e.beklemeSaniye()))
+                .body(Map.of("hata", e.getMessage()));
     }
 
     /** Jackson'ın ham mesajı Java sınıf adları taşır — kullanıcıya sabit Türkçe metin, ayrıntı logda. */

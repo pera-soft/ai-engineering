@@ -36,6 +36,11 @@ public class ZiyaretciService {
         repo.dokun(kullaniciId, saat.instant());
     }
 
+    /** Satır VARSA {@code son_gorulme}'yi (günde en çok bir kez) tazeler; satır açmaz (salt okuyan istekler). */
+    public void tazele(String kullaniciId) {
+        repo.tazele(kullaniciId, saat.instant());
+    }
+
     public boolean varMi(String kullaniciId) {
         return repo.varMi(kullaniciId);
     }

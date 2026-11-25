@@ -14,6 +14,14 @@ app:
   site:
     guvenli-cerez: ${APP_SITE_GUVENLI_CEREZ:true}         # ziyaretçi + XSRF-TOKEN çerezleri için
     izinli-originler: ${APP_SITE_IZINLI_ORIGINLER:}       # ör. https://egitim.ornek.com (virgülle çoklu)
+    # Hız sınırları (bellek içi, IP/ziyaretçi başına; pencereler sabit). Tek NAT arkasındaki sınıf/ofis için
+    # yükseltilebilir — docs/kurulum-site.md §7.6. Ortam değişkeni adları aşağıdaki placeholder'lardır;
+    # değişken yoksa boş kalır ve config/SiteAyarlari.Hiz'daki @DefaultValue (TEK kaynak: 60/20/10/20) geçerli olur.
+    hiz:
+      yazma-dakika: ${APP_SITE_HIZ_YAZMA_DAKIKA:}                 # yazan istek / dakika / IP
+      sohbet-dakika: ${APP_SITE_HIZ_SOHBET_DAKIKA:}               # sohbet mesajı / dakika / ziyaretçi
+      geri-yukle-saat: ${APP_SITE_HIZ_GERI_YUKLE_SAAT:}           # ilerleme kodu geri yükleme / saat / IP
+      yeni-ziyaretci-saat: ${APP_SITE_HIZ_YENI_ZIYARETCI_SAAT:}   # yeni ziyaretçi / saat / IP
 
 spring:
   # AI (Faz 10, ADR-0017): sohbet ziyaretçinin KENDİ OpenRouter anahtarıyla (X-OpenRouter-Anahtar başlığı,

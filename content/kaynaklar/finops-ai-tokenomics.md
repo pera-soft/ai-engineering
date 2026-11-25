@@ -386,7 +386,7 @@ ikisini karıştırma.
 çağrılmaz. Anlamsal önbellek ise sohbet için **yanlış** bir fikir olurdu ve sebebi maliyet değil
 **izolasyondur**: sohbet prompt'u öğrencinin kendi hafızasını (`OGRENCI.md`) ve son mesajlarını
 taşır; iki öğrencinin "benzer" sorusu farklı cevap gerektirir. Kullanıcıdan bağımsız anahtarlı bir
-anlamsal önbellek, A'nın kişisel bağlamla üretilmiş cevabını B'ye verir — ADR-0012'nin "bir
+anlamsal önbellek, A'nın kişisel bağlamla üretilmiş cevabını B'ye verir — ADR-0012'nin (ADR-0017'de de geçerli) "bir
 kullanıcının başkasının verisini görmesi" başarısızlık ölçütünü doğrudan ihlal eder. Kural: L1
 önbelleğin anahtarı, cevabı etkileyen **her** girdiyi (kullanıcı, bağlam sürümü, model) içermelidir.
 
@@ -627,7 +627,7 @@ SOHBET, QUIZ…; enum'un kendi yorumu "maliyet raporunun etiketi (ADR-0003)" der
 yazar. Yani iş + rota damgası **ilk günden** vardı. Kullanıcı damgası ise sonradan geldi: Faz 9b'de
 `ai_kullanim.kullanici_id` sütunu eklendi ve eski satırlar varsayılan `yerel` değerini aldı
 (ADR-0012 §10). O satırların kime ait olduğu artık bilinemez — "geriye dönük atıf her zaman eksik
-kalır" kuralının bu depodaki küçük kanıtı. Kiracı boyutu tek şirketlik sitede gereksizdir.
+kalır" kuralının bu depodaki küçük kanıtı. Kiracı boyutu bu depoda gereksizdir (her ziyaretçi zaten kendi anahtarıyla ödüyor).
 
 **Dört token katmanı.** Girdi/çıktı ayrımı (§7) gereklidir ama yeterli değildir; girdinin kendisi
 farklı nedenlerle büyüyen üç parçadan oluşur:
@@ -645,7 +645,7 @@ girdi ve çıktı toplamını tutar; web yüzünde araç çağrısı yok, ama **
 artar ve pano bunu "prompt şişti" diye gösterir. Katmanı ayırmanın en ucuz yolu, prompt'u kuran
 yerde (`BaglamServisi` + `PromptFactory`) parça uzunluklarını ayrı ayrı loglamaktır.
 
-#### 7.2. Oran sınırı → harcama tavanı → kill switch — ve bu sitenin "kota YOK" kararı
+#### 7.2. Oran sınırı → harcama tavanı → kill switch — ve bu sitenin "kendi anahtarın" kararı
 Derslerin önerdiği yaptırım merdiveni (enforcement ladder) üç basamaklıdır: (1) kiracı/kullanıcı
 başına **hız sınırı** (beklenen tepenin 2–3 katı; aşılırsa 429), (2) günlük **harcama tavanı**
 (aşılırsa sınır sıkılaşır, uyarı gider), (3) olağandışı harcamada (ör. kişinin kendi tabanından çok
@@ -654,32 +654,33 @@ kill switch'in nasıl tetiklendiği ve ajan bağlamındaki operasyonel ayrıntı
 [`ajan-calisma-zamani-kontrolleri.md`](ajan-calisma-zamani-kontrolleri.md). Burada tek soru şudur:
 bu merdiven **bu depoya** nasıl oturur?
 
-Çok kullanıcılı site (ADR-0012) bilinçli bir kullanıcı kararı taşır: "şirketin tek OpenRouter
-anahtarı, **kota yok**." ADR'nin başarısızlık ölçütü de bellidir: "pera dışından birinin kayıt olup
-şirket anahtarını harcaması." Yani bu karar "harcama önemsiz" demiyor; **kişi başı tavanı**
-reddediyor ve kötüye kullanım riskini **kimlik** katmanında kapatıyor: yalnız `@pera.software`,
-kayıt ekip koduyla (ADR-0015), kimliksiz model çağrısı yok (`SpringAiOgretmenClient` kimliği
-çağrıdan önce çözer). 50–60 kişilik, kimliği bilinen bir iç kitlede kişi başı kota çoğu zaman
-öğrenmeyi cezalandırır; bu karar savunulabilirdir.
+Tarihçe tek cümlede: ADR-0012 siteyi "şirketin tek OpenRouter anahtarı, kota yok" diye kurmuştu ve
+kötüye kullanımı kimlik katmanında (`@pera.software` + ekip kodu) kapatıyordu; ADR-0017 (2026-11-25)
+bu modeli **değiştirdi**. Site artık girişsizdir ve sohbet botunu kullanan her ziyaretçi **kendi
+OpenRouter anahtarını** getirir (BYOK — bring your own key, "kendi anahtarını getir"). Sunucuda
+OpenRouter anahtarı yoktur; anahtar yalnız o isteğin ömrü boyunca bellekte yaşar, veritabanına, loga
+ya da `ai_kullanim`'a yazılmaz. Karar harcama tavanını merdivenden silmedi, **ziyaretçinin hesabına
+taşıdı**: maliyet ve toplam harcama tavanı ziyaretçinin kendi OpenRouter hesabındadır (sohbet
+panelindeki yardım metni "anahtarına bir harcama limiti koy" der) ve sitenin maliyet maruziyeti
+yaklaşık sıfırdır. Kalan risk, sunucunun **açık vekile** (open proxy) dönüşmesidir; bunu bu kez
+kimlik değil **hız sınırları** kapatır.
 
-Kota yokken **hangi korkuluk yine de anlamlı?** Merdivenin her basamağını "kota mı, değil mi"
-sorusuyla ayır:
+Merdivenin her basamağı bu modelde nerede duruyor?
 
-| Korkuluk | Kota mı? | Bu depoda | Yorum |
-|---|---|---|---|
-| Çağrı başına tavan (`max_tokens`, sınırlı yeniden deneme) | Hayır | **Var** (`max_tokens`: ADR-0003; 3 deneme / 30 sn: `application.yml`) | Tek bir çağrının kaçmasını önler; kotayla çelişmez |
-| Toplam harcama tavanı (gateway'de) | Hayır — kişiye değil şirkete | **Runbook'ta**: aylık tavan OpenRouter panelinden (`docs/kurulum-site.md` §8.3); aşılınca 402 → `KREDI_BITTI` | Şirketi korur; ama aşılınca **herkes** durur (geniş patlama yarıçapı) |
-| Olağandışılık uyarısı (kişi başı günlük toplam) | Hayır — engellemez, haber verir | **Yok**; veri var (`ai_kullanim` kullanıcı + işlem) | En düşük sürtünmeli eksik; "kota yok" ile tam uyumlu |
-| Yüksek hız sınırı (insanın ulaşamayacağı, döngünün ulaşacağı) | Hayır — toplamı değil hızı sınırlar | **Yok** (AI uçlarında) | Takılan bir sekme/betik döngüsüne karşı; ADR ile karar verilmeli |
-| Kill switch | — | **Kaba**: anahtarı kaldırıp yeniden başlatınca AI uçları 503, site açık kalır (`AiYapilandirma`) | Çalışır ama dakikalar sürer, tümden kapatır |
-| Kişi başı günlük/aylık token kotası | **Evet** | Bilinçli olarak yok (ADR-0012) | Kullanıcı kararı |
+| Korkuluk | Bu depoda | Yorum |
+|---|---|---|
+| Çağrı başına tavan (`max_tokens`, sınırlı yeniden deneme) | **Var** (`max_tokens`: ADR-0003; 3 deneme / 30 sn: `application.yml`) | Tek bir çağrının kaçmasını önler |
+| Hız sınırı (bellek içi, tek JVM) | **Var** (ADR-0017 §7): sohbet 20/dk/ziyaretçi, yazma 60/dk/IP, yeni ziyaretçi 20/saat/IP, ilerleme kodu geri yükleme 10/saat/IP; aşımda 429 | Maliyeti değil **kötüye kullanımı** sınırlar: betik her istekte yeni çerezle satır üretemez, sunucu açık vekil olmaz. Yeniden başlatmada sıfırlanır; çok örneğe çıkılırsa ortak depo gerekir |
+| Toplam harcama tavanı | **Ziyaretçinin OpenRouter hesabında** | Tavan sitede değil, parayı harcayanın elinde; bir ziyaretçinin tavanı dolarsa (402 → "kredin bitti") yalnız o kişi durur, başkası etkilenmez (patlama yarıçapı = 1 kişi) |
+| Olağandışılık uyarısı (kişi başı günlük toplam) | **Yok**, gerekmiyor | Sunucu kimsenin parasını harcamıyor; harcamayı görmek ziyaretçinin OpenRouter panelinin işi |
+| Kill switch | **Maliyet tarafında kapatılacak bir şey yok** | Sunucu anahtarı yok. Ziyaretçi anahtarını OpenRouter'dan iptal ederse harcama anında biter (sunucu 401 görür, ön yüz anahtarı siler). Sohbet dışındaki AI uçları sitede zaten kapalıdır (404): `/api/degerlendir`, `/api/rapor/**`, `/api/quiz/uret` vb. yalnız yerel modda, sunucu anahtarıyla çalışır |
 
-Sonuç: "kota YOK" kararı merdivenin **kişiye özel toplam tavanını** kaldırır, merdivenin kendisini
-değil. Çağrı başına tavan ve gateway'deki şirket tavanı zaten var; en ucuz eksik basamak
-**engellemeyen bir olağandışılık uyarısıdır** (ör. `ai_kullanim` üzerinden günlük kişi başı toplamın
-o kişinin olağan düzeyinden çok sapması). Yüksek bir hız sınırı ise kota değil bir **hata
-korkuluğudur**; eklenecekse bu ayrım bir ADR'ye yazılmalı ki ileride "kotayı gizlice getirdik" diye
-okunmasın. Bunlar bir reçete değil, kaydedilecek kararlardır.
+Sonuç: ADR-0012'nin "kota yok" kararı merdiveni değil **kimin ödediğini** belirliyordu; ADR-0017 aynı
+merdiveni korur ama tavanı ödeyenin hesabına koyar. Ders genelleşir: kullanıcıya açık bir AI
+özelliğinde en güçlü maliyet korkuluğu çoğu zaman bir eşik değil, **maliyetin sahibini değiştirmektir**
+(BYOK); geriye kalan iş, sistemin başkasının anahtarıyla bile olsa açık vekil olmasını önleyen hız
+sınırlarıdır. Yerel modda (sunucu anahtarı, tek kullanıcı) ise eski tablo geçerlidir: yalnız çağrı
+başına tavan ve OpenRouter panelindeki hesap tavanı. Bunlar bir reçete değil, kaydedilecek kararlardır.
 
 ## Diyagram 3 — Çağrı başına maliyet vs başarılı çıktı başına maliyet
 Solda ucuz model üç denemede tutturuyor; sağda pahalı model bir denemede. Çağrı başına metrik solu
@@ -793,13 +794,16 @@ seçtirir; başarılı çıktı başına metrik gerçeği gösterir.
     *Cevap:* Hepsi ilk yazma bitmeden gelir: 10 yazma, 0 okuma. Önce tek çağrı, önbellek dolunca
     kalan 9'u paralel. Rapor için "24 saat bu kullanıcı için ne demek?" — "üretim" olması değil
     SLA'sı belirler.
-16. Sitede kişi başı kota yok (ADR-0012). Yine de anlamlı olan iki korkuluğu say ve neden kotayla
-    çelişmediklerini açıkla. Çağrı noktasında damgalamanın bu depodaki kanıtı nedir (hangi sütun
-    sonradan geldi, eski satırlara ne oldu)?
-    *Cevap:* Ör. çağrı başına tavan (`max_tokens` + sınırlı deneme) ve engellemeyen olağandışılık
-    uyarısı; ikisi de kişinin toplam kullanımını sınırlamaz. (Gateway'deki şirket tavanı da var ama
-    aşılınca herkesi durdurur.) `Islem` + model ilk günden damgalı; `kullanici_id` Faz 9b'de
-    eklendi, eski satırlar `yerel` oldu — kimin olduğu artık bilinemez.
+16. Sitede sunucu anahtarı yok; her ziyaretçi kendi OpenRouter anahtarını getirir (ADR-0017, eski
+    "tek anahtar, kota yok" kararı ADR-0012'ydi). Maliyet tavanı artık nerede duruyor, sitenin
+    hâlâ ihtiyaç duyduğu korkuluk hangisi ve neden? Çağrı noktasında damgalamanın bu depodaki
+    kanıtı nedir (hangi sütun sonradan geldi, eski satırlara ne oldu)?
+    *Cevap:* Toplam harcama tavanı ziyaretçinin kendi OpenRouter hesabındadır (yardım metni limit
+    koymasını söyler); sitenin maliyet maruziyeti ~0'dır, bir ziyaretçinin kredisi bitince (402)
+    yalnız o durur. Sunucunun açık vekile dönüşmemesi için hız sınırları gerekir (sohbet
+    20/dk/ziyaretçi, yazma 60/dk/IP, yeni ziyaretçi 20/saat/IP). Çağrı başına tavan
+    (`max_tokens` + sınırlı deneme) de durur. `Islem` + model ilk günden damgalı; `kullanici_id`
+    Faz 9b'de eklendi, eski satırlar `yerel` oldu — kimin olduğu artık bilinemez.
 
 ## Kaynaklar
 - **FinOps for AI — teknoloji kategorisi (FinOps Framework):**

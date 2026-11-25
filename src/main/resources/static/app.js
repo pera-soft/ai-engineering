@@ -1550,8 +1550,13 @@ function anahtarKaldirDugmesiEkle() {
   document.querySelector(".chat-head").appendChild(btn);
 }
 
+/** Anahtar nesli: her anahtar değişiminde artar; istek sürerken değiştiyse geç gelen cevap/hata panele basılmaz
+ *  (panel yeniden çizildi, "düşünüyor…" düğümü ayrıldı — tech-debt #10). */
+let anahtarNesli = 0;
+
 /** Anahtar eklendi/silindi/geçersiz çıktı: bayrağı yeniden hesapla, paneli ve görev düğmelerini yeniden çiz. */
 function anahtarDegisti(hataMetni) {
+  anahtarNesli++;
   durum.sohbetAcik = sohbetAcikHesapla();
   if (!durum.sohbetAcik) { // öğretmen kapısı artık kapanamaz — bekleyen kapıyı bırak; görev kendin işaretlenir
     durum.gorevBekleyen = null;
@@ -1597,6 +1602,7 @@ async function gonder() {
   chatGirdi().value = "";
   chatGonderBtn().disabled = true;
   const nesil = haftaSecNesli;          // (#race) gönderim anındaki hafta bağlamı
+  const anahtarNesil = anahtarNesli;    // gönderim anındaki anahtar nesli (tech-debt #10)
   mesajEkle("user", metin);
   const bekleyen = mesajEkle("asistan bekliyor", "düşünüyor…");
 
@@ -1609,6 +1615,7 @@ async function gonder() {
       body: JSON.stringify({ hafta: sohbetHaftasi(), gun: durum.sohbetGun, mesaj: metin }),
     });
     if (nesil !== haftaSecNesli) { bekleyen.remove(); return; } // hafta değişti — bayat yanıtı basma (#race)
+    if (anahtarNesil !== anahtarNesli) { eskiAnahtarBilgisi(true); return; } // anahtar değişti — cevabı yeni panele ekleme
     bekleyen.remove();
     mesajEkle("asistan", yanit.icerik);
     // YUMUŞAK KAPI: bir oku/tartış görevi öğretmen cevabı bekliyorsa, kullanıcının samimi bir
@@ -1645,14 +1652,24 @@ async function gonder() {
         anahtarDegisti(h.status === 401 ? h.message + " Yeni bir anahtar oluşturup buraya ekle." : h.message);
         return;
       }
-      bekleyen.textContent = "Hata (önceki anahtarla gönderilen mesaj): " + h.message;
-      return;
     }
+    // anahtar bu arada değişti: panel yeniden çizildi, bekleyen düğüm ayrık — hatayı oraya yazma, tek satır bilgi ver
+    if (anahtarNesil !== anahtarNesli) { eskiAnahtarBilgisi(false); return; }
     bekleyen.textContent = "Hata: " + h.message;
   } finally {
     chatGonderBtn().disabled = !durum.sohbetAcik;
     if (durum.sohbetAcik) chatGirdi().focus();
   }
+}
+
+/**
+ * İstek sürerken anahtar değişti: eski anahtarın cevabı/hatası yerine yeni panele tek satırlık görünür bilgi.
+ * cevapGeldi: başarılı cevap sunucuda sohbet geçmişine kaydedildi → orada görüneceği söylenir.
+ */
+function eskiAnahtarBilgisi(cevapGeldi) {
+  mesajEkle("sistem", cevapGeldi
+    ? "Önceki anahtarla gönderilen mesajın cevabı burada gösterilmedi; sohbet geçmişinde görünecek."
+    : "Önceki anahtarla gönderilen mesajın cevabı gösterilmedi.");
 }
 
 /** Değerlendirme kartını KURAR ve döndürür (bir yere eklemez — çağıran yerleştirir). */

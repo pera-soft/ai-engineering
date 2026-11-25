@@ -67,6 +67,32 @@ public class HizSiniri {
     }
 
     /**
+     * İzin var mı — TÜKETMEDEN bakar (tech-debt #15): izin varsa {@link Duration#ZERO}, pencere doluysa en eski
+     * kaydın pencereden çıkmasına kalan süre. Bilinmeyen anahtar için kayıt açmaz; budama kova başına atomik
+     * {@code computeIfPresent} içinde yapılır.
+     *
+     * <p>Birden çok kovalı istek önce tüm kovalara bununla bakar, hepsi izin veriyorsa {@link #izinVer} ile yazar:
+     * reddedilen istek önceki kovaları tüketmez. "Kontrol-sonra-yaz" yarışı: eşzamanlı iki istek aynı boş yeri
+     * görebilir; {@code izinVer} kova başına atomik olduğu için sınır yine aşılmaz, yalnız yarışı kaybeden istek
+     * (nadiren) kendinden önceki kovalara yazmış olarak reddedilir — kabul edilebilir sapma.
+     */
+    public Duration bekleme(String anahtar, int enCok, Duration pencere) {
+        Instant simdi = saat.instant();
+        Instant sinir = simdi.minus(pencere);
+        Duration[] kalan = {Duration.ZERO};
+        kayitlar.computeIfPresent(anahtar, (k, z) -> {
+            while (!z.isEmpty() && !z.peekFirst().isAfter(sinir)) {
+                z.pollFirst();
+            }
+            if (!z.isEmpty() && z.size() >= enCok) {
+                kalan[0] = Duration.between(sinir, z.peekFirst());
+            }
+            return z.isEmpty() ? null : z;
+        });
+        return kalan[0];
+    }
+
+    /**
      * Bir daha hiç gelmeyen anahtarların (taze çerezli betikler, IPv6 dönüşümü) bellekte kalmaması için: en yeni
      * kaydı bilinen en büyük pencereden eski olan kuyruklar silinir. Eşzamanlı {@code izinVer}'le {@code compute}
      * üzerinden güvenli yarışır.

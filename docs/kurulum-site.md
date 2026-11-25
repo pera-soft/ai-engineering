@@ -224,12 +224,13 @@ Her gece 03:30'da (sunucu saati) 180 gündür gelmeyen ziyaretçilerin bütün s
 Kontrol:
 ```bash
 sudo journalctl -u ai-ogretmen-site --since today | grep 'Ziyaretçi temizliği'
-#   → "Ziyaretçi temizliği tamam: N ziyaretçi silindi"
+#   → "Ziyaretçi temizliği tamam: N ziyaretçi silindi, M geri döndüğü için atlandı, K başarısız"
 ```
 `… başarısız (sonraki turda yeniden denenecek)` görürsen o ziyaretçinin silinmesi geri alınmıştır; sonraki
-gece yeniden denenir. `Öğrenci hafızası silinemedi` uyarısında veritabanı satırları silinmiştir ama dizin
-`data/hafiza/kullanicilar/` altında kalmış olabilir (bilinen sınırlama, ADR-0017) — izinleri düzelt, dizini
-elle silebilirsin (kimlik rastgele olduğundan ona kimse ulaşamaz).
+gece yeniden denenir. `kişisel dizin silinemedi` nedeninde hafıza/rapor dizini (izin, disk) silinemediği için
+veritabanı satırları da geri alınmıştır — izinleri düzelt, sonraki gece hepsi birlikte silinir (ADR-0017).
+`Ziyaretçi geri döndü, atlandı` (INFO) hata değildir: ziyaretçi listelemeyle silme arasında geldi, verisi
+korundu; özetteki "atlandı" sayısına girer, "başarısız"a girmez.
 
 ### 7.3 Bir ziyaretçinin verisini silme (KVKK talebi)
 Ziyaretçi kendi tarayıcısında "🔄 Sıfırla" düğmesiyle ilerlemesini silebilir. Tamamen silinmesini
@@ -262,8 +263,20 @@ Sitede kota yok; AI maliyeti ziyaretçinin kendi anahtarına yazılır. Ziyaret�
 
 ### 7.6 Hız sınırları (bilgi)
 Aşımda 429 Türkçe mesaj döner: yazan istekler IP başına 60/dk, sohbet ziyaretçi başına 20/dk, ilerleme kodu
-geri yükleme IP başına 10/saat, yeni ziyaretçi IP başına 20/saat. Sayaçlar bellekte; restart sıfırlar.
-Değerler kodda sabittir (`HizSiniriInterceptor`).
+geri yükleme IP başına 10/saat, yeni ziyaretçi IP başına 20/saat (varsayılanlar). Sayaçlar bellekte; restart
+sıfırlar. Pencereler sabit, sayılar `/etc/ai-ogretmen/site.env`'den ayarlanır (sonra `systemctl restart`):
+
+| Değişken | Varsayılan | Anlamı |
+|---|---|---|
+| `APP_SITE_HIZ_YAZMA_DAKIKA` | 60 | yazan istek / dakika / IP |
+| `APP_SITE_HIZ_SOHBET_DAKIKA` | 20 | sohbet mesajı / dakika / ziyaretçi |
+| `APP_SITE_HIZ_GERI_YUKLE_SAAT` | 10 | ilerleme kodu geri yükleme / saat / IP |
+| `APP_SITE_HIZ_YENI_ZIYARETCI_SAAT` | 20 | yeni ziyaretçi / saat / IP |
+
+**Tek NAT arkasında sınıf/ofis:** herkes aynı genel IP'den gelir, IP başına sınırlar bütün sınıfa paylaşılır
+(ör. 30 kişilik sınıf ilk derste 20 yeni ziyaretçiden sonra 429 alır). Böyle bir kullanım bekleniyorsa
+`APP_SITE_HIZ_YENI_ZIYARETCI_SAAT` (ör. 60) ve `APP_SITE_HIZ_YAZMA_DAKIKA` (ör. 300) yükseltilir; sohbet sınırı
+ziyaretçi başına olduğundan etkilenmez. Değerler en az 1 olmalı (yoksa uygulama açılmaz).
 
 ## 8. Sorun giderme
 

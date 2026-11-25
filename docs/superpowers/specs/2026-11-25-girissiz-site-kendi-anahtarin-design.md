@@ -1,7 +1,7 @@
 # Tasarım — Girişsiz site + "kendi OpenRouter anahtarın" ile sohbet
 
 - **Tarih:** 2026-11-25
-- **Durum:** onaylandı (2026-11-25). Kapsam: site internete açılmaya hazır biçimde — hız sınırları, 180 gün
+- **Durum:** onaylandı ve uygulandı (2026-11-25); karar kaydı: [ADR-0017](../../adr/0017-girissiz-site-ve-kendi-anahtarin.md). Kapsam: site internete açılmaya hazır biçimde — hız sınırları, 180 gün
   temizliği, `deploy/` ve kurulum belgesi bu işe dahil, ertelenmez (*benim kararım*: kullanıcı bana bıraktı;
   "sıfır teknik borç" kuralı + açıldığı gün güvenli olsun).
 - **Etkilediği kararlar:** ADR-0012 (site profili), ADR-0013 (SMTP), ADR-0015 (ekip kodu) → yeni **ADR-0017**

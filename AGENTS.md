@@ -12,6 +12,7 @@
     Yerel http denemesi: `APP_SITE_GUVENLI_CEREZ=false`
   - Site veritabanı (ADR-0014): `SPRING_DATASOURCE_URL` (+ `_USERNAME`, `_PASSWORD`) ŞART — canlıda
     PostgreSQL; yoksa açılmaz. Yerel deneme: `SPRING_DATASOURCE_URL='jdbc:h2:file:./data/site-deneme'`
+  - Site hız sınırları (isteğe bağlı, tek NAT arkasındaki sınıf/ofis için): `APP_SITE_HIZ_*` (yazma/dk 60, sohbet/dk 20, geri-yükle/saat 10, yeni ziyaretçi/saat 20; `docs/kurulum-site.md` §7.6)
   - Site dağıtımı/işletmesi: `docs/kurulum-site.md` (runbook) + `deploy/` (systemd, nginx, env, PostgreSQL
     şablonları — gerçek host/IP/sır YOK); nginx arkasında `APP_SITE_IZINLI_ORIGINLER`
 - PostgreSQL uyumluluk testi (opt-in, atılabilir DB ile): `PG_TEST_URL=jdbc:postgresql://localhost:5432/<db>

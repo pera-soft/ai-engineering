@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
@@ -79,6 +80,8 @@ class SiteSohbetAnahtarTest {
     /** Her sahte-sunucu isteğinin buluşmayı gerçekten görüp görmediği (await sonucu). */
     static final ConcurrentLinkedQueue<Boolean> BULUSMA_SONUCLARI = new ConcurrentLinkedQueue<>();
     static final HttpServer SUNUCU;
+    /** Sahte sunucunun iş parçacıkları; @AfterAll'da kapatılır (açık kalırsa test JVM'i 60 sn'ye kadar bekler). */
+    static final ExecutorService SUNUCU_HAVUZU = Executors.newCachedThreadPool();
     static final Path HAFIZA;
 
     static {
@@ -88,7 +91,7 @@ class SiteSohbetAnahtarTest {
         } catch (IOException e) {
             throw new IllegalStateException(e);
         }
-        SUNUCU.setExecutor(Executors.newCachedThreadPool());
+        SUNUCU.setExecutor(SUNUCU_HAVUZU);
         SUNUCU.createContext("/", SiteSohbetAnahtarTest::cevapla);
         SUNUCU.start();
     }
@@ -102,6 +105,7 @@ class SiteSohbetAnahtarTest {
     @AfterAll
     static void kapat() {
         SUNUCU.stop(0);
+        SUNUCU_HAVUZU.shutdownNow();
     }
 
     private static void cevapla(HttpExchange x) throws IOException {
@@ -255,6 +259,7 @@ class SiteSohbetAnahtarTest {
         MvcResult r = sohbet("10.6.0.8", "DDDDDDDDDDDDDDDDDDDDDb", GECERSIZ);
         assertThat(r.getResponse().getStatus()).isEqualTo(402);
         assertThat(r.getResponse().getContentAsString()).contains("kredin bitti");
+        assertThat(r.getResolvedException()).isNotNull();
         for (Throwable t = r.getResolvedException(); t != null; t = t.getCause() == t ? null : t.getCause()) {
             assertThat(t.toString()).as("402 gövdesi anahtarı yansıtır; zincirde olmamalı").doesNotContain("sk-or-");
         }

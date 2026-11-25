@@ -1,5 +1,9 @@
 # ExecPlan: Faz 9 — pera ekibi için çok kullanıcılı eğitim sitesi
 
+> **Durum: TAMAMLANDI.** Faz 9 bitti; kimlik kısmı (login / e-posta doğrulama / ekip kodu / `@pera.software`)
+> 2026-11-25'te Faz 10 ile kaldırıldı — bkz. [ADR-0017](../../adr/0017-girissiz-site-ve-kendi-anahtarin.md) ve
+> [faz-10-girissiz-site.md](faz-10-girissiz-site.md). Aşağıdaki metin tarihsel kayıttır.
+
 > Yaşayan belge. Yalnızca bu belgeden işi yeniden başlatmak mümkün olmalı.
 > Kaynak: kullanıcı isteği (2026-10-22) — "pera'da birçok kullanıcı var; login olsun, her kullanıcı
 > kendi durumunu görsün, herkes farklı hafta/günde olabilir". `docs/gelecek-cok-kullanicili-dagitim.md`

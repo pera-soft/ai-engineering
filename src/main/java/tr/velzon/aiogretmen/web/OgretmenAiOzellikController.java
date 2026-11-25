@@ -16,7 +16,8 @@ import tr.velzon.aiogretmen.types.UretilenQuiz;
 import java.util.Map;
 
 import static tr.velzon.aiogretmen.web.OgretmenController.haftaGerekli;
-import static tr.velzon.aiogretmen.web.OgretmenController.sinirla;
+import static tr.velzon.aiogretmen.web.GirdiSiniri.BOLEREK_GONDER;
+import static tr.velzon.aiogretmen.web.GirdiSiniri.sinirla;
 
 /**
  * Sunucu anahtarıyla çalışan, sohbet dışı AI uçları: değerlendirme, örnek, açıklama, quiz üretimi, rapor.
@@ -50,7 +51,7 @@ public class OgretmenAiOzellikController {
     public Map<String, Object> degerlendir(@RequestBody DegerlendirIstek istek) {
         String tur = istek.tur() == null || istek.tur().isBlank() ? "OZET" : istek.tur();
         var sonuc = degerlendirmeService.degerlendir(haftaGerekli(istek.hafta()), istek.gun(), tur,
-                sinirla("icerik", istek.icerik()), istek.gorevMetni());
+                sinirla("icerik", istek.icerik(), BOLEREK_GONDER), istek.gorevMetni());
         return Map.of("gonderimId", sonuc.gonderimId(), "degerlendirme", sonuc.degerlendirme());
     }
 
@@ -61,14 +62,14 @@ public class OgretmenAiOzellikController {
     @PostMapping("/ornek")
     public Map<String, Object> ornek(@RequestBody OrnekIstek istek) {
         return Map.of("ornek", ornekService.ornekUret(haftaGerekli(istek.hafta()), istek.gun(),
-                sinirla("gorevMetni", istek.gorevMetni())));
+                sinirla("gorevMetni", istek.gorevMetni(), BOLEREK_GONDER)));
     }
 
     /** "Soruyu aç": görevi sade Türkçeyle açar + terimleri tanımlar (CEVAP/ÖRNEK vermez). */
     @PostMapping("/aciklama")
     public Map<String, Object> aciklama(@RequestBody OrnekIstek istek) {
         return Map.of("aciklama", ornekService.aciklaUret(haftaGerekli(istek.hafta()), istek.gun(),
-                sinirla("gorevMetni", istek.gorevMetni())));
+                sinirla("gorevMetni", istek.gorevMetni(), BOLEREK_GONDER)));
     }
 
     public record QuizUretIstek(Integer hafta, Integer adet) {

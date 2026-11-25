@@ -29,21 +29,6 @@ public class OgretmenController {
         this.kullanimService = kullanimService;
     }
 
-    /** Girdi üst sınırı (inceleme bulgusu): dev yapıştırma → context aşımı → anlamsız 500 olmasın. */
-    static final int MAX_GIRDI = 20_000;
-
-    static String sinirla(String alanAdi, String deger) {
-        if (deger == null || deger.isBlank()) {
-            throw new IllegalArgumentException(alanAdi + " boş olamaz");
-        }
-        if (deger.length() > MAX_GIRDI) {
-            throw new IllegalArgumentException(
-                    alanAdi + " çok uzun (%d karakter) — üst sınır %d. Metni bölerek gönder."
-                            .formatted(deger.length(), MAX_GIRDI));
-        }
-        return deger;
-    }
-
     /**
      * Hafta alanı zorunlu: eksik/null gelirse primitive int sessizce 0 olurdu (ana sayfadan sohbet hatası).
      * Var olmayan hafta numarası (0, 13…) servis katmanında BulunamadiException → 404 olur.
@@ -60,7 +45,7 @@ public class OgretmenController {
 
     @PostMapping("/sohbet")
     public SohbetMesaji sohbet(@RequestBody SohbetIstek istek) {
-        return sohbetService.mesajGonder(haftaGerekli(istek.hafta()), istek.gun(), sinirla("mesaj", istek.mesaj()));
+        return sohbetService.mesajGonder(haftaGerekli(istek.hafta()), istek.gun(), GirdiSiniri.sinirla("mesaj", istek.mesaj(), GirdiSiniri.BOLEREK_GONDER));
     }
 
     @GetMapping("/sohbet/{hafta}")

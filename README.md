@@ -1069,7 +1069,7 @@ yetkilidir) — ADR-0017.
 ./mvnw -Dtest='DegerlendirmeServiceTest#*' test # bir sınıfın tüm metotları (desen örneği)
 ```
 
-- `./mvnw verify` şu an **67 test sınıfında 403 test** çalıştırır ve yeşildir; bunların **5'i
+- `./mvnw verify` şu an **71 test sınıfında 427 test** çalıştırır ve yeşildir; bunların **5'i
   atlanır** (aşağıdaki isteğe bağlı PostgreSQL testi).
 - Testler katman katman düzenlenmiştir: `ai/` (prompt doldurma, JSON ayrıştırma, anlam araması),
   `repo/` (içerik ve atölye ayrıştırıcıları, kullanım sorguları, şema taşınabilirliği), `service/`

@@ -18,9 +18,6 @@ import java.util.List;
 @RequestMapping("/api/atolye")
 public class AtolyeController {
 
-    /** Girdi üst sınırı (OgretmenController deseni): dev yapıştırma → context aşımı olmasın. */
-    static final int MAX_GIRDI = 20_000;
-
     private final AtolyeService atolyeService;
 
     public AtolyeController(AtolyeService atolyeService) {
@@ -30,17 +27,5 @@ public class AtolyeController {
     @GetMapping
     public List<AtolyeKategori> kategoriler() {
         return atolyeService.kategoriler();
-    }
-
-    static String sinirla(String alanAdi, String deger) {
-        if (deger == null || deger.isBlank()) {
-            throw new IllegalArgumentException(alanAdi + " boş olamaz");
-        }
-        if (deger.length() > MAX_GIRDI) {
-            throw new IllegalArgumentException(
-                    alanAdi + " çok uzun (%d karakter) — üst sınır %d."
-                            .formatted(deger.length(), MAX_GIRDI));
-        }
-        return deger;
     }
 }

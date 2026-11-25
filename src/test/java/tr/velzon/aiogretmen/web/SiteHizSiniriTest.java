@@ -71,6 +71,31 @@ class SiteHizSiniriTest {
 
         assertThat(r.getResponse().getStatus()).isEqualTo(429);
         assertThat(r.getResponse().getContentAsString()).isEqualTo(GOVDE_429);
+        // Retry-After: yazma penceresinin (1 dk) kalan süresi, saniye, en az 1
+        assertThat(r.getResponse().getHeader("Retry-After")).isNotNull();
+        assertThat(Integer.parseInt(r.getResponse().getHeader("Retry-After"))).isBetween(1, 60);
+    }
+
+    /** Tech-debt #15: geri-yükle sınırına takılan (reddedilen) istekler aynı IP'nin yazma kovasını tüketmez. */
+    @Test
+    void reddedilenGeriYukleYazmaKovasiniTuketmez() throws Exception {
+        for (int i = 1; i <= 50; i++) {   // 10 izinli (422) + 40 reddedilen (429)
+            MvcResult r = mvc.perform(post("/api/ziyaretci/geri-yukle").with(ip("10.0.8.1"))
+                    .cookie(new Cookie(ZiyaretciCerezi.AD, "KKKKKKKKKKKKKKKKKKKKKa"))
+                    .with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"kod\":\"NNNNNNNNNNNNNNNNNNNNNa\"}")).andReturn();
+            assertThat(r.getResponse().getStatus()).as("geri-yükle " + i).isEqualTo(i <= 10 ? 422 : 429);
+            if (i > 10) {
+                assertThat(Integer.parseInt(r.getResponse().getHeader("Retry-After")))
+                        .as("geri-yükle penceresi 1 saat").isBetween(3500, 3600);
+            }
+        }
+        // yaz|ip kovasında yalnız 10 izinli istek var → 50 yazma daha sığar
+        for (int i = 1; i <= 50; i++) {
+            assertThat(gorev("10.0.8.1", "KKKKKKKKKKKKKKKKKKKKKa").getResponse().getStatus()).as("görev " + i)
+                    .isEqualTo(200);
+        }
+        assertThat(gorev("10.0.8.1", "KKKKKKKKKKKKKKKKKKKKKa").getResponse().getStatus()).isEqualTo(429);
     }
 
     /** Sitede sunucu anahtarı yok → sohbet 503 döner; sayaç preHandle'da işler, 21. istek yine 429 olmalı. */

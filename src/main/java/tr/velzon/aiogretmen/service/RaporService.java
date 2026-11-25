@@ -41,6 +41,8 @@ import java.util.stream.Collectors;
 public class RaporService {
 
     static final int MAX_TOKENS = 3000;
+    /** {@code app.rapor-dir} verilmezse (ZiyaretciTemizlikService de aynı kökü denetler). */
+    static final String VARSAYILAN_RAPOR_DIR = "./data/raporlar";
 
     private final Path raporKok;
     private final OgretmenAiClient aiClient;
@@ -66,7 +68,7 @@ public class RaporService {
                         IlerlemeRepo ilerlemeRepo, QuizSonucRepo quizSonucRepo,
                         GonderimRepo gonderimRepo, SohbetRepo sohbetRepo,
                         KullaniciBaglami kullaniciBaglami) {
-        this.raporKok = Path.of(props.raporDir() == null ? "./data/raporlar" : props.raporDir());
+        this.raporKok = Path.of(props.raporDir() == null ? VARSAYILAN_RAPOR_DIR : props.raporDir());
         this.aiClient = aiClient;
         this.baglamServisi = baglamServisi;
         this.promptFactory = promptFactory;

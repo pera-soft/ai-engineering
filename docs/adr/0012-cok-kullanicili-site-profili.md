@@ -7,7 +7,7 @@
 > `kullanici_id` izolasyonu geçerli kalır. Aşağıdaki metin tarihsel kayıttır, silinmedi.
 
 - **Durum:** Kabul edildi (9a + 9b + 9c + 9d uygulandı — 9c e-posta: ADR-0013, 9d PostgreSQL: ADR-0014; 9e açık — bkz.
-  `docs/exec-plans/active/faz-9-cok-kullanicili-site.md`). 2026-10-22 güncellemesi: self-servis hesap silme
+  `docs/exec-plans/completed/faz-9-cok-kullanicili-site.md`). 2026-10-22 güncellemesi: self-servis hesap silme
   KALDIRILDI (§9, §10).
 - **Tarih:** 2026-10-22
 - **Bağlam sahibi:** kullanıcı kararı (pera ekibi için site) + uygulayıcı kararları (aşağıda işaretli)

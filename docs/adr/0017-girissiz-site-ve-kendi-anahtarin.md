@@ -39,7 +39,8 @@ sitede **sunucu anahtarıyla** AI çağırması; anahtarsız ziyaretçinin bir h
   `ZiyaretciKullaniciBaglami` **fail-closed**: kimlik yoksa hata, asla `yerel`'e düşmez. Hiçbir uç dışarıdan
   `kullanici_id` almaz; ADR-0008'den beri var olan `kullanici_id` izolasyonu aynen kullanılır.
 - `ziyaretci(id, olusturma, son_gorulme)` tablosu; satır **yalnız ilk yazmada** açılır (salt bakan ziyaretçi
-  veritabanında iz bırakmaz), `son_gorulme` en çok günde bir güncellenir.
+  veritabanında iz bırakmaz), `son_gorulme` en çok günde bir güncellenir — satırı olan ziyaretçinin salt okuyan
+  `GET /api/**` istekleri de tazeler (satır açmadan), yani "180 gün gelmeyen" gerçekten gelmeyendir.
 - **İlerleme kodu:** `GET /api/ziyaretci/kod` kimliği gösterir; `POST /api/ziyaretci/geri-yukle {kod}` biçimi
   geçerli **ve** `ziyaretci` tablosunda kayıtlı kodu çereze yazar (biçimsiz → 400, kayıtsız → 422). Bu
   tarayıcının önceki ilerlemesi birleştirilmez, üzerine geçilir (ön yüz onaylatır). Kod şifre gibidir.
@@ -101,14 +102,18 @@ sohbet geçmişi çalışır. Yerel mod hepsini sunucu anahtarıyla eskisi gibi 
 ### 7. Kötüye kullanım sınırları *(uygulayıcı kararı)*
 Girişsiz sitede bir betik her istekte yeni çerezle sınırsız satır üretmesin, sunucu "açık vekil" olmasın:
 yazan istekler (`POST/PUT/DELETE /api/**`) IP başına 60/dk; sohbet ziyaretçi başına 20/dk; `geri-yukle` IP
-başına 10/saat; yeni ziyaretçi satırı IP başına 20/saat. Aşımda 429 `{"hata": …}`. Mesaj uzunluk sınırları,
+başına 10/saat; yeni ziyaretçi satırı IP başına 20/saat. Aşımda 429 `{"hata": …}` + `Retry-After` başlığı (en
+uzun kalan pencere süresi, saniye, en az 1). Dört sayı `APP_SITE_HIZ_*` ortam değişkenleriyle ayarlanabilir (tek
+NAT arkasındaki sınıf/ofis için; `docs/kurulum-site.md` §7.6), pencereler sabit. Mesaj uzunluk sınırları,
 sistem prompt'u ve model sabit.
 
 ### 8. 180 gün temizliği — ShedLock YOK (bilinçli sapma) *(uygulayıcı kararı)*
 Her gece 03:30 (`@Scheduled`) `son_gorulme`'si 180 günden eski ziyaretçilerin tüm satırları (görev, gönderim,
 quiz, sohbet, mülakat, `ai_kullanim`, `ziyaretci`) ve kişisel `data/hafiza`/`data/raporlar` dizinleri silinir;
-ziyaretçi başına **tek okuma-yazma işlemi** (PostgreSQL salt-okunur işlemde DELETE'i reddeder; `ziyaretci`
-satırı en son silinir — hata olursa üçü birden geri alınır, sonraki gece yeniden denenir).
+ziyaretçi başına **tek okuma-yazma işlemi** (PostgreSQL salt-okunur işlemde DELETE'i reddeder). İşlemin ilk
+adımı `ziyaretci` satırını **yaş yeniden denetlenerek** siler (`… AND son_gorulme < eşik`): listeleme ile silme
+arasında geri dönen ziyaretçide 0 satır → işlem geri alınır, hiçbir verisi/dosyası silinmez. Sonraki adımlardan
+biri hata verirse de hepsi birden geri alınır, sonraki gece yeniden denenir.
 Ekip standardı her `@Scheduled` işe `@SchedulerLock` ister (çok pod). **Burada uygulanmadı**, gerekçe:
 site tek JVM'dir (systemd, tek örnek — `deploy/ai-ogretmen-site.service`; Docker/k8s yok) ve iş **idempotenttir**
 (iki kez çalışsa ikinci tur silinecek satır bulamaz, zarar yok). ShedLock yeni bağımlılık + kilit tablosu
@@ -121,13 +126,17 @@ demekti; kazancı yok. Site birden çok örneğe çıkarsa bu karar yeniden aç�
 - **İlerleme kodu ilk yazmadan önce çalışmaz:** satır yalnız ilk yazmada açıldığından, henüz hiçbir şey
   işaretlememiş birinin kodu başka tarayıcıda 422 ("kayıtlı ilerleme bulunamadı") verir. Kabul edildi: kaydedecek
   ilerleme yok.
-- **Sahipsiz hafıza dizini kalabilir:** temizlikte dosya silme başarısız olursa (izin, disk) veritabanı satırları
-  yine silinir ve dizin `data/hafiza` altında kalabilir. Veritabanı yetkilidir (dizine yeni bir ziyaretçi
-  ulaşamaz — kimlik rastgele). Bilinen sınırlama; logda uyarı görünür.
+- **Silinemeyen kişisel dizin, satırları da bekletir:** temizlikte ziyaretçinin hafıza/rapor dizini silinemezse
+  (izin, disk) işlem geri alınır — veritabanı satırları ve `ziyaretci` satırı kalır, hata loglanır, sonraki gece
+  yeniden denenir; engel kalkınca hepsi birlikte silinir (yetim dizin kalmaz; tech-debt #16). Temizlik en eskiden
+  başlayarak 500'lük partilerle ilerler; sayfalama imleçlidir (keyset: önceki partinin son `(son_gorulme, id)`'sinden
+  sonrası) — o turda başarısız olan ya da arada geri dönen kimlik yeniden denenmez ve sayfayı kaydırmaz; tam bir
+  parti kalıcı başarısız olsa bile arkasındaki eski ziyaretçiler aynı turda silinir, imleç hep ilerlediği için
+  sonsuz döngü olmaz (tech-debt #17, son inceleme 2026-11-25). Geri dönen ziyaretçi hata sayılmaz ("atlanan").
 - **Hız sınırları JVM başına bellekte:** yeniden başlatmada sıfırlanır, birden çok örnek arasında paylaşılmaz.
   Tek örnekli site için yeterli; çok örneğe çıkılırsa ortak depo gerekir.
-- **`SitePostgresEntegrasyonTest` 2026-11-25'te yerel PostgreSQL 14.15'e karşı 5/5 geçti** (atılabilir
-  veritabanı, test sonrası silindi; ziyaretçi izolasyonu, ilerleme kodu ve 180 gün temizliği dahil). Test
+- **`SitePostgresEntegrasyonTest` 2026-11-25'te yerel PostgreSQL 14.15'e karşı 5/5 geçti**, son inceleme düzeltmelerinden
+  sonra da (`20ee07a`, imleçli temizlik sayfalaması dahil) yeniden koşuldu (atılabilir veritabanı, test sonrası silindi; ziyaretçi izolasyonu, ilerleme kodu ve 180 gün temizliği dahil). Test
   `PG_TEST_URL` yoksa atlanır; canlı sunucunun PostgreSQL sürümü farklıysa dağıtımdan önce orada da bir kez
   koşulmalı (`docs/kurulum-site.md` §9).
 

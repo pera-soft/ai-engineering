@@ -2,9 +2,11 @@
 
 > **Durum: TARİHSEL — Faz 9'da uygulandı.** Erteleme 2026-10-22'de kullanıcı isteğiyle kalktı;
 > çok kullanıcılı site `site` profili olarak hayata geçirildi. Güncel kararlar için:
-> [docs/exec-plans/active/faz-9-cok-kullanicili-site.md](exec-plans/active/faz-9-cok-kullanicili-site.md)
+> [docs/exec-plans/completed/faz-9-cok-kullanicili-site.md](exec-plans/completed/faz-9-cok-kullanicili-site.md)
 > ve [ADR-0012](adr/0012-cok-kullanicili-site-profili.md) (e-posta: ADR-0013, PostgreSQL: ADR-0014;
-> kurulum: [kurulum-site.md](kurulum-site.md)). Aşağıdaki metin 11 Tem 2026 tartışmasının notu
+> kurulum: [kurulum-site.md](kurulum-site.md)). **Faz 10 (2026-11-25) login modelini değiştirdi:** giriş/kayıt/ekip kodu/SMTP
+> kalktı, site girişsiz + ziyaretçinin kendi OpenRouter anahtarı — bkz. [ADR-0017](adr/0017-girissiz-site-ve-kendi-anahtarin.md).
+> Aşağıdaki metin 11 Tem 2026 tartışmasının notu
 > olarak olduğu gibi bırakıldı; "bugünkü durum" ve seçenekler o tarihe aittir ve artık güncel değildir.
 >
 > (Eski durum satırı: "ERTELENDİ (bilinçli). Önce tüm eğitim/müfredat bitirilecek, sonra sistemdeki

@@ -60,6 +60,38 @@ class SiteOnYuzIcerikTest {
         assertThat(karsilastir).isLessThan(sil); // silme yalnız karşılaştırmanın içinde
     }
 
+    /**
+     * Tech-debt #10: istek sürerken anahtar değişirse ({@code anahtarDegisti} paneli yeniden çizer, "düşünüyor…"
+     * düğümü ayrılır) geç gelen cevap/hata eski düğüme yazılmaz ve panele eklenmez; "anahtar nesli" karşılaştırılır,
+     * yerine tek satırlık görünür bilgi eklenir.
+     */
+    @Test
+    void eskiAnahtarinCevabiYeniPaneleEklenmez() throws IOException {
+        String app = oku("app.js");
+        int degisti = app.indexOf("function anahtarDegisti(");
+        assertThat(degisti).isPositive();
+        assertThat(app.substring(degisti, app.indexOf("\n}", degisti))).contains("anahtarNesli++");
+
+        int gonder = app.indexOf("async function gonder(");
+        String govde = app.substring(gonder, app.indexOf("\n}", gonder));
+        assertThat(govde).contains("const anahtarNesil = anahtarNesli;");
+        int basariKontrol = govde.indexOf("anahtarNesil !== anahtarNesli");
+        assertThat(basariKontrol).as("başarı yolunda nesil kontrolü").isPositive()
+                .isLessThan(govde.indexOf("mesajEkle(\"asistan\", yanit.icerik)"));
+        int hataDali = govde.indexOf("} catch (h) {");
+        assertThat(govde.indexOf("anahtarNesil !== anahtarNesli", hataDali)).as("hata yolunda nesil kontrolü")
+                .isGreaterThan(hataDali);
+        assertThat(govde).doesNotContain("Hata (önceki anahtarla gönderilen mesaj)");
+        // son inceleme #8: başarılı cevap sunucuda kaydedildi → "sohbet geçmişinde görünecek"; hata yolunda değil
+        assertThat(govde.indexOf("eskiAnahtarBilgisi(true)")).as("başarı yolu").isPositive().isLessThan(hataDali);
+        assertThat(govde.indexOf("eskiAnahtarBilgisi(false)", hataDali)).as("hata yolu").isGreaterThan(hataDali);
+        int bilgi = app.indexOf("function eskiAnahtarBilgisi(");
+        assertThat(bilgi).isPositive();
+        assertThat(app.substring(bilgi, app.indexOf("\n}", bilgi)))
+                .contains("Önceki anahtarla gönderilen mesajın cevabı burada gösterilmedi; sohbet geçmişinde görünecek.")
+                .contains("Önceki anahtarla gönderilen mesajın cevabı gösterilmedi.");
+    }
+
     /** Anahtar hataları mesaj metniyle değil, sunucunun kararlı {@code neden} koduyla ayırt edilir. */
     @Test
     void anahtarHatasiNedenKoduylaAyirtEdilir() throws IOException {
